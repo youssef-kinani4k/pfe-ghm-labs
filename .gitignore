@@ -1,0 +1,26 @@
+# Secrets et config locale
+.env
+*.local
+
+# Backend (Maven / Java)
+backend/target/
+*.class
+*.log
+
+# Frontend (Node / Angular)
+node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# OS
+.DS_Store
+Thumbs.db

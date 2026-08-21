@@ -1,0 +1,10 @@
+logging:
+  level:
+    com.leadflow: DEBUG
+    org.springframework.amqp: INFO
+    org.hibernate.SQL: DEBUG
+
+management:
+  endpoint:
+    health:
+      show-details: always
