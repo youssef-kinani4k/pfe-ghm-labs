@@ -44,6 +44,10 @@ management:
       show-details: when-authorized
 
 leadflow:
+  security:
+    # Cle AES-256 en base64 sur 32 octets. Aucune valeur de repli : l'application
+    # doit refuser de demarrer plutot que de chiffrer avec une cle devinable.
+    master-key: ${LEADFLOW_MASTER_KEY:}
   webhook:
     # Secret partage avec les sites clients pour signer le payload (HMAC-SHA256).
     hmac-secret: ${WEBHOOK_HMAC_SECRET:change-me-in-env}

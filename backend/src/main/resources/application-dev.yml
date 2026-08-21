@@ -8,3 +8,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+leadflow:
+  security:
+    # Cle fixe de developpement. Elle rend reproductibles les valeurs chiffrees du
+    # jeu de demonstration. Ne jamais l'utiliser hors du poste de developpement.
+    master-key: gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=
