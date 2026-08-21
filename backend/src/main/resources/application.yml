@@ -61,6 +61,7 @@ leadflow:
         connect-timeout: 5s
         read-timeout: 15s
       odoo:
-        enabled: false
+        # Adaptateur ecrit en F5 : le connecteur est desormais utilisable.
+        enabled: true
         connect-timeout: 5s
         read-timeout: 15s
