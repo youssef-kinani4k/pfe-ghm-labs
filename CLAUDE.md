@@ -110,14 +110,16 @@ responsabilite — le lire avant d'ajouter du code dedans.
 - `routing/` — selection du commercial, notifications.
 - `crm/` — port de sortie vers les ERP/CRM (voir la section dediee plus bas).
 - `monitoring/` — API REST du dashboard.
-- `common/` — exceptions, gestion d'erreurs REST, types partages.
+- `tenant/` — donnees de reference multi-tenant : client et commerciaux. Seul package qui
+  ne soit pas une etape du pipeline ; il porte ce qui parametre toutes les etapes.
+- `common/` — exceptions, gestion d'erreurs REST, chiffrement des secrets, types partages.
 - `config/` — beans Spring et proprietes typees.
 
 ### Configuration
 
 `application.yml` ne contient aucun secret en dur : tout passe par des variables
-d'environnement avec valeur de repli pour le dev (`${DOLIBARR_API_KEY:}`). Les nouveaux
-reglages metier vont sous le prefixe `leadflow.*` et se lisent via un `record`
+d'environnement (`${LEADFLOW_MASTER_KEY:}`). Les nouveaux reglages metier vont sous le
+prefixe `leadflow.*` et se lisent via un `record`
 `@ConfigurationProperties` place dans `config/` — `@ConfigurationPropertiesScan` est actif
 sur `BackendApplication`, aucun enregistrement manuel n'est necessaire.
 
@@ -128,10 +130,37 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Seule `V1__raw_lead_event.sql` existe pour l'instant (journal de capture). Le schema metier
-— lead qualifie, commercial, trace de synchronisation — reste a ecrire. La table de trace
-devra porter le `provider_id` et les references renvoyees par l'ERP : un meme lead peut etre
-pousse vers des fournisseurs differents selon le client.
+Deux migrations existent : `V1__raw_lead_event.sql` (journal de capture) et
+`V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
+`crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`). Le schema est
+desormais complet : les features suivantes ne devraient plus avoir a le modifier.
+
+Sous le profil `dev`, `spring.flyway.locations` inclut en plus `classpath:db/dev`, qui
+contient `R__demo_data.sql` — un client de demonstration et ses commerciaux. La production
+ne charge jamais ce dossier.
+
+### Multi-tenant et secrets
+
+Chaque client (table `client`) porte son secret HMAC, l'identifiant de son connecteur ERP
+et les parametres de connexion a **son** instance ERP. Rien de tout cela n'est dans
+`application.yml` : ajouter un client est une insertion en base, pas un redeploiement.
+
+Le webhook identifie le client par une cle publique placee dans l'URL
+(`/api/webhooks/leads/{clientKey}`, colonne `client.public_key`). Cette cle n'est pas
+secrete — c'est la signature qui authentifie — et elle est distincte de la cle primaire
+pour pouvoir etre revoquee sans recreer la ligne.
+
+`client.hmac_secret` et `client.crm_config` sont **chiffres au repos** en AES-256-GCM par
+`common/SecretCipher` et deux `AttributeConverter` (`EncryptedStringConverter`,
+`EncryptedJsonConverter`). La cle maitre vient de `LEADFLOW_MASTER_KEY` et n'est jamais en
+base ; sa perte rend les secrets irrecuperables. Les converters sont des `@Component` :
+ils recoivent `SecretCipher` par injection grace au `SpringBeanContainer` que Spring Boot
+installe dans Hibernate. En consequence, **les tests de persistance utilisent
+`@SpringBootTest` et non `@DataJpaTest`**, dont la tranche n'inclut pas les `@Component`.
+
+`client.crm_config` est un document JSON chiffre plutot que des colonnes plates : ajouter
+un ERP reclamant un reglage inedit ne doit demander ni migration ni modification d'entite.
+Le prix assume est qu'il n'est pas requetable en SQL.
 
 ### Messaging
 
@@ -148,9 +177,10 @@ d'attente » du dashboard doit s'appuyer dessus.
 
 ```
 crm/
-├── CrmConnector.java          port : providerId() + sync(CrmLead)
+├── CrmConnector.java          port : providerId() + sync(CrmLead, CrmTarget)
 ├── CrmConnectorRegistry.java  resout l'adaptateur par providerId
-├── model/                     modele pivot : CrmLead, CrmSyncResult, CrmSyncException
+├── CrmSyncAttempt.java        trace append-only des synchronisations
+├── model/                     modele pivot : CrmLead, CrmTarget, CrmSyncResult, CrmSyncException
 ├── dolibarr/                  adaptateur REST
 └── odoo/                      adaptateur JSON-RPC
 ```
@@ -176,10 +206,18 @@ Contact en deux endpoints, alors qu'Odoo met les deux dans `res.partner` disting
 n'y a aucune liste de fournisseurs a maintenir a la main, et aucun `switch` sur le nom de
 l'ERP a ajouter quelque part.
 
-`CrmProperties.Provider` est volontairement un record commun dont **tous les champs ne
-concernent pas tous les ERP** : `apiKey` suffit a Dolibarr, Odoo exige en plus `database` et
-`username`. Chaque adaptateur valide ce dont il a besoin a son demarrage plutot que d'imposer
-un schema de configuration commun artificiel.
+`sync` prend un `CrmTarget(providerId, settings)` decrivant **l'instance** ERP visee, car
+deux clients sur le meme type d'ERP ont chacun leur serveur. Les cles de `settings`
+viennent de `client.crm_config` et sont interpretees par l'adaptateur seul.
+
+Il n'y a **pas de connecteur par defaut** : tout lead appartient a un client, et tout
+client nomme son fournisseur. `CrmConnectorRegistry.defaultConnector()` et la propriete
+`leadflow.crm.default-provider` ont ete supprimees.
+
+`leadflow.crm.providers.<provider>` ne porte donc que des reglages **techniques** communs a
+toutes les instances d'un meme fournisseur (`enabled`, `connect-timeout`, `read-timeout`).
+Tout ce qui depend du client — URL, cle d'API, base, utilisateur — vit dans `crm_config`
+sur la ligne `client`, chiffre.
 
 ### Securite
 
@@ -218,13 +256,14 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le squelette compile de bout en bout, mais **la logique metier n'est pas implementee**.
+Le squelette compile de bout en bout et **le modele de donnees est complet** (F1 livree).
 
-Ce qui existe reellement : la configuration (Rabbit, Security, proprietes typees), le port
-`CrmConnector`, son registre et le modele pivot. Ce qui n'existe pas : **aucun adaptateur ERP
-n'est encore ecrit** — `crm/dolibarr/` et `crm/odoo/` ne contiennent que leur
-`package-info.java`, donc `CrmConnectorRegistry` resout actuellement sur un registre vide et
-`defaultConnector()` leve une `IllegalArgumentException`. Meme chose pour `capture`,
-`qualification`, `routing` et `monitoring`, et les quatre composants de `features/` sont des
-placeholders. Ne pas supposer l'existence d'entites, de services ou d'endpoints — verifier
-avant de referencer.
+Ce qui existe : la configuration (Rabbit, Security, proprietes typees), le chiffrement des
+secrets, les cinq entites et leurs repositories, les migrations `V1` et `V2`, le port
+`CrmConnector` et son registre, le modele pivot.
+
+Ce qui n'existe pas : **aucun comportement au runtime**. Pas d'endpoint webhook, pas de
+consommateur RabbitMQ, aucun adaptateur ERP — `crm/dolibarr/` et `crm/odoo/` ne contiennent
+que leur `package-info.java` — et les quatre composants de `features/` sont des
+placeholders. Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de
+referencer.
