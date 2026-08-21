@@ -62,9 +62,11 @@ public class CrmSyncService {
         CrmConnector connector = registry.forProvider(client.getCrmProviderId());
         CrmTarget cible = new CrmTarget(client.getCrmProviderId(), client.getCrmConfig());
         CrmSyncState anterieur = etatAnterieur(leadId, client.getCrmProviderId());
-        String assigneeRef = referenceDuCommercial(lead, connector, cible);
 
         try {
+            // Dans le try : resolveAssignee appelle l'ERP, et une instance injoignable doit
+            // laisser une ligne FAILED exploitable plutot que de disparaitre sans trace.
+            String assigneeRef = referenceDuCommercial(lead, connector, cible);
             CrmSyncResult resultat = connector.sync(versPivot(lead, assigneeRef), cible, anterieur);
             trace.succes(leadId, resultat);
             return resultat;

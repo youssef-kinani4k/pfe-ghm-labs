@@ -37,6 +37,16 @@ public class DolibarrConnector implements CrmConnector {
         return DolibarrClient.PROVIDER_ID;
     }
 
+    /**
+     * <b>Limitation connue.</b> Si {@code lieResponsable} echoue apres la creation de
+     * l'opportunite, l'etat partiel porte deja la reference de celle-ci : au rejeu, tout le
+     * bloc est saute et l'opportunite reste sans chef de projet, sans que rien ne le signale.
+     * {@link CrmSyncState} n'a pas de logement pour cette quatrieme etape — il modelise
+     * l'idempotence comme trois references connues, ce qui suffit tant qu'une
+     * synchronisation se decompose en trois creations. Le jour ou un ERP en apportera une
+     * quatrieme, la bonne reponse sera une carte de references par etape plutot qu'un champ
+     * de plus. Decision reportee a F3, quand le consommateur de file sera cable.
+     */
     @Override
     public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {
         String compte = previous.accountRef();

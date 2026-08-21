@@ -47,6 +47,7 @@ class CrmSyncServiceTest {
         CrmSyncState etatRecu;
         CrmAssignee assigneeRecu;
         boolean echoue;
+        boolean echoueSurLeCommercial;
 
         /**
          * Fournisseur qui n'existe que pour ce test : deux connecteurs ne peuvent pas
@@ -72,6 +73,9 @@ class CrmSyncServiceTest {
         @Override
         public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
             this.assigneeRecu = assignee;
+            if (echoueSurLeCommercial) {
+                throw new CrmSyncException("espion", "instance injoignable", null);
+            }
             return "U-9";
         }
     }
@@ -99,6 +103,7 @@ class CrmSyncServiceTest {
     @BeforeEach
     void preparerUnLeadComplet() {
         connecteur.echoue = false;
+        connecteur.echoueSurLeCommercial = false;
         connecteur.assigneeRecu = null;
 
         Client client = new Client();
@@ -205,6 +210,26 @@ class CrmSyncServiceTest {
         assertThat(tentatives.getFirst().getContactRef()).isEqualTo("C-1");
         assertThat(tentatives.getFirst().getOpportunityRef()).isNull();
         assertThat(tentatives.getFirst().getErrorMessage()).contains("opportunite refusee");
+        assertThat(leadRepository.findById(leadId).orElseThrow().getStatus())
+                .isEqualTo(LeadStatus.FAILED);
+    }
+
+    @Test
+    void traceLEchecQuandLERPEstInjoignableDesLaResolutionDuCommercial() {
+        // resolveAssignee appelle l'ERP : une instance injoignable a ce moment-la doit
+        // laisser la meme trace FAILED qu'un echec pendant sync, sans quoi le lead reste
+        // ROUTED et disparait des ecrans de suivi.
+        connecteur.echoueSurLeCommercial = true;
+
+        assertThatThrownBy(() -> service.synchronise(leadId))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("instance injoignable");
+
+        List<CrmSyncAttempt> tentatives =
+                attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, "espion");
+        assertThat(tentatives).hasSize(1);
+        assertThat(tentatives.getFirst().getStatus()).isEqualTo(CrmSyncAttemptStatus.FAILED);
+        assertThat(tentatives.getFirst().getErrorMessage()).contains("instance injoignable");
         assertThat(leadRepository.findById(leadId).orElseThrow().getStatus())
                 .isEqualTo(LeadStatus.FAILED);
     }

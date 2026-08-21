@@ -1,34 +1,39 @@
 package com.leadflow.crm;
 
 import com.leadflow.config.CrmProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * Un {@code RestClient.Builder} par fournisseur, portant ses propres delais.
+ * Fabrique de {@code RestClient.Builder}, un par fournisseur, portant ses propres delais.
+ *
+ * <p>Volontairement <b>sans bean nomme par fournisseur</b> : le builder se demande par cle,
+ * si bien qu'ajouter un ERP ne demande rien ici. C'est ce qui maintient l'invariant des
+ * trois gestes — un sous-package, un {@code @Component} implementant {@code CrmConnector},
+ * une entree {@code leadflow.crm.providers.<provider>}.
  *
  * <p>Les timeouts sont poses ici et non dans l'adaptateur : un test peut ainsi injecter un
  * builder nu branche sur {@code MockRestServiceServer} sans que la fabrique de requetes de
  * production interfere. L'URL de l'instance n'est pas connue a ce stade — elle vient de la
  * ligne client — donc aucun {@code baseUrl} n'est fixe ici.
  */
-@Configuration
+@Component
 public class CrmHttpConfig {
 
-    @Bean
-    RestClient.Builder dolibarrRestClientBuilder(CrmProperties properties) {
-        return RestClient.builder().requestFactory(requestFactory(properties, "dolibarr"));
+    private final CrmProperties properties;
+
+    public CrmHttpConfig(CrmProperties properties) {
+        this.properties = properties;
     }
 
-    @Bean
-    RestClient.Builder odooRestClientBuilder(CrmProperties properties) {
-        return RestClient.builder().requestFactory(requestFactory(properties, "odoo"));
+    /** @throws IllegalStateException si le fournisseur n'a aucune entree de configuration. */
+    public RestClient.Builder builderPour(String providerId) {
+        return RestClient.builder().requestFactory(requestFactory(providerId));
     }
 
-    static ClientHttpRequestFactory requestFactory(CrmProperties properties, String providerId) {
+    private ClientHttpRequestFactory requestFactory(String providerId) {
         CrmProperties.Provider provider =
                 properties.providers() == null ? null : properties.providers().get(providerId);
         if (provider == null) {

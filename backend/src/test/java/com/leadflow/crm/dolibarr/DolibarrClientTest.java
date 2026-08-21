@@ -79,6 +79,8 @@ class DolibarrClientTest {
         assertThatThrownBy(() -> client.creeTiers(CIBLE, Map.of("name", "Acme")))
                 .isInstanceOf(CrmSyncException.class)
                 .hasMessageContaining("thirdparties")
+                // Le corps de la reponse est la seule information exploitable dans la trace.
+                .hasMessageContaining("champ manquant")
                 .hasMessageNotContaining("cle-de-test");
     }
 

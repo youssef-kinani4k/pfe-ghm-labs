@@ -51,6 +51,19 @@ class OdooClientTest {
     }
 
     @Test
+    void refuseUneCreationSansIdentifiant() {
+        // Reponse tronquee ou proxy intercale : ni result, ni error. Rendre null ferait
+        // passer le lead en SYNCED avec une reference vide.
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andRespond(withSuccess(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.cree(CIBLE, 7, "res.partner", Map.of("name", "Acme")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("res.partner.create");
+    }
+
+    @Test
     void refuseUneAuthentificationSansUid() {
         serveur.expect(requestTo("http://odoo.test/jsonrpc"))
                 .andRespond(withSuccess(

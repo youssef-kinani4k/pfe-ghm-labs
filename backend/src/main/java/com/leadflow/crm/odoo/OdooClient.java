@@ -1,12 +1,13 @@
 package com.leadflow.crm.odoo;
 
+import com.leadflow.crm.CrmHttpConfig;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmTarget;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -28,7 +29,13 @@ public class OdooClient {
 
     private final RestClient.Builder builder;
 
-    public OdooClient(@Qualifier("odooRestClientBuilder") RestClient.Builder builder) {
+    @Autowired
+    public OdooClient(CrmHttpConfig http) {
+        this(http.builderPour(PROVIDER_ID));
+    }
+
+    /** Constructeur des tests : un builder nu, branche sur {@code MockRestServiceServer}. */
+    public OdooClient(RestClient.Builder builder) {
         this.builder = builder;
     }
 
@@ -50,7 +57,14 @@ public class OdooClient {
         Map<String, Object> reponse =
                 executeKw(target, uid, modele, "create", List.of(List.of(champs)));
         Object identifiant = resultat(reponse, modele + ".create");
-        return identifiant == null ? null : String.valueOf(identifiant);
+        // Un corps sans « result » ni « error » — reponse tronquee, proxy intercale — rendrait
+        // null, et le lead finirait SYNCED avec une reference vide. Odoo cree toujours un
+        // entier : tout le reste est un echec, y compris le « false » que rend un appel refuse.
+        if (!(identifiant instanceof Number nombre)) {
+            throw new CrmSyncException(
+                    PROVIDER_ID, "Odoo n'a renvoye aucun identifiant sur " + modele + ".create", null);
+        }
+        return String.valueOf(nombre.longValue());
     }
 
     /**

@@ -1,10 +1,11 @@
 package com.leadflow.crm.dolibarr;
 
+import com.leadflow.crm.CrmHttpConfig;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmTarget;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -23,9 +24,18 @@ public class DolibarrClient {
 
     static final String PROVIDER_ID = "dolibarr";
 
+    /** Au-dela, c'est une page d'erreur du serveur et non un diagnostic. */
+    private static final int MESSAGE_MAX = 500;
+
     private final RestClient.Builder builder;
 
-    public DolibarrClient(@Qualifier("dolibarrRestClientBuilder") RestClient.Builder builder) {
+    @Autowired
+    public DolibarrClient(CrmHttpConfig http) {
+        this(http.builderPour(PROVIDER_ID));
+    }
+
+    /** Constructeur des tests : un builder nu, branche sur {@code MockRestServiceServer}. */
+    public DolibarrClient(RestClient.Builder builder) {
         this.builder = builder;
     }
 
@@ -121,7 +131,21 @@ public class DolibarrClient {
         return valeur;
     }
 
+    /**
+     * Le message de la cause est repris dans celui de l'exception : {@code error_message} de
+     * la trace ne recoit que {@code getMessage()}, et sans lui l'exploitant sait qu'un appel
+     * a echoue sans jamais savoir lequel des champs Dolibarr a ete refuse. Tronque parce
+     * qu'un serveur en erreur peut repondre une page HTML entiere.
+     *
+     * <p>Sans risque pour les secrets : la cle voyage dans l'en-tete {@code DOLAPIKEY}, et
+     * {@code RestClientResponseException} ne porte que le corps de la reponse.
+     */
     private CrmSyncException echec(String chemin, Exception cause) {
-        return new CrmSyncException(PROVIDER_ID, "Appel Dolibarr en echec sur " + chemin, cause);
+        String detail = cause == null ? null : cause.getMessage();
+        String message = "Appel Dolibarr en echec sur " + chemin;
+        if (detail != null && !detail.isBlank()) {
+            message += " : " + (detail.length() > MESSAGE_MAX ? detail.substring(0, MESSAGE_MAX) : detail);
+        }
+        return new CrmSyncException(PROVIDER_ID, message, cause);
     }
 }

@@ -192,7 +192,7 @@ crm/
 ├── CrmConnectorRegistry.java  resout l'adaptateur par providerId, applique `enabled`
 ├── CrmSyncService.java        orchestration : cible, etat anterieur, trace
 ├── CrmSyncTraceWriter.java    ecriture de la trace en transaction propre
-├── CrmHttpConfig.java         un RestClient.Builder par fournisseur, avec ses delais
+├── CrmHttpConfig.java         builderPour(providerId) : un RestClient.Builder par ERP, avec ses delais
 ├── CrmSyncAttempt.java        trace append-only des synchronisations
 ├── model/                     modele pivot : CrmLead, CrmTarget, CrmSyncState, CrmAssignee, ...
 ├── dolibarr/                  adaptateur REST : DolibarrConnector + DolibarrClient
@@ -229,6 +229,17 @@ obtenues lors des tentatives precedentes — et saute toute etape dont la refere
 connue. C'est la, et nulle part ailleurs, que se joue l'absence de doublon au rejeu. En cas
 d'echec partiel, il leve une `CrmSyncException` enrichie de ce qu'il avait obtenu, sans
 quoi le rejeu recreerait ce qui existe deja.
+
+Deux limitations connues vivent dans cette modelisation, documentees dans le Javadoc de
+`DolibarrConnector` : le rattachement du responsable Dolibarr n'a pas de logement dans
+`CrmSyncState` — s'il echoue apres la creation de l'opportunite, le rejeu saute l'etape sans
+le signaler — et la `ref` d'opportunite est tiree au hasard faute de reference de lead dans
+le pivot. Les deux appellent la meme decision : elargir le pivot, ou passer d'un triplet de
+references a une carte par etape. Elle se prendra avec F3, quand le consommateur de file
+dira ce qu'il peut fournir comme identifiant.
+
+Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
+`docs/erp-integration-setup.md`.
 
 `CrmSyncService` porte tout ce qui est propre a LeadFlow : resolution de `CrmTarget` depuis
 `client.crm_config` dechiffre, reconstruction de l'etat anterieur (valeur non nulle la plus

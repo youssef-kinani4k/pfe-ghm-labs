@@ -66,12 +66,16 @@ class ErpIntegrationTest {
         assertThat(premier.contactRef()).isNotBlank();
         assertThat(premier.opportunityRef()).isNotBlank();
 
-        CrmSyncResult rejeu = connecteur.sync(lead, cibleDolibarr(), new CrmSyncState(
-                premier.accountRef(), premier.contactRef(), premier.opportunityRef()));
+        // Rejeu partiel : seul le tiers est connu. C'est le seul scenario qu'un vrai ERP
+        // peut departager — avec l'etat complet, l'adaptateur sort sans le moindre appel et
+        // l'assertion serait vraie sans conteneur. Ici Dolibarr doit accepter le socid
+        // reutilise et rendre un contact et une opportunite neufs.
+        CrmSyncResult rejeu = connecteur.sync(lead, cibleDolibarr(),
+                new CrmSyncState(premier.accountRef(), null, null));
 
         assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
-        assertThat(rejeu.contactRef()).isEqualTo(premier.contactRef());
-        assertThat(rejeu.opportunityRef()).isEqualTo(premier.opportunityRef());
+        assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());
+        assertThat(rejeu.opportunityRef()).isNotBlank().isNotEqualTo(premier.opportunityRef());
     }
 
     @Test
@@ -86,9 +90,13 @@ class ErpIntegrationTest {
         assertThat(premier.contactRef()).isNotBlank();
         assertThat(premier.opportunityRef()).isNotBlank();
 
-        CrmSyncResult rejeu = connecteur.sync(lead, cibleOdoo(), new CrmSyncState(
-                premier.accountRef(), premier.contactRef(), premier.opportunityRef()));
+        // Meme raisonnement que pour Dolibarr : le rejeu part de la seule societe connue, et
+        // Odoo doit accepter le parent_id d'une res.partner existante.
+        CrmSyncResult rejeu = connecteur.sync(lead, cibleOdoo(),
+                new CrmSyncState(premier.accountRef(), null, null));
 
-        assertThat(rejeu.opportunityRef()).isEqualTo(premier.opportunityRef());
+        assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
+        assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());
+        assertThat(rejeu.opportunityRef()).isNotBlank().isNotEqualTo(premier.opportunityRef());
     }
 }

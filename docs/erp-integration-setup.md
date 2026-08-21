@@ -129,7 +129,28 @@ curl -s -X POST http://localhost:8069/jsonrpc -H 'Content-Type: application/json
 
 ---
 
-## 4. Variables d'environnement des tests
+## 4. Clés attendues dans `client.crm_config`
+
+`crm_config` est le document JSON chiffré porté par la ligne `client` : c'est lui, et non
+`application.yml`, qui décrit **l'instance** ERP du client. Les clés sont interprétées par
+l'adaptateur seul, qui refuse la synchronisation avec un message nommant la clé manquante.
+
+| Fournisseur | Clé | Rôle | Exemple |
+| --- | --- | --- | --- |
+| `dolibarr` | `baseUrl` | racine de l'API REST, `/api/index.php` compris | `http://localhost:8081/api/index.php` |
+| `dolibarr` | `apiKey` | valeur envoyée en en-tête `DOLAPIKEY` | `cle-de-sonde-leadflow` |
+| `odoo` | `baseUrl` | racine du serveur, sans `/jsonrpc` | `http://localhost:8069` |
+| `odoo` | `database` | base Odoo visée | `leadflow` |
+| `odoo` | `username` | login du compte de service | `admin` |
+| `odoo` | `apiKey` | mot de passe ou clé d'API de ce compte | `admin` |
+
+Les réglages **techniques** (`enabled`, `connect-timeout`, `read-timeout`) ne sont pas ici :
+ils vivent sous `leadflow.crm.providers.<fournisseur>` dans `application.yml`, car ils sont
+communs à toutes les instances d'un même ERP.
+
+---
+
+## 5. Variables d'environnement des tests
 
 ```bash
 export LEADFLOW_DOLIBARR_URL=http://localhost:8081/api/index.php
@@ -161,7 +182,7 @@ Relevé de la dernière exécution : `./mvnw verify -Perp-it` → **78 tests, 0 
 
 ---
 
-## 5. Repartir de zéro
+## 6. Repartir de zéro
 
 ```bash
 docker compose --profile dolibarr --profile odoo down -v
