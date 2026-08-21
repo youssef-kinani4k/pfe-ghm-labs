@@ -2817,7 +2817,7 @@ git commit -m "test: integration contre les ERP reels sous le profil erp-it"
 - Consumes : tout ce qui précède.
 - Produces : rien de logiciel.
 
-- [ ] **Step 1: Mettre à jour l'arborescence `crm/`**
+- [x] **Step 1: Mettre à jour l'arborescence `crm/`**
 
 Remplacer le bloc d'arborescence de la section « Connecteurs ERP/CRM » par :
 
@@ -2834,7 +2834,7 @@ crm/
 └── odoo/                      adaptateur JSON-RPC : OdooConnector + OdooClient
 ```
 
-- [ ] **Step 2: Documenter l'idempotence et la frontière des adaptateurs**
+- [x] **Step 2: Documenter l'idempotence et la frontière des adaptateurs**
 
 Ajouter, après le paragraphe sur `CrmTarget` :
 
@@ -2853,7 +2853,7 @@ la reprise appartient a la DLQ. La trace s'ecrit en `REQUIRES_NEW` pour survivre
 d'un appelant transactionnel.
 ```
 
-- [ ] **Step 3: Documenter les deux étages de test**
+- [x] **Step 3: Documenter les deux étages de test**
 
 Ajouter à la section « Backend — conventions », sous « Commandes » :
 
@@ -2870,7 +2870,7 @@ docker compose --profile dolibarr --profile odoo up -d
 ```
 ````
 
-- [ ] **Step 4: Mettre à jour « Etat actuel »**
+- [x] **Step 4: Mettre à jour « Etat actuel »**
 
 Remplacer la section par :
 
@@ -2890,7 +2890,7 @@ donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'existence d'
 ou d'un endpoint : verifier avant de referencer.
 ```
 
-- [ ] **Step 5: Recette complète**
+- [x] **Step 5: Recette complète**
 
 ```bash
 docker compose down -v
@@ -2912,7 +2912,7 @@ grep -rn "thirdparty\|res.partner\|crm.lead\|socid" backend/src/main/java/com/le
 
 Attendu : **aucun résultat**. Le modèle pivot est resté neutre.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add CLAUDE.md
@@ -2929,7 +2929,7 @@ Utiliser la compétence `superpowers:requesting-code-review` pour une revue de b
 
 ---
 
-## Etat a l'arret — 7 taches sur 9
+## Etat final — 9 taches sur 9
 
 | Tache | Commit | Etat |
 | --- | --- | --- |
@@ -2940,28 +2940,29 @@ Utiliser la compétence `superpowers:requesting-code-review` pour une revue de b
 | 5. Adaptateur Dolibarr | `a48d7b0` | faite |
 | 6. Transport Odoo | `740c242` | faite |
 | 7. Adaptateur Odoo | `b29688c` | faite |
-| 8. Tests d'integration reels | — | **a faire** |
-| 9. CLAUDE.md et recette | — | a faire |
+| 8. Tests d'integration reels | `c4ac099` | faite |
+| 9. CLAUDE.md et recette | ce commit | faite |
 
-**Point de reprise : BASE `b29688c`, branche `feature/f5-connecteurs-erp`, reprendre a la
-tache 8.** Suite au vert : **76 tests, 0 echec** (`./mvnw test` depuis `backend/`, Docker
-requis).
+Recette : `./mvnw verify` -> **76 tests, 0 echec** ; `./mvnw verify -Perp-it`, conteneurs
+Dolibarr et Odoo montes -> **78 tests, 0 echec**. Le modele pivot est reste neutre (le seul
+resultat du grep est la phrase de `model/package-info.java` qui enonce la regle).
 
-### Ce qu'une session repartant a froid doit savoir
+Ecarts assumes en cours de route, tous documentes dans les commits concernes :
 
-- **Tout le code de F5 est ecrit et teste.** Il reste la verification contre les vrais ERP
-  (tache 8) et la documentation (tache 9). Les deux sont independantes du reste.
-- **La sonde a deja eu lieu** : son releve est le §15 de la spec, et la mise en route des
-  conteneurs suit `docs/erp-integration-setup.md` — pas la peine de re-explorer les API.
-  Sans l'activation prealable des modules `Societe` et `Projet`, Dolibarr repond `403` a
-  toute creation, et le module `crm` d'Odoo s'installe en ligne de commande, pas en JSON-RPC.
-- **Deux ecarts avec le plan initial ont ete assumes en cours de route**, tous deux
-  documentes dans les commits concernes :
-  1. `CrmConnectorRegistry` nomme desormais le conflit quand deux connecteurs declarent le
-     meme `providerId` (tache 5) ;
-  2. `CrmSyncServiceTest` se donne son propre fournisseur `espion`, active par une propriete
-     de test, l'adaptateur Dolibarr reel occupant la cle `dolibarr` dans le contexte.
-- **Question encore ouverte, sans urgence** : la `ref` d'opportunite Dolibarr est tiree au
-  hasard (`LF-XXXXXXXX`) faute d'identifiant de lead dans le pivot. Le raisonnement est dans
-  le Javadoc de `DolibarrConnector.reference()`. Une `ref` stable demanderait d'ajouter une
-  reference de lead au modele pivot — decision a prendre avec l'utilisateur, pas seul.
+1. `CrmConnectorRegistry` nomme le conflit quand deux connecteurs declarent le meme
+   `providerId` (tache 5) ;
+2. `CrmSyncServiceTest` se donne son propre fournisseur `espion`, active par une propriete
+   de test, l'adaptateur Dolibarr reel occupant la cle `dolibarr` dans le contexte ;
+3. la cle d'API Dolibarr est lue avec une valeur par defaut vide dans `ErpIntegrationTest`,
+   `Map.of` refusant une valeur nulle quand la variable d'environnement n'est pas posee ;
+4. la recette n'a pas rejoue `docker compose down -v` : la suite tourne sur Testcontainers
+   et non sur la base de `docker-compose.yml`, et l'effacement des volumes aurait detruit
+   l'installation Dolibarr / Odoo verifiee a la tache 8.
+
+**Question encore ouverte, sans urgence** : la `ref` d'opportunite Dolibarr est tiree au
+hasard (`LF-XXXXXXXX`) faute d'identifiant de lead dans le pivot. Le raisonnement est dans
+le Javadoc de `DolibarrConnector.reference()`. Une `ref` stable demanderait d'ajouter une
+reference de lead au modele pivot — decision a prendre avec l'utilisateur, pas seul.
+
+Reste : revue de branche, puis fusion de `feature/f5-connecteurs-erp` dans `main` sans
+supprimer la branche.
