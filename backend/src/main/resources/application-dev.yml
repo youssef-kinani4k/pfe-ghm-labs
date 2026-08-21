@@ -1,3 +1,8 @@
+spring:
+  flyway:
+    # Le jeu de demonstration s'ajoute aux migrations de schema, uniquement en dev.
+    locations: classpath:db/migration,classpath:db/dev
+
 logging:
   level:
     com.leadflow: DEBUG
@@ -8,3 +13,11 @@ management:
   endpoint:
     health:
       show-details: always
+
+leadflow:
+  security:
+    # Repli de developpement seulement : il rend reproductibles les valeurs chiffrees du
+    # jeu de demonstration. LEADFLOW_MASTER_KEY reste prioritaire, pour que lancer le
+    # profil dev contre une base partagee ne chiffre pas avec une cle publiee dans le
+    # depot. Ne jamais utiliser cette valeur de repli hors du poste de developpement.
+    master-key: ${LEADFLOW_MASTER_KEY:gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=}

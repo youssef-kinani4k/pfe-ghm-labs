@@ -44,27 +44,23 @@ management:
       show-details: when-authorized
 
 leadflow:
+  security:
+    # Cle AES-256 en base64 sur 32 octets. Aucune valeur de repli : l'application
+    # doit refuser de demarrer plutot que de chiffrer avec une cle devinable.
+    master-key: ${LEADFLOW_MASTER_KEY:}
   webhook:
-    # Secret partage avec les sites clients pour signer le payload (HMAC-SHA256).
-    hmac-secret: ${WEBHOOK_HMAC_SECRET:change-me-in-env}
     signature-header: X-Leadflow-Signature
     # Fenetre de tolerance anti-rejeu sur l'horodatage de la requete.
     tolerance: 5m
   crm:
-    # Fournisseur utilise quand le lead ne designe pas explicitement sa cible.
-    default-provider: ${CRM_DEFAULT_PROVIDER:dolibarr}
+    # Reglages techniques uniquement. L'URL et les identifiants de chaque instance ERP
+    # vivent sur la ligne client, chiffres.
     providers:
       dolibarr:
         enabled: true
-        base-url: ${DOLIBARR_BASE_URL:http://localhost:8081/api/index.php}
-        api-key: ${DOLIBARR_API_KEY:}
         connect-timeout: 5s
         read-timeout: 15s
       odoo:
         enabled: false
-        base-url: ${ODOO_BASE_URL:http://localhost:8069}
-        database: ${ODOO_DATABASE:leadflow}
-        username: ${ODOO_USERNAME:}
-        api-key: ${ODOO_API_KEY:}
         connect-timeout: 5s
         read-timeout: 15s
