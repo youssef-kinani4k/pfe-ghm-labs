@@ -1,5 +1,7 @@
-# Dependances locales du backend. `docker compose up -d` demarre Postgres + RabbitMQ ;
-# `docker compose --profile dolibarr up -d` ajoute une instance Dolibarr de test.
+# Dependances locales du backend. `docker compose up -d` demarre Postgres + RabbitMQ.
+# Les ERP de test sont derriere des profils, pour ne monter que celui dont on a besoin :
+#   docker compose --profile dolibarr up -d
+#   docker compose --profile odoo up -d
 services:
   postgres:
     image: postgres:16-alpine
@@ -66,8 +68,36 @@ services:
     volumes:
       - dolibarr-docs:/var/www/documents
 
+  odoo-db:
+    image: postgres:16-alpine
+    container_name: leadflow-odoo-db
+    profiles: ["odoo"]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+
+  odoo:
+    image: odoo:17
+    container_name: leadflow-odoo
+    profiles: ["odoo"]
+    depends_on:
+      - odoo-db
+    environment:
+      HOST: odoo-db
+      USER: odoo
+      PASSWORD: odoo
+    ports:
+      - "8069:8069"
+    volumes:
+      - odoo-data:/var/lib/odoo
+
 volumes:
   postgres-data:
   rabbitmq-data:
   dolibarr-db-data:
   dolibarr-docs:
+  odoo-db-data:
+  odoo-data:

@@ -17,5 +17,10 @@ export const routes: Routes = [
     title: "File d'attente",
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),
   },
+  {
+    path: 'connectors',
+    title: 'Connecteurs ERP',
+    loadComponent: () => import('./features/connectors/connectors').then((m) => m.Connectors),
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];

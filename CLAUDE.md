@@ -5,9 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Ce qu'est le projet
 
 LeadFlow est un **middleware asynchrone** entre les canaux marketing (formulaires web) et
-Dolibarr (ERP/CRM). Ce n'est pas un CRUD : c'est un pipeline de traitement de leads en
-quatre etapes, et l'architecture des deux projets suit ce decoupage. Comprendre le pipeline
-est le prerequis pour naviguer dans le code.
+les ERP/CRM du commerce (Dolibarr, Odoo, et d'autres a venir). Ce n'est pas un CRUD : c'est
+un pipeline de traitement de leads en quatre etapes, et l'architecture des deux projets suit
+ce decoupage. Comprendre le pipeline est le prerequis pour naviguer dans le code.
+
+Deuxieme invariant, aussi structurant que le premier : **aucun ERP n'est cable en dur**. Le
+pipeline parle a un port `CrmConnector` et a un modele pivot ; chaque ERP vit dans son
+propre adaptateur.
 
 ```
 Formulaire client
@@ -22,7 +26,10 @@ RabbitMQ  leadflow.leads  --(3 echecs)-->  leadflow.leads.dlq
 [qualification]  nettoyage . dedup . NLP intention . scoring
     |
     v
-[routing]  choix du commercial  -->  [dolibarr]  Tiers + Contact + Opportunite + agenda
+[routing]  choix du commercial
+    |
+    v
+[crm]  CrmConnector (port)  -->  crm.dolibarr  |  crm.odoo  |  ...
     |
     v
 [monitoring]  API REST  -->  dashboard Angular
@@ -39,7 +46,7 @@ dans `capture` casse cette garantie de non-perte sous charge.
 | -------------------- | --------------------------------------------------- |
 | `backend/`           | Spring Boot 4.1 / Java 21 / Maven — projet autonome  |
 | `frontend/`          | Angular 20 standalone / npm — projet autonome        |
-| `docker-compose.yml` | Postgres + RabbitMQ (+ Dolibarr sous profil)         |
+| `docker-compose.yml` | Postgres + RabbitMQ (+ Dolibarr / Odoo sous profils) |
 
 Il n'y a pas d'outil de build racine : chaque projet se construit depuis son propre
 repertoire, avec son propre gestionnaire de dependances.
@@ -54,6 +61,7 @@ Les commandes backend s'executent depuis `backend/`, les commandes frontend depu
 ```bash
 docker compose up -d                      # Postgres (5432) + RabbitMQ (5672, console 15672)
 docker compose --profile dolibarr up -d   # ajoute Dolibarr sur :8081 + sa MariaDB
+docker compose --profile odoo up -d       # ajoute Odoo sur :8069 + sa Postgres dediee
 docker compose down -v                    # remet la base a zero (rejoue les migrations Flyway)
 ```
 
@@ -100,8 +108,7 @@ responsabilite — le lire avant d'ajouter du code dedans.
 - `capture/` — endpoints webhook, verification HMAC, publication sur RabbitMQ.
 - `qualification/` — consommateur de la file : validation, dedup, NLP, scoring.
 - `routing/` — selection du commercial, notifications.
-- `dolibarr/` — client de l'API REST Dolibarr. **Le format Dolibarr ne doit pas fuir hors de
-  ce package** ; le reste du code manipule le modele du domaine.
+- `crm/` — port de sortie vers les ERP/CRM (voir la section dediee plus bas).
 - `monitoring/` — API REST du dashboard.
 - `common/` — exceptions, gestion d'erreurs REST, types partages.
 - `config/` — beans Spring et proprietes typees.
@@ -122,7 +129,9 @@ migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut
 une migration, soit `docker compose down -v` en dev.
 
 Seule `V1__raw_lead_event.sql` existe pour l'instant (journal de capture). Le schema metier
-— lead qualifie, commercial, trace de synchronisation Dolibarr — reste a ecrire.
+— lead qualifie, commercial, trace de synchronisation — reste a ecrire. La table de trace
+devra porter le `provider_id` et les references renvoyees par l'ERP : un meme lead peut etre
+pousse vers des fournisseurs differents selon le client.
 
 ### Messaging
 
@@ -134,6 +143,43 @@ Le comportement d'echec est delibere : `default-requeue-rejected: false` plus 3 
 avec backoff exponentiel, puis passage en DLQ. Un message ne reboucle donc jamais
 indefiniment ; la DLQ est la source de verite des leads en echec, et l'ecran « File
 d'attente » du dashboard doit s'appuyer dessus.
+
+### Connecteurs ERP/CRM — la regle a ne pas casser
+
+```
+crm/
+├── CrmConnector.java          port : providerId() + sync(CrmLead)
+├── CrmConnectorRegistry.java  resout l'adaptateur par providerId
+├── model/                     modele pivot : CrmLead, CrmSyncResult, CrmSyncException
+├── dolibarr/                  adaptateur REST
+└── odoo/                      adaptateur JSON-RPC
+```
+
+**Le modele pivot de `crm/model` ne doit contenir aucun terme propre a un fournisseur** —
+ni « thirdparty » (Dolibarr), ni « res.partner » (Odoo). Toute la traduction se fait dans
+l'adaptateur. C'est ce qui rend le pipeline independant de l'ERP, et c'est l'invariant le
+plus facile a casser par inadvertance : des qu'un champ specifique remonte dans `CrmLead`,
+la generalisation est perdue.
+
+Les ERP ne se correspondent pas un pour un, et c'est normal : Dolibarr separe Tiers et
+Contact en deux endpoints, alors qu'Odoo met les deux dans `res.partner` distingues par
+`is_company`. Ces divergences se resolvent dans l'adaptateur, jamais en amont.
+
+**Ajouter un ERP** se fait en trois gestes, sans toucher au reste du code :
+
+1. un sous-package `crm/<provider>/` ;
+2. une classe `@Component` implementant `CrmConnector`, dont `providerId()` renvoie la cle
+   utilisee dans la configuration ;
+3. une entree sous `leadflow.crm.providers.<provider>` dans `application.yml`.
+
+`CrmConnectorRegistry` collecte les connecteurs par injection de `List<CrmConnector>` : il
+n'y a aucune liste de fournisseurs a maintenir a la main, et aucun `switch` sur le nom de
+l'ERP a ajouter quelque part.
+
+`CrmProperties.Provider` est volontairement un record commun dont **tous les champs ne
+concernent pas tous les ERP** : `apiKey` suffit a Dolibarr, Odoo exige en plus `database` et
+`username`. Chaque adaptateur valide ce dont il a besoin a son demarrage plutot que d'imposer
+un schema de configuration commun artificiel.
 
 ### Securite
 
@@ -172,7 +218,13 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le squelette compile de bout en bout, mais **la logique metier n'est pas implementee** : les
-packages `capture`, `qualification`, `routing`, `dolibarr` et `monitoring` ne contiennent que
-leur `package-info.java`, et les trois composants de `features/` sont des placeholders. Ne pas
-supposer l'existence d'entites, de services ou d'endpoints — verifier avant de referencer.
+Le squelette compile de bout en bout, mais **la logique metier n'est pas implementee**.
+
+Ce qui existe reellement : la configuration (Rabbit, Security, proprietes typees), le port
+`CrmConnector`, son registre et le modele pivot. Ce qui n'existe pas : **aucun adaptateur ERP
+n'est encore ecrit** — `crm/dolibarr/` et `crm/odoo/` ne contiennent que leur
+`package-info.java`, donc `CrmConnectorRegistry` resout actuellement sur un registre vide et
+`defaultConnector()` leve une `IllegalArgumentException`. Meme chose pour `capture`,
+`qualification`, `routing` et `monitoring`, et les quatre composants de `features/` sont des
+placeholders. Ne pas supposer l'existence d'entites, de services ou d'endpoints — verifier
+avant de referencer.
