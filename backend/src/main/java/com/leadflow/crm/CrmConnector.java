@@ -1,15 +1,17 @@
 package com.leadflow.crm;
 
+import com.leadflow.crm.model.CrmAssignee;
 import com.leadflow.crm.model.CrmLead;
 import com.leadflow.crm.model.CrmSyncResult;
+import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 
 /**
  * Port de sortie vers un ERP/CRM. Une implementation par fournisseur supporte.
  *
  * <p>Les implementations sont des beans Spring ; {@link CrmConnectorRegistry} les collecte
- * automatiquement. Un adaptateur doit etre idempotent autant que possible : le message
- * peut etre rejoue apres un echec partiel.
+ * automatiquement. Un adaptateur ne lit jamais notre base : tout ce dont il a besoin arrive
+ * par ses arguments.
  */
 public interface CrmConnector {
 
@@ -20,10 +22,23 @@ public interface CrmConnector {
     String providerId();
 
     /**
-     * Cree ou met a jour le tiers, le contact, l'opportunite et la tache de rappel dans
-     * l'instance ERP designee par {@code target}.
+     * Cree le compte, le contact et l'opportunite dans l'instance ERP designee par
+     * {@code target}.
+     *
+     * <p>{@code previous} porte ce qui a deja ete cree lors des tentatives precedentes :
+     * toute reference non nulle dispense de recreer l'objet correspondant. En cas d'echec
+     * partiel, l'implementation leve une {@link com.leadflow.crm.model.CrmSyncException}
+     * enrichie de ce qu'elle a obtenu avant de tomber.
      *
      * @throws com.leadflow.crm.model.CrmSyncException si l'ERP refuse ou est injoignable
      */
-    CrmSyncResult sync(CrmLead lead, CrmTarget target);
+    CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous);
+
+    /**
+     * Traduit un commercial en identifiant utilisateur dans l'ERP cible.
+     *
+     * @return l'identifiant, ou {@code null} si l'ERP ne connait pas ce commercial
+     * @throws com.leadflow.crm.model.CrmSyncException si l'ERP est injoignable
+     */
+    String resolveAssignee(CrmAssignee assignee, CrmTarget target);
 }
