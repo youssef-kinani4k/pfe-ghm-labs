@@ -27,7 +27,16 @@ public class CrmConnectorRegistry {
 
     public CrmConnectorRegistry(List<CrmConnector> connectors, CrmProperties properties) {
         this.connectors = connectors.stream()
-                .collect(Collectors.toUnmodifiableMap(CrmConnector::providerId, Function.identity()));
+                .collect(Collectors.toUnmodifiableMap(
+                        CrmConnector::providerId,
+                        Function.identity(),
+                        (premier, second) -> {
+                            throw new IllegalStateException(
+                                    "Deux connecteurs CRM declarent le meme providerId '"
+                                            + premier.providerId() + "' : "
+                                            + premier.getClass().getName() + " et "
+                                            + second.getClass().getName());
+                        }));
         Map<String, CrmProperties.Provider> declares =
                 properties.providers() == null ? Map.of() : properties.providers();
         this.enabled = declares.entrySet().stream()

@@ -36,7 +36,7 @@ import org.springframework.context.annotation.Import;
  * {@code @SpringBootTest} et non {@code @DataJpaTest} — les converters de chiffrement sont
  * des {@code @Component}.
  */
-@SpringBootTest
+@SpringBootTest(properties = "leadflow.crm.providers.espion.enabled=true")
 @Import({TestcontainersConfiguration.class, CrmSyncServiceTest.ConnecteurDeTest.class})
 class CrmSyncServiceTest {
 
@@ -48,9 +48,13 @@ class CrmSyncServiceTest {
         CrmAssignee assigneeRecu;
         boolean echoue;
 
+        /**
+         * Fournisseur qui n'existe que pour ce test : deux connecteurs ne peuvent pas
+         * declarer le meme identifiant, et l'adaptateur Dolibarr reel est dans le contexte.
+         */
         @Override
         public String providerId() {
-            return "dolibarr";
+            return "espion";
         }
 
         @Override
@@ -59,10 +63,10 @@ class CrmSyncServiceTest {
             this.cibleRecue = target;
             this.etatRecu = previous;
             if (echoue) {
-                throw new CrmSyncException("dolibarr", "opportunite refusee", null)
+                throw new CrmSyncException("espion", "opportunite refusee", null)
                         .avecEtat(new CrmSyncState("A-1", "C-1", null));
             }
-            return new CrmSyncResult("dolibarr", "A-1", "C-1", "O-1", null, Instant.now());
+            return new CrmSyncResult("espion", "A-1", "C-1", "O-1", null, Instant.now());
         }
 
         @Override
@@ -101,7 +105,7 @@ class CrmSyncServiceTest {
         client.setPublicKey("cle-" + UUID.randomUUID());
         client.setName("Boutique de test");
         client.setHmacSecret("secret");
-        client.setCrmProviderId("dolibarr");
+        client.setCrmProviderId("espion");
         client.setCrmConfig(Map.of("baseUrl", "http://erp.test", "apiKey", "cle-erp"));
         client = clientRepository.saveAndFlush(client);
 
@@ -137,7 +141,7 @@ class CrmSyncServiceTest {
     void construitLaCibleDepuisLaConfigurationDechiffreeDuClient() {
         service.synchronise(leadId);
 
-        assertThat(connecteur.cibleRecue.providerId()).isEqualTo("dolibarr");
+        assertThat(connecteur.cibleRecue.providerId()).isEqualTo("espion");
         assertThat(connecteur.cibleRecue.settings()).containsEntry("baseUrl", "http://erp.test");
         assertThat(connecteur.cibleRecue.settings()).containsEntry("apiKey", "cle-erp");
     }
@@ -179,7 +183,7 @@ class CrmSyncServiceTest {
         assertThat(leadRepository.findById(leadId).orElseThrow().getStatus())
                 .isEqualTo(LeadStatus.SYNCED);
         List<CrmSyncAttempt> tentatives =
-                attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, "dolibarr");
+                attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, "espion");
         assertThat(tentatives).hasSize(1);
         assertThat(tentatives.getFirst().getStatus()).isEqualTo(CrmSyncAttemptStatus.SUCCESS);
         assertThat(tentatives.getFirst().getAccountRef()).isEqualTo("A-1");
@@ -194,7 +198,7 @@ class CrmSyncServiceTest {
                 .hasMessageContaining("opportunite refusee");
 
         List<CrmSyncAttempt> tentatives =
-                attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, "dolibarr");
+                attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, "espion");
         assertThat(tentatives).hasSize(1);
         assertThat(tentatives.getFirst().getStatus()).isEqualTo(CrmSyncAttemptStatus.FAILED);
         assertThat(tentatives.getFirst().getAccountRef()).isEqualTo("A-1");
