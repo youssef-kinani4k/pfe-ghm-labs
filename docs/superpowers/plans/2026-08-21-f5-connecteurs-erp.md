@@ -2636,7 +2636,7 @@ L'étage 2 de la stratégie de test. Il ne tourne pas à chaque `./mvnw test` : 
 - Consumes : `DolibarrConnector`, `OdooConnector`, `CrmLead`, `CrmSyncState`, `CrmTarget`, et la procédure de la tâche 1.
 - Produces : le profil Maven `erp-it`.
 
-- [ ] **Step 1: Exclure le groupe `erp` par défaut et ajouter le profil**
+- [x] **Step 1: Exclure le groupe `erp` par défaut et ajouter le profil**
 
 Dans `backend/pom.xml`, ajouter la propriété dans le bloc `<properties>` existant :
 
@@ -2671,7 +2671,7 @@ Et le profil, juste avant `</project>` :
 	</profiles>
 ```
 
-- [ ] **Step 2: Écrire le test d'intégration**
+- [x] **Step 2: Écrire le test d'intégration**
 
 Créer `backend/src/test/java/com/leadflow/crm/ErpIntegrationTest.java` :
 
@@ -2772,7 +2772,7 @@ class ErpIntegrationTest {
 }
 ```
 
-- [ ] **Step 3: Vérifier que la suite par défaut ignore bien ces tests**
+- [x] **Step 3: Vérifier que la suite par défaut ignore bien ces tests**
 
 ```bash
 ./mvnw test
@@ -2780,7 +2780,7 @@ class ErpIntegrationTest {
 
 Attendu : **76 tests**, inchangé. `ErpIntegrationTest` ne doit pas apparaître dans `target/surefire-reports/`.
 
-- [ ] **Step 4: Lancer l'étage 2 pour de vrai**
+- [x] **Step 4: Lancer l'étage 2 pour de vrai**
 
 ```bash
 docker compose --profile dolibarr --profile odoo up -d
@@ -2794,7 +2794,7 @@ Attendu : `BUILD SUCCESS`, avec `ErpIntegrationTest` exécuté et vert.
 
 **Si l'obtention de la clé Dolibarr résiste à toute automatisation raisonnable** (risque identifié au §13 de la spec) : ne pas s'acharner. Consigner dans `docs/erp-integration-setup.md` la procédure manuelle exacte, laisser le test en place derrière sa variable d'environnement, et le signaler dans le rapport de tâche. L'étage 1 reste intact et la feature reste livrable.
 
-- [ ] **Step 5: Compléter la documentation et commiter**
+- [x] **Step 5: Compléter la documentation et commiter**
 
 Compléter `docs/erp-integration-setup.md` avec les variables d'environnement attendues et la commande exacte, puis :
 

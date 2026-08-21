@@ -143,7 +143,21 @@ cd backend && ./mvnw verify -Perp-it
 ```
 
 Les tests marqués `@Tag("erp")` sont exclus de `./mvnw test` : sans ces variables et sans
-les conteneurs, la suite ordinaire reste rapide et verte.
+les conteneurs, la suite ordinaire reste rapide et verte. L'exclusion vient du plugin
+Surefire, configuré sur `<excludedGroups>${erp.excludedGroups}</excludedGroups>` ; la
+propriété vaut `erp` par défaut et le profil `erp-it` la remplace par un nom de groupe
+inexistant, ce qui laisse tout passer.
+
+Chaque test est en plus conditionné par une variable d'environnement
+(`LEADFLOW_DOLIBARR_API_KEY` pour Dolibarr, `LEADFLOW_ODOO_DB` pour Odoo) : sous
+`-Perp-it` sans ces variables, le test concerné est ignoré au lieu d'échouer.
+
+Les deux tests créent un tiers, un contact et une opportunité portant un suffixe aléatoire,
+puis rejouent la même synchronisation avec les références obtenues : le rejeu ne doit rien
+recréer. Les objets sont laissés en place dans les ERP — la section 5 remet à zéro.
+
+Relevé de la dernière exécution : `./mvnw verify -Perp-it` → **78 tests, 0 échec**, dont les
+2 de `ErpIntegrationTest` contre Dolibarr 23.0.2 et Odoo (module `crm` installé).
 
 ---
 
