@@ -849,7 +849,8 @@ class CrmSyncServiceTest {
 
         RawLeadEvent evenement = new RawLeadEvent();
         evenement.setClientId(client.getId());
-        evenement.setPayload("{}");
+        evenement.setSource("test");
+        evenement.setPayload(Map.of("email", "karim@acme.test"));
         evenement.setSignature("sig");
         evenement.setReceivedAt(Instant.now());
         UUID rawEventId = rawLeadEventRepository.saveAndFlush(evenement).getId();
@@ -1193,7 +1194,7 @@ public class CrmSyncService {
 ./mvnw test -Dtest=CrmSyncServiceTest
 ```
 
-Attendu : 7 tests verts. Si `preparerUnLeadComplet` échoue sur `RawLeadEvent`, ouvrir `backend/src/main/java/com/leadflow/capture/RawLeadEvent.java` et aligner les setters sur les champs réels — la fixture doit satisfaire les colonnes `NOT NULL` de `V1`.
+Attendu : 7 tests verts. La fixture doit satisfaire les colonnes `NOT NULL` de `V1` : `source`, `payload` (une `Map`, sérialisée en `jsonb`), `signature` et `received_at`. En cas d'échec de persistance, ouvrir `backend/src/main/java/com/leadflow/capture/RawLeadEvent.java` et aligner les setters sur les champs réels.
 
 - [ ] **Step 7: Lancer la suite complète et commiter**
 
