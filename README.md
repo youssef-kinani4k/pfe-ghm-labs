@@ -30,7 +30,7 @@ implementer une interface, sans toucher au reste du pipeline.
 ## Demarrage
 
 ```bash
-cp .env.example .env          # renseigner WEBHOOK_HMAC_SECRET et DOLIBARR_API_KEY
+cp .env.example .env          # renseigner LEADFLOW_MASTER_KEY (openssl rand -base64 32)
 docker compose up -d          # Postgres + RabbitMQ
 # ERP de test au besoin : docker compose --profile dolibarr up -d  (ou --profile odoo)
 cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev

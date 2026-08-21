@@ -16,6 +16,8 @@ management:
 
 leadflow:
   security:
-    # Cle fixe de developpement. Elle rend reproductibles les valeurs chiffrees du
-    # jeu de demonstration. Ne jamais l'utiliser hors du poste de developpement.
-    master-key: gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=
+    # Repli de developpement seulement : il rend reproductibles les valeurs chiffrees du
+    # jeu de demonstration. LEADFLOW_MASTER_KEY reste prioritaire, pour que lancer le
+    # profil dev contre une base partagee ne chiffre pas avec une cle publiee dans le
+    # depot. Ne jamais utiliser cette valeur de repli hors du poste de developpement.
+    master-key: ${LEADFLOW_MASTER_KEY:gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=}
