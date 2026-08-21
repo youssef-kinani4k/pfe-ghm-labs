@@ -156,15 +156,18 @@ REST sur `/api/index.php`, authentification par en-tête `DOLAPIKEY`.
 | ------------------------------------------ | ------------------------------------------- |
 | `companyName`                              | `POST /thirdparties`, `client: 2` (prospect) |
 | `firstName`, `lastName`, `email`, `phone`  | `POST /contacts`, lié par `socid`           |
-| opportunité                                | `POST /projects` avec les champs d'opportunité |
+| opportunité                                | `POST /projects` — `ref` **obligatoire et unique**, `usage_opportunity`, `opp_status` |
 | `message`, `detectedIntent`, `score`       | note du tiers et de l'opportunité           |
-| `assigneeRef`                              | utilisateur responsable de l'opportunité    |
+| `assigneeRef`                              | `POST /projects/{id}/contacts` — `fk_socpeople`, `type_contact=PROJECTLEADER`, `source=internal` |
 
-Deux divergences résolues ici et nulle part ailleurs :
+Trois divergences résolues ici et nulle part ailleurs, toutes confirmées par la sonde (§15) :
 
 - **Dolibarr n'a pas d'objet « opportunité » de plein droit.** Ce qui s'en rapproche est le
-  projet doté des champs d'opportunité. C'est le point de traduction le moins acquis, et la
-  sonde doit le confirmer avant écriture.
+  projet doté des champs d'opportunité. Il exige une `ref` unique : l'adaptateur en fabrique
+  une, stable par lead ; un doublon se traduit par un `500` de Dolibarr.
+- **`fk_user_resp` est ignoré**, à la création comme en modification. Assigner le commercial
+  demande un second appel sur `/projects/{id}/contacts`. C'est le seul endroit de F5 où une
+  étape de `sync` compte deux appels.
 - **Un lead sans société** : Dolibarr exige un tiers pour rattacher un contact. L'adaptateur
   crée alors un tiers au nom de la personne. Le pivot n'a pas à connaître cette contrainte.
 
@@ -182,7 +185,7 @@ JSON-RPC sur `/jsonrpc` : `common.authenticate` pour obtenir l'`uid`, puis
 | opportunité                  | `crm.lead`, `type: 'opportunity'`, `partner_id`, `email_from` |
 | `score`                      | `priority` (échelle 0–3)                              |
 | `detectedIntent`, `message`  | `description`                                         |
-| `assigneeRef`                | `user_id`, résolu via `res.users`                     |
+| `assigneeRef`                | `user_id`, résolu via `res.users` sur `login` **ou** `email` |
 
 **Le piège à ne pas rater** : Odoo répond `HTTP 200` avec un objet `error` dans le corps
 quand l'appel échoue. Un adaptateur qui se fie au code de statut avalerait silencieusement
@@ -318,3 +321,101 @@ ne choisit pas de commercial, ne consomme aucune file, ne réessaie pas.
 
 Écrire le plan d'implémentation via la compétence `writing-plans`, sur la branche
 `feature/f5-connecteurs-erp`. La sonde en est la première tâche.
+
+---
+
+## 15. Relevé de la sonde
+
+Réalisé le 21 août 2026, contre `dolibarr/dolibarr:23.0.2` (relevé
+`MAIN_VERSION_LAST_INSTALL = 23.0.2`) et `odoo:17.0` (`Odoo Server 17.0-20260817`). Les deux
+images sont désormais épinglées dans `docker-compose.yml`. La procédure complète et
+reproductible vit dans `docs/erp-integration-setup.md`.
+
+### Dolibarr
+
+**Obtention de la clé d'API** : la voie SQL fonctionne — insertion de la constante
+`MAIN_MODULE_API` dans `llx_const` et écriture directe de `llx_user.api_key`, sans
+chiffrement ni condition. Le point d'entrée `/api/index.php/status` répond alors `200` avec
+la version.
+
+**Mais l'installation par défaut n'active que `API` et `USER`.** Sans les modules `Societe`
+et `Projet`, toute création répond `403 Forbidden` — et le message ne dit pas pourquoi. Ces
+deux modules ne s'activent pas par une constante : leur activation crée aussi les
+permissions dans `llx_rights_def`, sans lesquelles même l'administrateur est refusé. Il faut
+donc une session web authentifiée (`admin/modules.php?action=set&value=modSociete`). C'est
+l'écart le plus coûteux relevé par la sonde, et il ne concerne que la mise en place des
+tests, pas le code de l'adaptateur.
+
+**Créations** — toutes en `HTTP 200`, réponse constituée du **seul identifiant nu** :
+
+| Appel | Corps envoyé (extrait) | Réponse |
+| --- | --- | --- |
+| `POST /thirdparties` | `{"name","client":"2","email","country_code","note_private"}` | `1` |
+| `POST /contacts` | `{"lastname","firstname","email","socid","phone_pro"}` | `1` |
+| `POST /projects` | `{"ref","title","socid","usage_opportunity":"1","opp_status":"1","opp_amount","note_private"}` | `1` |
+
+**`ref` est obligatoire sur `POST /projects`** : sans lui, `400 Bad Request: ref field
+missing`. Et il est unique — un doublon donne `500` avec `Duplicate entry 'SONDE-1-1' for key
+'uk_projet_ref'`. L'adaptateur doit donc fabriquer une référence unique et stable par lead.
+
+**`fk_user_resp` est ignoré**, à la création comme en `PUT` : le champ reste nul. Assigner le
+commercial passe par un appel distinct, qui fonctionne :
+
+```
+POST /projects/{id}/contacts?fk_socpeople={userId}&type_contact=PROJECTLEADER&source=internal
+```
+
+Vérifié : ligne créée dans `llx_element_contact` avec `fk_c_type_contact = 50`.
+
+**Recherche d'utilisateur** : `GET /users?sqlfilters=(t.email:=:'amina@demo.test')` renvoie le
+tableau des utilisateurs correspondants ; aucune correspondance donne `[]` en `200`, jamais
+`404`.
+
+**Forme d'une erreur** : `{"error":{"code":400,"message":"Bad Request: name field missing"},"debug":{...}}`,
+avec le code HTTP aligné sur `error.code`.
+
+### Odoo
+
+**Base et module** : `POST /web/database/create` avec `master_pwd=admin` crée la base en une
+minute environ. Le module `crm` doit ensuite être installé **par la ligne de commande**
+(`odoo -d leadflow -i crm --stop-after-init`) : lancé via `button_immediate_install` en
+JSON-RPC, le redémarrage du registre coupe la requête et laisse la base avec des modules
+`to install` dans un état incohérent.
+
+**`common.authenticate`** renvoie `{"result": 2}` — l'`uid` de `admin` est `2`, pas `1`.
+
+**Créations**, toutes par `object.execute_kw` puis `create` :
+
+| Modèle | Champs vérifiés | Réponse |
+| --- | --- | --- |
+| `res.partner` société | `name`, `is_company: true`, `email`, `phone` | `7` |
+| `res.partner` contact | `name`, `is_company: false`, `parent_id`, `email`, `phone` | `8` |
+| `crm.lead` | `name`, `type: "opportunity"`, `partner_id`, `email_from`, `description`, `priority`, `user_id`, `phone` | `2` |
+
+**`priority` est bien bornée** : `"9"` est refusé avec `Wrong value for crm.lead.priority: '9'`.
+L'échelle 0–3 retenue au §7 est confirmée.
+
+**Recherche d'utilisateur** : `res.users` porte `login` **et** `email` (l'administrateur a
+`login = "admin"` et `email = "admin@example.com"`). Un test sur le seul `login` échouerait
+donc pour un commercial identifié par son courriel. La forme retenue est le OU explicite,
+vérifiée : `["|", ["login","=",x], ["email","=",x]]`. Aucune correspondance renvoie `[]`.
+
+**Forme d'une erreur — le point capital** : confirmée. `HTTP 200`, corps
+`{"error":{"code":200,"message":"Odoo Server Error","data":{"name":"...","message":"Invalid field 'champ_inexistant' on model 'res.partner'","debug":"<trace complète>"}}}`.
+Le message exploitable est bien **`error.data.message`** ; `error.message` ne dit que
+« Odoo Server Error ». La trace Python complète arrive dans `error.data.debug` — à ne jamais
+recopier telle quelle dans `crm_sync_attempt.error_message`.
+
+### Écarts avec les §6 et §7
+
+Trois, tous côté Dolibarr, tous répercutés dans le §6 :
+
+1. **`ref` obligatoire et unique** sur l'opportunité. Le §6 ne le mentionnait pas et le plan
+   d'implémentation ne l'envoyait pas : l'adaptateur aurait échoué systématiquement.
+2. **`fk_user_resp` inopérant** : l'assignation du commercial demande un second appel sur
+   `/projects/{id}/contacts`, au lieu d'un champ à la création.
+3. **Activation préalable des modules `Societe` et `Projet`**, faute de quoi tout est `403`.
+   Sans incidence sur le code, déterminant pour la mise en place des tests.
+
+Côté Odoo, un seul ajustement : la recherche d'utilisateur se fait sur `login` **ou** `email`,
+et non sur `login` seul.

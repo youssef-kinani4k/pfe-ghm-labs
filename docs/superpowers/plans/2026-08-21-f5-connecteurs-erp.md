@@ -18,7 +18,8 @@
 - **F5 n'ajoute aucune migration Flyway.** Le schéma est complet depuis F1. Si une tâche croit avoir besoin d'une colonne, c'est le signe qu'elle déborde de son périmètre — s'arrêter et le signaler.
 - **Ne jamais modifier `V1__raw_lead_event.sql` ni `V2__multi_tenant_schema.sql`.** Flyway échouerait sur une somme de contrôle divergente.
 - **Le modèle pivot `crm/model` ne doit contenir aucun terme propre à un fournisseur** : ni `thirdparty`, ni `socid`, ni `res.partner`, ni `crm.lead`. Toute la traduction vit dans `crm/dolibarr/` et `crm/odoo/`.
-- **La tâche 1 fait autorité sur les noms de champs ERP.** Les extraits de code des tâches 4 à 7 sont écrits d'après la documentation des deux ERP. Si la sonde relève un écart, c'est la sonde qui gagne : corriger la spec (§6, §7) *puis* le code, et le signaler dans le rapport de tâche.
+- **La tâche 1 a été exécutée** : son relevé est le §15 de la spec, et les écarts qu'elle a trouvés sont déjà répercutés dans les §6 et §7 de la spec et dans le code des tâches 4 à 7 (`ref` obligatoire sur les projets Dolibarr, `fk_user_resp` inopérant remplacé par un appel dédié, recherche Odoo sur `login` ou `email`). Si un écart subsiste à l'exécution, la même règle vaut : l'ERP réel fait foi, on corrige la spec puis le code.
+- Les images ERP sont épinglées (`dolibarr/dolibarr:23.0.2`, `odoo:17.0`). La mise en route des conteneurs suit `docs/erp-integration-setup.md` — sans l'activation préalable des modules `Societe` et `Projet`, Dolibarr répond `403` à toute création.
 - `crm_sync_attempt` est **append-only** : aucun `UPDATE`, jamais. Une tentative = une ligne.
 - Jackson est en version 3 dans ce projet : importer `tools.jackson.databind.ObjectMapper`, jamais `com.fasterxml.jackson`.
 - Clé maître de chiffrement utilisée par les tests (déjà dans `src/test/resources/application.properties`) : `gh/SD1Jp/HfWc/sB/BybtvbUqehzXmv0YIZ8uMwutME=`
@@ -1228,6 +1229,7 @@ Deux couches, et cette tâche ne fait que la couche basse : parler HTTP à une i
   - `DolibarrClient.creeTiers(CrmTarget, Map<String,Object>) → String`
   - `DolibarrClient.creeContact(CrmTarget, Map<String,Object>) → String`
   - `DolibarrClient.creeOpportunite(CrmTarget, Map<String,Object>) → String`
+  - `DolibarrClient.lieResponsable(CrmTarget, String opportuniteRef, String utilisateurRef)`
   - `DolibarrClient.chercheUtilisateurParEmail(CrmTarget, String) → String` (nul si absent)
 
 - [ ] **Step 1: Écrire le test du transport**
@@ -1325,6 +1327,20 @@ class DolibarrClientTest {
         assertThatThrownBy(() -> client.creeTiers(incomplete, Map.of("name", "Acme")))
                 .isInstanceOf(CrmSyncException.class)
                 .hasMessageContaining("apiKey");
+    }
+
+    @Test
+    void lieLeResponsableParUnAppelDedie() {
+        // Releve de la sonde : fk_user_resp est ignore a la creation comme en PUT.
+        serveur.expect(requestTo(org.hamcrest.Matchers.containsString("/projects/99/contacts")))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(requestTo(org.hamcrest.Matchers.containsString("fk_socpeople=9")))
+                .andExpect(requestTo(org.hamcrest.Matchers.containsString("PROJECTLEADER")))
+                .andRespond(withSuccess("{\"id\":\"99\"}", MediaType.APPLICATION_JSON));
+
+        client.lieResponsable(CIBLE, "99", "9");
+
+        serveur.verify();
     }
 
     @Test
@@ -1445,6 +1461,29 @@ public class DolibarrClient {
         return cree(target, "/projects", corps);
     }
 
+    /**
+     * Assigne un utilisateur interne a une opportunite.
+     *
+     * <p>Appel distinct parce que Dolibarr ignore {@code fk_user_resp}, a la creation comme
+     * en modification : la sonde de la tache 1 l'a verifie dans les deux sens. C'est le seul
+     * endroit de F5 ou une etape de {@code sync} compte deux appels.
+     */
+    public void lieResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
+        try {
+            restClient(target)
+                    .post()
+                    .uri(uri -> uri.path("/projects/" + opportuniteRef + "/contacts")
+                            .queryParam("fk_socpeople", utilisateurRef)
+                            .queryParam("type_contact", "PROJECTLEADER")
+                            .queryParam("source", "internal")
+                            .build())
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException e) {
+            throw echec("/projects/" + opportuniteRef + "/contacts", e);
+        }
+    }
+
     /** @return l'identifiant de l'utilisateur, ou {@code null} si l'ERP n'en connait aucun. */
     @SuppressWarnings("unchecked")
     public String chercheUtilisateurParEmail(CrmTarget target, String email) {
@@ -1514,7 +1553,7 @@ public class DolibarrClient {
 ./mvnw test -Dtest=DolibarrClientTest
 ```
 
-Attendu : 6 tests verts. Si la sonde (tâche 1) a relevé une autre forme de recherche d'utilisateur que `sqlfilters`, **c'est la sonde qui fait foi** : adapter `chercheUtilisateurParEmail` et le test.
+Attendu : 7 tests verts. La forme `sqlfilters=(t.email:=:'…')` a été vérifiée par la sonde, tout comme la réponse `[]` en `200` quand aucun utilisateur ne correspond.
 
 - [ ] **Step 6: Lancer la suite complète et commiter**
 
@@ -1522,7 +1561,7 @@ Attendu : 6 tests verts. Si la sonde (tâche 1) a relevé une autre forme de rec
 ./mvnw test
 ```
 
-Attendu : **49 tests, 0 échec**.
+Attendu : **50 tests, 0 échec**.
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm backend/src/test/java/com/leadflow/crm
@@ -1576,6 +1615,7 @@ class DolibarrConnectorTest {
         private Map<String, Object> corpsTiers;
         private Map<String, Object> corpsContact;
         private Map<String, Object> corpsOpportunite;
+        private String responsableLie;
         private boolean echoueSurOpportunite;
 
         private TransportFactice() {
@@ -1607,6 +1647,12 @@ class DolibarrConnectorTest {
         }
 
         @Override
+        public void lieResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
+            appels.add("responsable");
+            responsableLie = utilisateurRef;
+        }
+
+        @Override
         public String chercheUtilisateurParEmail(CrmTarget target, String email) {
             appels.add("utilisateur");
             return "9";
@@ -1631,7 +1677,7 @@ class DolibarrConnectorTest {
     void creeLeTiersLeContactPuisLOpportunite() {
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
-        assertThat(transport.appels).containsExactly("tiers", "contact", "opportunite");
+        assertThat(transport.appels).containsExactly("tiers", "contact", "opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
         assertThat(resultat.opportunityRef()).isEqualTo("99");
@@ -1651,6 +1697,26 @@ class DolibarrConnectorTest {
     }
 
     @Test
+    void donneUneReferenceUniqueALOpportunite() {
+        // Releve de la sonde : sans `ref`, Dolibarr repond 400 ; en doublon, 500.
+        connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+        Object premiere = transport.corpsOpportunite.get("ref");
+
+        TransportFactice second = new TransportFactice();
+        new DolibarrConnector(second).sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(premiere).asString().startsWith("LF-");
+        assertThat(second.corpsOpportunite.get("ref")).isNotEqualTo(premiere);
+    }
+
+    @Test
+    void assigneLeCommercialALOpportuniteParUnAppelDedie() {
+        connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.responsableLie).isEqualTo("9");
+    }
+
+    @Test
     void nommeLeTiersDApresLaPersonneQuandAucuneSocieteNEstFournie() {
         connecteur.sync(lead(null), CIBLE, CrmSyncState.VIERGE);
 
@@ -1662,7 +1728,7 @@ class DolibarrConnectorTest {
         CrmSyncResult resultat =
                 connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", null));
 
-        assertThat(transport.appels).containsExactly("opportunite");
+        assertThat(transport.appels).containsExactly("opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
     }
@@ -1766,6 +1832,9 @@ public class DolibarrConnector implements CrmConnector {
             }
             if (opportunite == null) {
                 opportunite = client.creeOpportunite(target, corpsOpportunite(lead, compte));
+                if (lead.assigneeRef() != null) {
+                    client.lieResponsable(target, opportunite, lead.assigneeRef());
+                }
             }
         } catch (CrmSyncException echec) {
             throw echec.avecEtat(new CrmSyncState(compte, contact, opportunite));
@@ -1821,15 +1890,25 @@ public class DolibarrConnector implements CrmConnector {
 
     private Map<String, Object> corpsOpportunite(CrmLead lead, String compte) {
         Map<String, Object> corps = new LinkedHashMap<>();
+        corps.put("ref", reference());
         corps.put("socid", compte);
         corps.put("title", lead.detectedIntent() == null ? "Lead LeadFlow" : lead.detectedIntent());
         corps.put("usage_opportunity", "1");
         corps.put("opp_status", "1");
         corps.put("note_private", note(lead));
-        if (lead.assigneeRef() != null) {
-            corps.put("fk_user_resp", lead.assigneeRef());
-        }
         return corps;
+    }
+
+    /**
+     * Dolibarr exige une {@code ref} sur un projet, et la refuse en doublon (contrainte
+     * {@code uk_projet_ref}). Elle est tiree au hasard plutot que derivee du lead : le
+     * pivot ne porte pas d'identifiant, et la non-recreation au rejeu est deja garantie en
+     * amont par {@code CrmSyncState}. Une opportunite ne peut donc etre creee deux fois que
+     * si la reponse de Dolibarr s'est perdue apres coup — cas ou une ref stable aurait, elle,
+     * fait echouer le rejeu au lieu de le laisser passer.
+     */
+    private String reference() {
+        return "LF-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     /** Le score n'a pas d'equivalent chez Dolibarr : il finit en texte, pas en champ. */
@@ -1852,7 +1931,7 @@ public class DolibarrConnector implements CrmConnector {
 ./mvnw test -Dtest=DolibarrConnectorTest
 ```
 
-Attendu : 8 tests verts.
+Attendu : 10 tests verts.
 
 - [ ] **Step 5: Vérifier que le registre voit l'adaptateur**
 
@@ -1861,7 +1940,7 @@ Attendu : 8 tests verts.
 ./mvnw test
 ```
 
-Attendu : suite complète à **57 tests, 0 échec**. `BackendApplicationTests` prouve au passage que le contexte démarre avec un vrai adaptateur enregistré.
+Attendu : suite complète à **60 tests, 0 échec**. `BackendApplicationTests` prouve au passage que le contexte démarre avec un vrai adaptateur enregistré.
 
 - [ ] **Step 6: Commit**
 
@@ -1986,8 +2065,10 @@ class OdooClientTest {
 
     @Test
     void chercheUnUtilisateurParEmailEtRenvoieNulSiAucun() {
+        // Releve de la sonde : res.users porte login ET email, d'ou le OU explicite.
         serveur.expect(requestTo("http://odoo.test/jsonrpc"))
                 .andExpect(jsonPath("$.params.args[3]").value("res.users"))
+                .andExpect(jsonPath("$.params.args[5][0][0]").value("|"))
                 .andRespond(withSuccess(
                         "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":[]}", MediaType.APPLICATION_JSON));
 
@@ -2082,7 +2163,8 @@ public class OdooClient {
     /** @return l'identifiant de l'utilisateur, ou {@code null} si Odoo n'en connait aucun. */
     public String chercheUtilisateurParEmail(CrmTarget target, int uid, String email) {
         Map<String, Object> reponse = executeKw(target, uid, "res.users", "search",
-                List.of(List.of(List.of(List.of("login", "=", email)))));
+                List.of(List.of(List.of("|", List.of("login", "=", email),
+                        List.of("email", "=", email)))));
         Object trouves = resultat(reponse, "res.users.search");
         if (!(trouves instanceof List<?> liste) || liste.isEmpty()) {
             return null;
@@ -2163,7 +2245,7 @@ public class OdooClient {
 ./mvnw test -Dtest=OdooClientTest
 ```
 
-Attendu : 7 tests verts. Si la sonde a relevé un autre chemin de message d'erreur que `error.data.message`, adapter `resultat` et le test — **la sonde fait foi**.
+Attendu : 7 tests verts. Le chemin `error.data.message` et le `HTTP 200` porteur d'erreur ont été confirmés par la sonde ; `error.data.debug` porte la trace Python complète, à ne jamais recopier dans `crm_sync_attempt.error_message`.
 
 - [ ] **Step 5: Lancer la suite complète et commiter**
 
@@ -2171,7 +2253,7 @@ Attendu : 7 tests verts. Si la sonde a relevé un autre chemin de message d'erre
 ./mvnw test
 ```
 
-Attendu : **64 tests, 0 échec**.
+Attendu : **67 tests, 0 échec**.
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm/odoo backend/src/test/java/com/leadflow/crm/odoo
@@ -2531,7 +2613,7 @@ Dans `backend/src/main/resources/application.yml`, sous `leadflow.crm.providers.
 ./mvnw test
 ```
 
-Attendu : **73 tests, 0 échec**.
+Attendu : **76 tests, 0 échec**.
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm/odoo backend/src/test/java/com/leadflow/crm/odoo \
@@ -2696,7 +2778,7 @@ class ErpIntegrationTest {
 ./mvnw test
 ```
 
-Attendu : **73 tests**, inchangé. `ErpIntegrationTest` ne doit pas apparaître dans `target/surefire-reports/`.
+Attendu : **76 tests**, inchangé. `ErpIntegrationTest` ne doit pas apparaître dans `target/surefire-reports/`.
 
 - [ ] **Step 4: Lancer l'étage 2 pour de vrai**
 
@@ -2816,7 +2898,7 @@ docker compose up -d
 cd backend && ./mvnw verify
 ```
 
-Attendu : `BUILD SUCCESS`, **73 tests, 0 échec**, et la présence dans la sortie de
+Attendu : `BUILD SUCCESS`, **76 tests, 0 échec**, et la présence dans la sortie de
 `DolibarrClientTest`, `DolibarrConnectorTest`, `OdooClientTest`, `OdooConnectorTest`,
 `CrmSyncServiceTest`, `CrmConnectorRegistryTest`, `CrmSyncExceptionTest`,
 `BackendApplicationTests`.
