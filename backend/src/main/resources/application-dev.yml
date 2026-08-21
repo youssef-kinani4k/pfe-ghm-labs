@@ -1,3 +1,8 @@
+spring:
+  flyway:
+    # Le jeu de demonstration s'ajoute aux migrations de schema, uniquement en dev.
+    locations: classpath:db/migration,classpath:db/dev
+
 logging:
   level:
     com.leadflow: DEBUG
