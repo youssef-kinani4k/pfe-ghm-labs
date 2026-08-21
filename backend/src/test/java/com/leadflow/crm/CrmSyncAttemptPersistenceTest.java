@@ -9,6 +9,8 @@ import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -78,13 +80,30 @@ class CrmSyncAttemptPersistenceTest {
     @Test
     void retrouveLaDerniereTentativeReussieEtIgnoreLesEchecs() {
         UUID leadId = leadEnregistre("cle-sync-2");
-        attemptRepository.saveAndFlush(tentative(leadId, CrmSyncAttemptStatus.SUCCESS, "1042"));
-        attemptRepository.saveAndFlush(tentative(leadId, CrmSyncAttemptStatus.FAILED, null));
+
+        // Horodatages fixes explicitement pour ne pas dependre de l'horloge systeme :
+        // deux ecritures rapprochees peuvent tomber sur le meme instant en millisecondes.
+        Instant ancienneDate = Instant.now().minus(1, ChronoUnit.HOURS);
+        Instant recenteDate = Instant.now();
+
+        CrmSyncAttempt ancienneReussie = tentative(leadId, CrmSyncAttemptStatus.SUCCESS, "1000");
+        ancienneReussie.setAttemptedAt(ancienneDate);
+        attemptRepository.saveAndFlush(ancienneReussie);
+
+        CrmSyncAttempt echec = tentative(leadId, CrmSyncAttemptStatus.FAILED, null);
+        echec.setAttemptedAt(recenteDate);
+        attemptRepository.saveAndFlush(echec);
+
+        CrmSyncAttempt recenteReussie = tentative(leadId, CrmSyncAttemptStatus.SUCCESS, "1042");
+        recenteReussie.setAttemptedAt(recenteDate);
+        attemptRepository.saveAndFlush(recenteReussie);
 
         CrmSyncAttempt derniere = attemptRepository
                 .findFirstByLeadIdAndStatusOrderByAttemptedAtDesc(leadId, CrmSyncAttemptStatus.SUCCESS)
                 .orElseThrow();
 
+        // Prouve les deux moities du contrat : le FAILED est ignore, et parmi les SUCCESS
+        // c'est le plus recent (1042, pas l'ancien 1000) qui est retrouve.
         assertThat(derniere.getAccountRef()).isEqualTo("1042");
     }
 
