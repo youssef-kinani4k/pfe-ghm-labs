@@ -100,7 +100,7 @@ Elle est jetable, comme l'était `DemoSecretGenerator` en F1 : le fichier de son
 - Consumes : rien.
 - Produces : le §15 de la spec, dont les tâches 4 à 7 tirent les noms de champs exacts ; `docs/erp-integration-setup.md`, dont la tâche 8 tire sa procédure.
 
-- [ ] **Step 1: Monter les deux ERP**
+- [x] **Step 1: Monter les deux ERP**
 
 ```bash
 docker compose --profile dolibarr --profile odoo up -d
@@ -109,7 +109,7 @@ docker compose ps
 
 Attendu : `leadflow-dolibarr` sur `:8081`, `leadflow-odoo` sur `:8069`, plus leurs bases. Dolibarr s'auto-installe au premier démarrage et peut prendre plusieurs minutes ; suivre `docker logs -f leadflow-dolibarr` jusqu'à ce que l'installation se termine.
 
-- [ ] **Step 2: Relever les versions réelles et épingler les images**
+- [x] **Step 2: Relever les versions réelles et épingler les images**
 
 ```bash
 docker exec leadflow-dolibarr sh -c 'cat /var/www/html/filefunc.inc.php | grep -i version' || true
@@ -132,7 +132,7 @@ par la version effectivement observée, par exemple :
 
 Faire de même pour `odoo:17` si l'image expose une version plus précise (`odoo:17.0`).
 
-- [ ] **Step 3: Obtenir une clé d'API Dolibarr**
+- [x] **Step 3: Obtenir une clé d'API Dolibarr**
 
 Deux voies. Essayer l'interface d'abord ; si elle résiste, la voie SQL.
 
@@ -155,7 +155,7 @@ docker exec leadflow-dolibarr-db mariadb -udolibarr -pdolibarr dolibarr -e \
 
 **Consigner dans le §15 de la spec laquelle des deux voies a fonctionné**, et sous quelle forme exacte. C'est cette procédure que la tâche 8 automatisera ou documentera.
 
-- [ ] **Step 4: Sonder l'API Dolibarr**
+- [x] **Step 4: Sonder l'API Dolibarr**
 
 ```bash
 CLE="<la cle relevee>"
@@ -179,7 +179,7 @@ curl -s "$BASE/users?sqlfilters=(t.email%3A%3D%3A'admin%40exemple.test')" -H "DO
 
 Consigner **la forme exacte des réponses** : un identifiant nu (`42`) ou un objet ? Un code HTTP `200` ou `201` ? Quelle forme prend une erreur de validation ? Le champ d'opportunité s'appelle-t-il bien `opp_status`, et faut-il `usage_opportunity` ? La recherche d'utilisateur accepte-t-elle `sqlfilters` sous cette forme ?
 
-- [ ] **Step 5: Préparer Odoo**
+- [x] **Step 5: Préparer Odoo**
 
 Créer la base et installer le module `crm` :
 
@@ -194,7 +194,7 @@ Puis, dans l'interface (`http://localhost:8069`, `admin` / `admin`) : Applicatio
 
 Consigner la procédure exacte qui a fonctionné, mot de passe maître inclus.
 
-- [ ] **Step 6: Sonder l'API Odoo**
+- [x] **Step 6: Sonder l'API Odoo**
 
 ```bash
 # 1. Authentification : renvoie l'uid
@@ -229,7 +229,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8069/jsonrpc \
 
 **Le point capital de cette étape est le n°4** : confirmer qu'Odoo renvoie bien `200` avec un objet `error` dans le corps, et relever le chemin exact du message (`error.data.message` ou `error.message`). Tout l'adaptateur Odoo repose là-dessus.
 
-- [ ] **Step 7: Consigner le relevé dans la spec**
+- [x] **Step 7: Consigner le relevé dans la spec**
 
 Ajouter à `docs/superpowers/specs/2026-08-21-f5-connecteurs-erp-design.md` une section :
 
@@ -258,7 +258,7 @@ Réalisé le <date>, contre `dolibarr/dolibarr:<version>` et `odoo:<version>`.
 
 Si des écarts existent, **corriger les tableaux des §6 et §7 de la spec en conséquence**.
 
-- [ ] **Step 8: Nettoyer et commiter**
+- [x] **Step 8: Nettoyer et commiter**
 
 ```bash
 rm -f backend/src/test/java/com/leadflow/crm/ErpProbe.java
@@ -301,7 +301,7 @@ Cette tâche apporte une **précision au §8 de la spec** : pour qu'une ligne `F
   - `CrmConnector.sync(CrmLead, CrmTarget, CrmSyncState)` et `CrmConnector.resolveAssignee(CrmAssignee, CrmTarget)`.
   - `CrmConnectorRegistry(List<CrmConnector>, CrmProperties)`.
 
-- [ ] **Step 1: Écrire le test de l'état partiel porté par l'exception**
+- [x] **Step 1: Écrire le test de l'état partiel porté par l'exception**
 
 Créer `backend/src/test/java/com/leadflow/crm/model/CrmSyncExceptionTest.java` :
 
@@ -338,7 +338,7 @@ class CrmSyncExceptionTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=CrmSyncExceptionTest
@@ -346,7 +346,7 @@ class CrmSyncExceptionTest {
 
 Attendu : échec de compilation — `CrmSyncState` et `avecEtat` n'existent pas.
 
-- [ ] **Step 3: Créer les deux records du modèle pivot**
+- [x] **Step 3: Créer les deux records du modèle pivot**
 
 `backend/src/main/java/com/leadflow/crm/model/CrmSyncState.java` :
 
@@ -383,7 +383,7 @@ public record CrmAssignee(String fullName, String email) {
 }
 ```
 
-- [ ] **Step 4: Enrichir `CrmSyncException`**
+- [x] **Step 4: Enrichir `CrmSyncException`**
 
 Remplacer le contenu de `backend/src/main/java/com/leadflow/crm/model/CrmSyncException.java` :
 
@@ -431,7 +431,7 @@ public class CrmSyncException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=CrmSyncExceptionTest
@@ -439,7 +439,7 @@ public class CrmSyncException extends RuntimeException {
 
 Attendu : 2 tests verts.
 
-- [ ] **Step 6: Écrire les tests du registre**
+- [x] **Step 6: Écrire les tests du registre**
 
 Remplacer `backend/src/test/java/com/leadflow/crm/CrmConnectorRegistryTest.java` :
 
@@ -566,7 +566,7 @@ class CrmConnectorRegistryTest {
 }
 ```
 
-- [ ] **Step 7: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 7: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=CrmConnectorRegistryTest
@@ -574,7 +574,7 @@ class CrmConnectorRegistryTest {
 
 Attendu : échec de compilation — le constructeur du registre ne prend pas `CrmProperties`, et le port n'a ni le troisième argument ni `resolveAssignee`.
 
-- [ ] **Step 8: Élargir le port**
+- [x] **Step 8: Élargir le port**
 
 Remplacer les deux déclarations de méthode de `backend/src/main/java/com/leadflow/crm/CrmConnector.java` (garder l'en-tête de classe et son Javadoc) :
 
@@ -609,7 +609,7 @@ Remplacer les deux déclarations de méthode de `backend/src/main/java/com/leadf
 
 Ajouter les imports `com.leadflow.crm.model.CrmAssignee` et `com.leadflow.crm.model.CrmSyncState`.
 
-- [ ] **Step 9: Réécrire le registre**
+- [x] **Step 9: Réécrire le registre**
 
 Remplacer le corps de `backend/src/main/java/com/leadflow/crm/CrmConnectorRegistry.java` :
 
@@ -681,7 +681,7 @@ public class CrmConnectorRegistry {
 }
 ```
 
-- [ ] **Step 10: Lancer la suite complète**
+- [x] **Step 10: Lancer la suite complète**
 
 ```bash
 ./mvnw test
@@ -689,7 +689,7 @@ public class CrmConnectorRegistry {
 
 Attendu : 32 tests de base moins les 4 anciens du registre, plus 6 nouveaux du registre et 2 de l'exception — **36 tests, 0 échec**. Vérifier le total dans la sortie ; s'il est inférieur, une classe ne compile plus.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm backend/src/test/java/com/leadflow/crm
@@ -717,7 +717,7 @@ Deux points de conception à ne pas rater :
 - Consumes : `CrmConnectorRegistry.forProvider(String)`, `CrmSyncException.partialState()`, `CrmSyncState`, `CrmAssignee`, `ClientRepository`, `SalesRepRepository`, `LeadRepository`, `CrmSyncAttemptRepository`, `Lead`, `LeadStatus`, `CrmSyncAttemptStatus`.
 - Produces : `CrmSyncService.synchronise(UUID leadId)` → `CrmSyncResult`, appelé par F3/F4 plus tard.
 
-- [ ] **Step 1: Ajouter le dérivé manquant au repository**
+- [x] **Step 1: Ajouter le dérivé manquant au repository**
 
 Dans `backend/src/main/java/com/leadflow/crm/CrmSyncAttemptRepository.java`, ajouter :
 
@@ -732,7 +732,7 @@ Dans `backend/src/main/java/com/leadflow/crm/CrmSyncAttemptRepository.java`, ajo
             UUID leadId, String providerId);
 ```
 
-- [ ] **Step 2: Écrire le test d'orchestration**
+- [x] **Step 2: Écrire le test d'orchestration**
 
 Créer `backend/src/test/java/com/leadflow/crm/CrmSyncServiceTest.java` :
 
@@ -957,7 +957,7 @@ class CrmSyncServiceTest {
 }
 ```
 
-- [ ] **Step 3: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 3: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=CrmSyncServiceTest
@@ -965,7 +965,7 @@ class CrmSyncServiceTest {
 
 Attendu : échec de compilation — `CrmSyncService` n'existe pas.
 
-- [ ] **Step 4: Écrire l'écrivain de trace**
+- [x] **Step 4: Écrire l'écrivain de trace**
 
 Créer `backend/src/main/java/com/leadflow/crm/CrmSyncTraceWriter.java` :
 
@@ -1041,7 +1041,7 @@ public class CrmSyncTraceWriter {
 }
 ```
 
-- [ ] **Step 5: Écrire l'orchestrateur**
+- [x] **Step 5: Écrire l'orchestrateur**
 
 Créer `backend/src/main/java/com/leadflow/crm/CrmSyncService.java` :
 
@@ -1189,7 +1189,7 @@ public class CrmSyncService {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=CrmSyncServiceTest
@@ -1197,7 +1197,7 @@ public class CrmSyncService {
 
 Attendu : 7 tests verts. La fixture doit satisfaire les colonnes `NOT NULL` de `V1` : `source`, `payload` (une `Map`, sérialisée en `jsonb`), `signature` et `received_at`. En cas d'échec de persistance, ouvrir `backend/src/main/java/com/leadflow/capture/RawLeadEvent.java` et aligner les setters sur les champs réels.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1232,7 +1232,7 @@ Deux couches, et cette tâche ne fait que la couche basse : parler HTTP à une i
   - `DolibarrClient.lieResponsable(CrmTarget, String opportuniteRef, String utilisateurRef)`
   - `DolibarrClient.chercheUtilisateurParEmail(CrmTarget, String) → String` (nul si absent)
 
-- [ ] **Step 1: Écrire le test du transport**
+- [x] **Step 1: Écrire le test du transport**
 
 Créer `backend/src/test/java/com/leadflow/crm/dolibarr/DolibarrClientTest.java` :
 
@@ -1355,7 +1355,7 @@ class DolibarrClientTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=DolibarrClientTest
@@ -1363,7 +1363,7 @@ class DolibarrClientTest {
 
 Attendu : échec de compilation — `DolibarrClient` n'existe pas.
 
-- [ ] **Step 3: Écrire la configuration HTTP**
+- [x] **Step 3: Écrire la configuration HTTP**
 
 Créer `backend/src/main/java/com/leadflow/crm/CrmHttpConfig.java` :
 
@@ -1413,7 +1413,7 @@ public class CrmHttpConfig {
 }
 ```
 
-- [ ] **Step 4: Écrire le transport Dolibarr**
+- [x] **Step 4: Écrire le transport Dolibarr**
 
 Créer `backend/src/main/java/com/leadflow/crm/dolibarr/DolibarrClient.java` :
 
@@ -1547,7 +1547,7 @@ public class DolibarrClient {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=DolibarrClientTest
@@ -1555,7 +1555,7 @@ public class DolibarrClient {
 
 Attendu : 7 tests verts. La forme `sqlfilters=(t.email:=:'…')` a été vérifiée par la sonde, tout comme la réponse `[]` en `200` quand aucun utilisateur ne correspond.
 
-- [ ] **Step 6: Lancer la suite complète et commiter**
+- [x] **Step 6: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1582,7 +1582,7 @@ La couche de traduction. Elle ne fait pas de HTTP : elle transforme le pivot en 
 - Consumes : `DolibarrClient` (tâche 4), `CrmConnector` (tâche 2), `CrmLead`, `CrmTarget`, `CrmSyncState`, `CrmSyncResult`, `CrmAssignee`.
 - Produces : bean `DolibarrConnector` avec `providerId() == "dolibarr"`, collecté automatiquement par `CrmConnectorRegistry`.
 
-- [ ] **Step 1: Écrire le test de traduction**
+- [x] **Step 1: Écrire le test de traduction**
 
 Créer `backend/src/test/java/com/leadflow/crm/dolibarr/DolibarrConnectorTest.java` :
 
@@ -1767,7 +1767,7 @@ class DolibarrConnectorTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=DolibarrConnectorTest
@@ -1775,7 +1775,7 @@ class DolibarrConnectorTest {
 
 Attendu : échec de compilation — `DolibarrConnector` n'existe pas.
 
-- [ ] **Step 3: Écrire l'adaptateur**
+- [x] **Step 3: Écrire l'adaptateur**
 
 Créer `backend/src/main/java/com/leadflow/crm/dolibarr/DolibarrConnector.java` :
 
@@ -1925,7 +1925,7 @@ public class DolibarrConnector implements CrmConnector {
 }
 ```
 
-- [ ] **Step 4: Lancer le test et vérifier qu'il passe**
+- [x] **Step 4: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=DolibarrConnectorTest
@@ -1933,7 +1933,7 @@ public class DolibarrConnector implements CrmConnector {
 
 Attendu : 10 tests verts.
 
-- [ ] **Step 5: Vérifier que le registre voit l'adaptateur**
+- [x] **Step 5: Vérifier que le registre voit l'adaptateur**
 
 ```bash
 ./mvnw test -Dtest=CrmConnectorRegistryTest
@@ -1942,7 +1942,7 @@ Attendu : 10 tests verts.
 
 Attendu : suite complète à **60 tests, 0 échec**. `BackendApplicationTests` prouve au passage que le contexte démarre avec un vrai adaptateur enregistré.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm/dolibarr backend/src/test/java/com/leadflow/crm/dolibarr
@@ -1966,7 +1966,7 @@ Le JSON-RPC d'Odoo demande deux appels : `common.authenticate` pour obtenir un `
   - `OdooClient.cree(CrmTarget, int uid, String modele, Map<String,Object> champs) → String`
   - `OdooClient.chercheUtilisateurParEmail(CrmTarget, int uid, String email) → String` (nul si absent)
 
-- [ ] **Step 1: Écrire le test du transport**
+- [x] **Step 1: Écrire le test du transport**
 
 Créer `backend/src/test/java/com/leadflow/crm/odoo/OdooClientTest.java` :
 
@@ -2095,7 +2095,7 @@ class OdooClientTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=OdooClientTest
@@ -2103,7 +2103,7 @@ class OdooClientTest {
 
 Attendu : échec de compilation — `OdooClient` n'existe pas.
 
-- [ ] **Step 3: Écrire le transport**
+- [x] **Step 3: Écrire le transport**
 
 Créer `backend/src/main/java/com/leadflow/crm/odoo/OdooClient.java` :
 
@@ -2239,7 +2239,7 @@ public class OdooClient {
 }
 ```
 
-- [ ] **Step 4: Lancer le test et vérifier qu'il passe**
+- [x] **Step 4: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=OdooClientTest
@@ -2247,7 +2247,7 @@ public class OdooClient {
 
 Attendu : 7 tests verts. Le chemin `error.data.message` et le `HTTP 200` porteur d'erreur ont été confirmés par la sonde ; `error.data.debug` porte la trace Python complète, à ne jamais recopier dans `crm_sync_attempt.error_message`.
 
-- [ ] **Step 5: Lancer la suite complète et commiter**
+- [x] **Step 5: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -2275,7 +2275,7 @@ Odoo place la société et le contact dans le même modèle `res.partner`, disti
 - Consumes : `OdooClient` (tâche 6), `CrmConnector` (tâche 2).
 - Produces : bean `OdooConnector` avec `providerId() == "odoo"`.
 
-- [ ] **Step 1: Écrire le test de traduction**
+- [x] **Step 1: Écrire le test de traduction**
 
 Créer `backend/src/test/java/com/leadflow/crm/odoo/OdooConnectorTest.java` :
 
@@ -2434,7 +2434,7 @@ class OdooConnectorTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=OdooConnectorTest
@@ -2442,7 +2442,7 @@ class OdooConnectorTest {
 
 Attendu : échec de compilation — `OdooConnector` n'existe pas.
 
-- [ ] **Step 3: Écrire l'adaptateur**
+- [x] **Step 3: Écrire l'adaptateur**
 
 Créer `backend/src/main/java/com/leadflow/crm/odoo/OdooConnector.java` :
 
@@ -2589,7 +2589,7 @@ public class OdooConnector implements CrmConnector {
 }
 ```
 
-- [ ] **Step 4: Lancer le test et vérifier qu'il passe**
+- [x] **Step 4: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=OdooConnectorTest
@@ -2597,7 +2597,7 @@ public class OdooConnector implements CrmConnector {
 
 Attendu : 9 tests verts.
 
-- [ ] **Step 5: Activer Odoo dans la configuration**
+- [x] **Step 5: Activer Odoo dans la configuration**
 
 Dans `backend/src/main/resources/application.yml`, sous `leadflow.crm.providers.odoo` :
 
@@ -2607,7 +2607,7 @@ Dans `backend/src/main/resources/application.yml`, sous `leadflow.crm.providers.
         enabled: true
 ```
 
-- [ ] **Step 6: Lancer la suite complète et commiter**
+- [x] **Step 6: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -2926,3 +2926,42 @@ git commit -m "docs: CLAUDE.md decrit les adaptateurs ERP de F5"
 Utiliser la compétence `superpowers:requesting-code-review` pour une revue de branche, traiter ce qui doit l'être, puis `superpowers:finishing-a-development-branch` pour fusionner `feature/f5-connecteurs-erp` dans `main`.
 
 **Ne pas supprimer la branche après la fusion** : les branches de feature sont conservées comme historique du projet.
+
+---
+
+## Etat a l'arret — 7 taches sur 9
+
+| Tache | Commit | Etat |
+| --- | --- | --- |
+| 1. Sonde contre les ERP reels | `fbf7f2c` | faite |
+| 2. Modele pivot, port et registre | `17a46c7` | faite |
+| 3. Orchestrateur `CrmSyncService` | `afc2f1b` | faite |
+| 4. Transport Dolibarr | `5b8d156` | faite |
+| 5. Adaptateur Dolibarr | `a48d7b0` | faite |
+| 6. Transport Odoo | `740c242` | faite |
+| 7. Adaptateur Odoo | `b29688c` | faite |
+| 8. Tests d'integration reels | — | **a faire** |
+| 9. CLAUDE.md et recette | — | a faire |
+
+**Point de reprise : BASE `b29688c`, branche `feature/f5-connecteurs-erp`, reprendre a la
+tache 8.** Suite au vert : **76 tests, 0 echec** (`./mvnw test` depuis `backend/`, Docker
+requis).
+
+### Ce qu'une session repartant a froid doit savoir
+
+- **Tout le code de F5 est ecrit et teste.** Il reste la verification contre les vrais ERP
+  (tache 8) et la documentation (tache 9). Les deux sont independantes du reste.
+- **La sonde a deja eu lieu** : son releve est le §15 de la spec, et la mise en route des
+  conteneurs suit `docs/erp-integration-setup.md` — pas la peine de re-explorer les API.
+  Sans l'activation prealable des modules `Societe` et `Projet`, Dolibarr repond `403` a
+  toute creation, et le module `crm` d'Odoo s'installe en ligne de commande, pas en JSON-RPC.
+- **Deux ecarts avec le plan initial ont ete assumes en cours de route**, tous deux
+  documentes dans les commits concernes :
+  1. `CrmConnectorRegistry` nomme desormais le conflit quand deux connecteurs declarent le
+     meme `providerId` (tache 5) ;
+  2. `CrmSyncServiceTest` se donne son propre fournisseur `espion`, active par une propriete
+     de test, l'adaptateur Dolibarr reel occupant la cle `dolibarr` dans le contexte.
+- **Question encore ouverte, sans urgence** : la `ref` d'opportunite Dolibarr est tiree au
+  hasard (`LF-XXXXXXXX`) faute d'identifiant de lead dans le pivot. Le raisonnement est dans
+  le Javadoc de `DolibarrConnector.reference()`. Une `ref` stable demanderait d'ajouter une
+  reference de lead au modele pivot — decision a prendre avec l'utilisateur, pas seul.
