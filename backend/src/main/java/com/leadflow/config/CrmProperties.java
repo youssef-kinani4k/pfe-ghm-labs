@@ -6,26 +6,16 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration des ERP/CRM cibles. Chaque fournisseur est une entree de
- * {@code leadflow.crm.providers}, ce qui permet d'en ajouter un sans toucher au code de
- * configuration.
- *
- * <p>Tous les champs de {@link Provider} ne concernent pas tous les ERP : {@code apiKey}
- * suffit a Dolibarr, tandis qu'Odoo exige en plus {@code database} et {@code username}.
- * Chaque adaptateur valide ce dont il a besoin a son demarrage.
+ * Reglages techniques des adaptateurs ERP. Tout ce qui depend du client — URL de
+ * l'instance, cle d'API, base, utilisateur — vit desormais sur la ligne {@code client},
+ * dans son document {@code crm_config}. Ne restent ici que les reglages communs a toutes
+ * les instances d'un meme fournisseur.
  */
 @ConfigurationProperties(prefix = "leadflow.crm")
-public record CrmProperties(
-        String defaultProvider,
-        Map<String, Provider> providers) {
+public record CrmProperties(Map<String, Provider> providers) {
 
     public record Provider(
             boolean enabled,
-            String baseUrl,
-            String apiKey,
-            String database,
-            String username,
-            String password,
             Duration connectTimeout,
             Duration readTimeout) {
     }

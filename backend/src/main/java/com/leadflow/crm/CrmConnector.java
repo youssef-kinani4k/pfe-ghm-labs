@@ -2,6 +2,7 @@ package com.leadflow.crm;
 
 import com.leadflow.crm.model.CrmLead;
 import com.leadflow.crm.model.CrmSyncResult;
+import com.leadflow.crm.model.CrmTarget;
 
 /**
  * Port de sortie vers un ERP/CRM. Une implementation par fournisseur supporte.
@@ -20,9 +21,9 @@ public interface CrmConnector {
 
     /**
      * Cree ou met a jour le tiers, le contact, l'opportunite et la tache de rappel dans
-     * l'ERP cible.
+     * l'instance ERP designee par {@code target}.
      *
      * @throws com.leadflow.crm.model.CrmSyncException si l'ERP refuse ou est injoignable
      */
-    CrmSyncResult sync(CrmLead lead);
+    CrmSyncResult sync(CrmLead lead, CrmTarget target);
 }
