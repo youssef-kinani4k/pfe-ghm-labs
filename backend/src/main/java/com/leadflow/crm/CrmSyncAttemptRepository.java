@@ -17,4 +17,13 @@ public interface CrmSyncAttemptRepository extends JpaRepository<CrmSyncAttempt, 
 
     /** Historique complet d'un lead, pour l'ecran de diagnostic du dashboard en F6. */
     List<CrmSyncAttempt> findByLeadIdOrderByAttemptedAtDesc(UUID leadId);
+
+    /**
+     * Historique d'un lead pour UN fournisseur, du plus recent au plus ancien. C'est la
+     * source de l'etat anterieur : un meme lead peut partir vers des fournisseurs
+     * differents, et des references Dolibarr ne doivent jamais servir d'etat de depart
+     * a Odoo.
+     */
+    List<CrmSyncAttempt> findByLeadIdAndProviderIdOrderByAttemptedAtDesc(
+            UUID leadId, String providerId);
 }
