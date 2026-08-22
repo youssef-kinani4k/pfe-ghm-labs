@@ -1814,12 +1814,14 @@ Le secret ne doit jamais partir dans un navigateur : la signature se calcule cô
 
 ### Vérifier en local avec curl
 
-Backend démarré sur `:8080` et données de démonstration chargées (profil `dev`) :
+Backend démarré sur `:8080` et données de démonstration chargées (profil `dev`). Les
+valeurs ci-dessous sont celles du client de démonstration de
+`backend/src/main/resources/db/dev/R__demo_data.sql`, dont le secret HMAC est donné en clair
+en commentaire de ce fichier :
 
 ```bash
-CLE=$(docker exec leadflow-postgres psql -U leadflow -d leadflow -tAc \
-  "SELECT public_key FROM client LIMIT 1")
-SECRET="secret-de-demonstration"   # celui de R__demo_data.sql
+CLE="demo-cd253966049ebd76243248e8"
+SECRET="c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19"
 CORPS='{"source":"formulaire-devis","email":"karim@acme.test"}'
 T=$(date +%s)
 SIG=$(printf '%s' "$T.$CORPS" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
@@ -1847,9 +1849,6 @@ Renvoyer **exactement** la même requête (même corps, même en-tête) ne crée
 lead : le service rend le `eventId` déjà attribué avec un `202`. Un client peut donc
 réessayer sans risque après un timeout réseau.
 ````
-
-**Vérifier `R__demo_data.sql`** avant de figer la valeur `SECRET` du bloc curl : si le
-secret de démonstration y porte un autre nom, corriger la ligne en conséquence.
 
 - [ ] **Step 2: Mettre à jour `CLAUDE.md`**
 
