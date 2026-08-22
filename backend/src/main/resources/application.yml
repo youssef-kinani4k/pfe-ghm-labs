@@ -65,6 +65,10 @@ leadflow:
   qualification:
     # Fenetre de deduplication : meme client, meme email normalise.
     dedup-window: 24h
+    listener:
+      # Presence du consommateur de la file. Toujours vrai en production ; la suite de
+      # tests le retire pour lire elle-meme ce que la capture a publie.
+      enabled: true
   intent:
     gemini:
       enabled: true

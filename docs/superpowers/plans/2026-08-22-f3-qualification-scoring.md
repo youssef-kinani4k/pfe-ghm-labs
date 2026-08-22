@@ -2119,7 +2119,7 @@ git commit -m "feat: deduplication par fenetre et ecriture du lead en transactio
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Écrire le test d'intégration**
+- [x] **Step 1: Écrire le test d'intégration**
 
 Créer `backend/src/test/java/com/leadflow/qualification/LeadQualificationIntegrationTest.java` :
 
@@ -2302,12 +2302,12 @@ class LeadQualificationIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=LeadQualificationIntegrationTest`
 Expected: échec de compilation — `LeadQualificationService` n'existe pas.
 
-- [ ] **Step 3: Écrire le service d'orchestration**
+- [x] **Step 3: Écrire le service d'orchestration**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadQualificationService.java` :
 
@@ -2471,7 +2471,7 @@ public class LeadQualificationService {
 }
 ```
 
-- [ ] **Step 4: Écrire le listener**
+- [x] **Step 4: Écrire le listener**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadQualificationListener.java` :
 
@@ -2513,7 +2513,7 @@ public class LeadQualificationListener {
 }
 ```
 
-- [ ] **Step 5: Écrire le test de mode dégradé de bout en bout**
+- [x] **Step 5: Écrire le test de mode dégradé de bout en bout**
 
 C'est le troisième critère de recette du plan général, et le seul qui vérifie que le repli
 est câblé **de bout en bout** et pas seulement à l'intérieur de l'analyseur. Gemini est
@@ -2589,14 +2589,14 @@ class QualificationModeDegradeTest {
 }
 ```
 
-- [ ] **Step 6: Lancer les tests et vérifier qu'ils passent**
+- [x] **Step 6: Lancer les tests et vérifier qu'ils passent**
 
 Run: `./mvnw test -Dtest='LeadQualificationIntegrationTest,QualificationModeDegradeTest'`
 Expected: 9 tests, 0 échec.
 
 Si `qualifieUnLeadCompletEtLeMarqueQualified` rend 90 au lieu de 80 : le client de démonstration porte un `scoring_config` non vide. Vérifier que `preparation()` crée bien un client neuf dont `scoringConfig` reste la carte vide par défaut.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte. **Le pipeline est désormais connecté de bout en bout jusqu'au lead qualifié.**
