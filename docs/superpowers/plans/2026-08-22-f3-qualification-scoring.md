@@ -3122,7 +3122,7 @@ git commit -m "feat: reference de lead stable dans le pivot, fin de la ref aleat
 
 **Interfaces:** aucune — tâche documentaire.
 
-- [ ] **Step 1: Enrichir le `package-info`**
+- [x] **Step 1: Enrichir le `package-info`**
 
 Remplacer `backend/src/main/java/com/leadflow/qualification/package-info.java` :
 
@@ -3152,7 +3152,7 @@ Remplacer `backend/src/main/java/com/leadflow/qualification/package-info.java` :
 package com.leadflow.qualification;
 ```
 
-- [ ] **Step 2: Mettre à jour la section « Capture » de `CLAUDE.md`**
+- [x] **Step 2: Mettre à jour la section « Capture » de `CLAUDE.md`**
 
 Dans la sous-section sur la publication at-least-once, remplacer la phrase « **le consommateur de F3 doit etre idempotent sur `eventId`** » par :
 
@@ -3162,7 +3162,7 @@ mais que le passage à `PUBLISHED` échoue, le message est renvoyé — le conso
 absorbe ce cas par la contrainte unique `lead.raw_event_id`.
 ```
 
-- [ ] **Step 3: Ajouter la section « Qualification » à `CLAUDE.md`**
+- [x] **Step 3: Ajouter la section « Qualification » à `CLAUDE.md`**
 
 Insérer après la section « Capture — le contrat d'entrée » :
 
@@ -3203,7 +3203,7 @@ transaction. **Il n'y a pas de filet de republication** : voir le Javadoc de
 `QualifiedLeadPublisher`, la dette appartient à F4.
 ```
 
-- [ ] **Step 4: Mettre à jour la section « État actuel » de `CLAUDE.md`**
+- [x] **Step 4: Mettre à jour la section « État actuel » de `CLAUDE.md`**
 
 Remplacer la section entière :
 
@@ -3227,11 +3227,11 @@ monitoring (F6), et les quatre composants de `features/` sont des placeholders. 
 supposer l'existence d'un service ou d'un endpoint : vérifier avant de référencer.
 ```
 
-- [ ] **Step 5: Mettre à jour la note sur les migrations**
+- [x] **Step 5: Mettre à jour la note sur les migrations**
 
 Dans la section « Base de données », remplacer « Deux migrations existent » par « Trois migrations existent », et ajouter `V3__raw_lead_event_idempotence.sql` à la liste si elle n'y figure pas. Vérifier que la phrase « les features suivantes ne devraient plus avoir à le modifier » reste vraie — F3 n'a ajouté aucune migration, elle l'est.
 
-- [ ] **Step 6: Vérifier et commiter**
+- [x] **Step 6: Vérifier et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte — le `package-info` est compilé.
