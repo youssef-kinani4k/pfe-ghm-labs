@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,18 +33,21 @@ public class LeadCaptureService {
     private final HmacSignatureVerifier verificateur;
     private final ObjectMapper objectMapper;
     private final WebhookProperties properties;
+    private final ApplicationEventPublisher evenements;
 
     public LeadCaptureService(
             ClientRepository clientRepository,
             RawLeadEventRepository rawLeadEventRepository,
             HmacSignatureVerifier verificateur,
             ObjectMapper objectMapper,
-            WebhookProperties properties) {
+            WebhookProperties properties,
+            ApplicationEventPublisher evenements) {
         this.clientRepository = clientRepository;
         this.rawLeadEventRepository = rawLeadEventRepository;
         this.verificateur = verificateur;
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.evenements = evenements;
     }
 
     @Transactional
@@ -88,6 +92,15 @@ public class LeadCaptureService {
         evenement.setStatus(RawLeadEventStatus.RECEIVED);
 
         RawLeadEvent enregistre = rawLeadEventRepository.saveAndFlush(evenement);
+
+        // Publie DANS la transaction, consomme APRES son commit : c'est tout le mecanisme
+        // du @TransactionalEventListener(AFTER_COMMIT) cote publieur.
+        evenements.publishEvent(new LeadCapturedEvent(
+                enregistre.getId(),
+                enregistre.getClientId(),
+                enregistre.getSource(),
+                enregistre.getReceivedAt()));
+
         return new CaptureAccepted(enregistre.getId());
     }
 

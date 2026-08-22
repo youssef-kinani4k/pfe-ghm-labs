@@ -7,6 +7,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -61,9 +62,27 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with(DLQ_ROUTING_KEY);
     }
 
+    /**
+     * Paquets dont une classe peut etre instanciee a la lecture d'un message. Le type
+     * voyage dans un en-tete du message : faire confiance a tout laisserait un producteur
+     * choisir la classe a instancier chez nous. C'est donc une liste blanche, et la
+     * correspondance est exacte — ni prefixe, ni joker. Une future feature qui ajoute un
+     * contrat de file dans un autre paquet doit l'ajouter ici.
+     */
+    private static final String[] PAQUETS_DE_CONFIANCE = {"com.leadflow.capture"};
+
+    /**
+     * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par
+     * defaut : nos propres contrats de file seraient refuses a la deserialisation, cote
+     * consommateur comme cote test.
+     */
     @Bean
     MessageConverter jsonMessageConverter() {
-        return new JacksonJsonMessageConverter();
+        JacksonJsonMessageConverter converteur = new JacksonJsonMessageConverter();
+        DefaultJacksonJavaTypeMapper typeMapper = new DefaultJacksonJavaTypeMapper();
+        typeMapper.setTrustedPackages(PAQUETS_DE_CONFIANCE);
+        converteur.setJavaTypeMapper(typeMapper);
+        return converteur;
     }
 
     @Bean

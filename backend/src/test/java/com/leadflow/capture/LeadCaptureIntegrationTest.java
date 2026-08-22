@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.leadflow.TestcontainersConfiguration;
+import com.leadflow.config.RabbitMQConfig;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import java.time.Duration;
@@ -19,6 +20,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +41,7 @@ class LeadCaptureIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ClientRepository clientRepository;
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
+    @Autowired private RabbitTemplate rabbitTemplate;
 
     private String clePublique;
     private UUID clientId;
@@ -222,6 +225,35 @@ class LeadCaptureIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(sansSource))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void publieLeMessageSurLaFileEtMarqueLEvenementPublie() throws Exception {
+        // On vide la file d'abord : un test precedent a pu y laisser un message.
+        while (rabbitTemplate.receive(RabbitMQConfig.LEADS_QUEUE, 200) != null) {
+            // rien : on purge
+        }
+
+        mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", enTeteValide(SECRET, CORPS))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted());
+
+        // Le message est reellement consomme depuis RabbitMQ, pas verifie sur un mock :
+        // c'est la seule facon de prouver que la topologie et le convertisseur marchent.
+        Object recu = rabbitTemplate.receiveAndConvert(RabbitMQConfig.LEADS_QUEUE, 5000);
+
+        assertThat(recu).isInstanceOf(CapturedLeadMessage.class);
+        CapturedLeadMessage message = (CapturedLeadMessage) recu;
+        RawLeadEvent evenement = rawLeadEventRepository.findAll().getFirst();
+        assertThat(message.eventId()).isEqualTo(evenement.getId());
+        assertThat(message.clientId()).isEqualTo(clientId);
+        assertThat(message.source()).isEqualTo("formulaire-devis");
+
+        RawLeadEvent relu = rawLeadEventRepository.findById(evenement.getId()).orElseThrow();
+        assertThat(relu.getStatus()).isEqualTo(RawLeadEventStatus.PUBLISHED);
+        assertThat(relu.getPublishedAt()).isNotNull();
     }
 
     @Test
