@@ -87,6 +87,10 @@ leadflow:
       # Garde-fou sur le texte envoye au modele.
       max-message-chars: 2000
   crm:
+    listener:
+      # Presence du consommateur de leadflow.leads.routed. Toujours vrai en production ;
+      # la suite de tests le retire pour ne pas appeler d'ERP sans le vouloir.
+      enabled: true
     # Reglages techniques uniquement. L'URL et les identifiants de chaque instance ERP
     # vivent sur la ligne client, chiffres.
     providers:
