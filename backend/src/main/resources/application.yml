@@ -62,6 +62,25 @@ leadflow:
     # Filet de republication : age minimal d'une ligne non publiee, et periode de balayage.
     relay-after: 2m
     relay-interval: 30s
+  qualification:
+    # Fenetre de deduplication : meme client, meme email normalise.
+    dedup-window: 24h
+    listener:
+      # Presence du consommateur de la file. Toujours vrai en production ; la suite de
+      # tests le retire pour lire elle-meme ce que la capture a publie.
+      enabled: true
+  intent:
+    gemini:
+      enabled: true
+      # Cle globale a l'instance : l'analyse d'intention est un service de l'agence, pas un
+      # reglage de tenant. Absente ou vide, l'application demarre et qualifie en mode RULES.
+      api-key: ${GEMINI_API_KEY:}
+      base-url: https://generativelanguage.googleapis.com/v1beta/models/
+      model: gemini-2.5-flash
+      connect-timeout: 3s
+      read-timeout: 8s
+      # Garde-fou sur le texte envoye au modele.
+      max-message-chars: 2000
   crm:
     # Reglages techniques uniquement. L'URL et les identifiants de chaque instance ERP
     # vivent sur la ligne client, chiffres.

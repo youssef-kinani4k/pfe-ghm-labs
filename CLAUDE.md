@@ -126,14 +126,57 @@ donc plusieurs textes valides decrivent la meme soumission et doivent partager u
 **La publication est at-least-once.** Elle part apres le commit
 (`@TransactionalEventListener(AFTER_COMMIT)`), et `PendingEventRelay` reprend
 periodiquement ce qui est reste non publie. Si l'envoi reussit mais que le passage a
-`PUBLISHED` echoue, le message est renvoye : **le consommateur de F3 doit etre idempotent
-sur `eventId`**. Le filet est mono-instance ; deux instances demanderaient un
-`SELECT ... FOR UPDATE SKIP LOCKED`.
+`PUBLISHED` echoue, le message est renvoye — le consommateur de F3 absorbe ce cas par la
+contrainte unique `lead.raw_event_id`. Le filet est mono-instance ; deux instances
+demanderaient un `SELECT ... FOR UPDATE SKIP LOCKED`.
 
 **Le convertisseur de messages ne fait confiance qu'a une liste blanche de paquets**
 (`RabbitMQConfig.PAQUETS_DE_CONFIANCE`), la correspondance etant exacte : ni prefixe, ni
 joker. Une feature qui ajoute un contrat de file dans un autre paquet doit l'y declarer,
 sans quoi le consommateur refusera de deserialiser le message.
+
+### Qualification — ce qui sort de la file
+
+Le consommateur est `qualification/LeadQualificationListener`, et il ne fait que traduire le
+protocole : tout le metier vit dans `LeadQualificationService`, testable sans broker. Le
+bean est conditionnel (`leadflow.qualification.listener.enabled`) et la suite de tests le
+retire — un consommateur actif volerait aux tests de capture le message qu'ils viennent de
+publier. Ne pas le remplacer par `spring.rabbitmq.listener.simple.auto-startup=false` : le
+cache de contextes de test met un contexte en pause puis le redemarre, et `start()` reveille
+les beans `Lifecycle` en ignorant `auto-startup`.
+
+**Le service n'est pas transactionnel, et c'est delibere.** L'appel a Gemini peut durer
+plusieurs secondes ; a l'interieur d'une transaction JPA il tiendrait une connexion Postgres
+ouverte pendant tout ce temps, et le pool s'epuiserait avant le broker. L'ecriture a sa
+propre transaction, portee par `LeadWriter` en `REQUIRES_NEW`.
+
+**L'ordre des etapes est porteur de sens.** Normalisation, puis deduplication, puis analyse
+d'intention : la deduplication compare des emails normalises, et un doublon ne doit pas
+couter un appel au modele.
+
+**Seul l'email peut faire echouer la qualification.** Les autres champs illisibles passent a
+`null`. Un evenement sans email exploitable n'ecrit aucun lead et marque `raw_lead_event` en
+`DISCARDED` : une erreur deterministe ne part jamais en DLQ. Ce statut est **terminal**, et
+c'est pour cela qu'il ne reutilise pas le `FAILED` de la capture, que `PendingEventRelay`
+rebalaye — un echec deterministe range sous `FAILED` serait republie a chaque tour de filet.
+
+**L'analyse d'intention ne peut pas echouer.** `GeminiIntentAnalyzer` est `@Primary` sous
+`leadflow.intent.gemini.enabled` et decore `RuleBasedIntentAnalyzer` ; toute defaillance —
+delai depasse, quota, reponse hors vocabulaire — retombe sur le lexique avec
+`IntentSource.RULES`. La cle d'API est **globale a l'instance** (`GEMINI_API_KEY`), pas
+portee par le client. La reponse du modele n'est acceptee que si elle appartient a
+l'enumeration `LeadIntent` : c'est la parade a une injection de prompt glissee dans le
+message du prospect.
+
+**`client.scoring_config` a desormais une forme**, fixee par `ScoringConfig` : bareme additif
+a criteres fixes, seuls les poids et les listes cibles sont configurables. La lecture est
+tolerante — un document malforme donne les defauts, jamais une erreur.
+
+**La sortie est `leadflow.leads.qualified`.** La publication est un appel direct apres le
+retour de `LeadWriter.insere`, donc apres le commit — et non un
+`@TransactionalEventListener` comme en F2, qui serait silencieusement ignore hors
+transaction. Un doublon `REJECTED` n'est pas publie. **Il n'y a pas de filet de
+republication** : voir le Javadoc de `QualifiedLeadPublisher`, la dette appartient a F4.
 
 ### Frontend
 
@@ -179,10 +222,12 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Deux migrations existent : `V1__raw_lead_event.sql` (journal de capture) et
+Trois migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
-`crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`). Le schema est
-desormais complet : les features suivantes ne devraient plus avoir a le modifier.
+`crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`) et
+`V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`). Le schema est
+desormais complet : F3 n'a rien eu a y ajouter, et les features suivantes ne devraient pas
+non plus.
 
 Sous le profil `dev`, `spring.flyway.locations` inclut en plus `classpath:db/dev`, qui
 contient `R__demo_data.sql` — un client de demonstration et ses commerciaux. La production
@@ -332,16 +377,18 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le modele de donnees est complet (F1), les deux adaptateurs ERP existent (F5), et
-**l'entree du pipeline est ouverte** (F2).
+Le modele de donnees est complet (F1), les deux adaptateurs ERP existent (F5), l'entree du
+pipeline est ouverte (F2) et **le milieu est branche** (F3).
 
 Ce qui existe : la configuration, le chiffrement des secrets, les cinq entites et leurs
 repositories, les migrations `V1` a `V3`, le port `CrmConnector` et son registre, les
-adaptateurs Dolibarr et Odoo, `CrmSyncService`, et la couche `capture` complete — webhook
-signe, evenement brut persiste, publication sur RabbitMQ avec filet de republication.
+adaptateurs Dolibarr et Odoo, `CrmSyncService`, la couche `capture` complete, et la couche
+`qualification` complete — consommation de la file, mapping du payload libre, normalisation,
+deduplication, analyse d'intention Gemini avec repli lexical, scoring, et publication sur
+`leadflow.leads.qualified`.
 
-Ce qui n'existe pas : **le milieu du pipeline**. Personne ne consomme
-`leadflow.leads.captured` : pas de qualification (F3), pas de routage (F4), pas d'API de
-monitoring (F6) ; les quatre composants de `features/` sont des placeholders. Rien
-n'appelle donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'existence
-d'un service ou d'un endpoint : verifier avant de referencer.
+Ce qui n'existe pas : **la sortie du pipeline**. Personne ne consomme
+`leadflow.leads.qualified` : pas de routage (F4), donc `lead.assigned_sales_rep_id` reste
+toujours nul et rien n'appelle `CrmSyncService` en dehors des tests ; pas d'API de
+monitoring (F6), et les quatre composants de `features/` sont des placeholders. Ne pas
+supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.

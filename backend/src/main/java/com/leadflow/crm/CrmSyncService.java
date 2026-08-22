@@ -7,6 +7,7 @@ import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 import com.leadflow.qualification.Lead;
+import com.leadflow.qualification.LeadReference;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
@@ -128,6 +129,7 @@ public class CrmSyncService {
 
     private CrmLead versPivot(Lead lead, String assigneeRef) {
         return new CrmLead(
+                LeadReference.pour(lead.getId()),
                 lead.getCompanyName(),
                 lead.getFirstName(),
                 lead.getLastName(),

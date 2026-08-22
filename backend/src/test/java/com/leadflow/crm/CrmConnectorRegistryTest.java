@@ -106,7 +106,7 @@ class CrmConnectorRegistryTest {
     @Test
     void transmetLeLeadLaCibleEtLEtatAnterieurAuConnecteur() {
         CrmTarget cible = new CrmTarget("dolibarr", Map.of("baseUrl", "http://client-a:8081"));
-        CrmLead lead = new CrmLead("Acme", "Amina", "Bensalem", "amina@exemple.test",
+        CrmLead lead = new CrmLead("LF-000000000001", "Acme", "Amina", "Bensalem", "amina@exemple.test",
                 "+212600000000", "Demande de devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "7");
         CrmSyncState etat = new CrmSyncState("42", null, null);
 

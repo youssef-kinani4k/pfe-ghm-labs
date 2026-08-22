@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -69,6 +70,34 @@ class DolibarrClientTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThat(client.chercheUtilisateurParEmail(CIBLE, "inconnu@demo.test")).isNull();
+    }
+
+    @Test
+    void chercheUneOpportuniteParSaReference() {
+        serveur.expect(requestTo(Matchers.containsString("/projects")))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(requestTo(Matchers.containsString("sqlfilters")))
+                .andRespond(withSuccess("[{\"id\":42}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheOpportuniteParRef(CIBLE, "LF-3F2A9C1B7D4E")).isEqualTo("42");
+        serveur.verify();
+    }
+
+    @Test
+    void renvoieNulQuandAucuneOpportuniteNePorteLaReference() {
+        serveur.expect(requestTo(Matchers.containsString("/projects")))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheOpportuniteParRef(CIBLE, "LF-3F2A9C1B7D4E")).isNull();
+    }
+
+    /** Selon les versions, Dolibarr repond 404 sur une recherche sans resultat. */
+    @Test
+    void traiteUn404DeRechercheCommeUneAbsenceEtNonUneErreur() {
+        serveur.expect(requestTo(Matchers.containsString("/projects")))
+                .andRespond(withResourceNotFound().body("{\"error\":{\"message\":\"Not Found\"}}"));
+
+        assertThat(client.chercheOpportuniteParRef(CIBLE, "LF-3F2A9C1B7D4E")).isNull();
     }
 
     @Test

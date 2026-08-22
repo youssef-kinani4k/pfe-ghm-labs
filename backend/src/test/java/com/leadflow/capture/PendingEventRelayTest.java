@@ -105,4 +105,20 @@ class PendingEventRelayTest {
         assertThat(rawLeadEventRepository.findById(publie.getId()).orElseThrow().getStatus())
                 .isEqualTo(RawLeadEventStatus.PUBLISHED);
     }
+
+    /**
+     * Le statut que la qualification pose sur un evenement sans email exploitable. Le filet
+     * doit l'ignorer : le rejouer le renverrait au consommateur, qui le rejetterait a
+     * l'identique, indefiniment.
+     */
+    @Test
+    void ignoreUnEvenementAbandonne() {
+        RawLeadEvent abandonne = evenement(RawLeadEventStatus.DISCARDED, 600);
+
+        relais.republieLesEnAttente();
+
+        assertThat(rabbitTemplate.receive(RabbitMQConfig.LEADS_QUEUE, 500)).isNull();
+        assertThat(rawLeadEventRepository.findById(abandonne.getId()).orElseThrow().getStatus())
+                .isEqualTo(RawLeadEventStatus.DISCARDED);
+    }
 }

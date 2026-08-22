@@ -13,6 +13,7 @@ import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 import com.leadflow.qualification.Lead;
+import com.leadflow.qualification.LeadReference;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
 import com.leadflow.tenant.Client;
@@ -155,6 +156,7 @@ class CrmSyncServiceTest {
     void traduitLeLeadVersLePivot() {
         service.synchronise(leadId);
 
+        assertThat(connecteur.leadRecu.reference()).isEqualTo(LeadReference.pour(leadId));
         assertThat(connecteur.leadRecu.companyName()).isEqualTo("Acme");
         assertThat(connecteur.leadRecu.email()).isEqualTo("karim@acme.test");
         assertThat(connecteur.leadRecu.score()).isEqualTo(72);

@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -49,6 +50,43 @@ public class DolibarrClient {
 
     public String creeOpportunite(CrmTarget target, Map<String, Object> corps) {
         return cree(target, "/projects", corps);
+    }
+
+    /**
+     * Cherche une opportunite par sa {@code ref}.
+     *
+     * <p>Existe pour rendre le rejeu inoffensif : la {@code ref} etant desormais derivee du
+     * lead, elle est stable d'une tentative a l'autre. Sans cette recherche, un rejeu apres
+     * une reponse perdue se heurterait a {@code uk_projet_ref} — un echec deterministe, donc
+     * trois tentatives puis DLQ, alors que l'objet existe deja et que tout va bien.
+     *
+     * <p>Le filtre {@code sqlfilters} est construit par concatenation : la {@code ref} doit
+     * donc rester une reference {@code LF-} derivee du lead. Les apostrophes sont retirees
+     * plutot qu'echappees, ce qui suffit pour cette forme et pour elle seule.
+     *
+     * @return l'identifiant de l'opportunite, ou {@code null} si l'ERP n'en connait aucune
+     */
+    @SuppressWarnings("unchecked")
+    public String chercheOpportuniteParRef(CrmTarget target, String ref) {
+        String filtre = "(t.ref:=:'" + ref.replace("'", "") + "')";
+        try {
+            List<Map<String, Object>> reponse = restClient(target)
+                    .get()
+                    .uri(uri -> uri.path("/projects").queryParam("sqlfilters", filtre).build())
+                    .retrieve()
+                    .body(List.class);
+            if (reponse == null || reponse.isEmpty()) {
+                return null;
+            }
+            Object id = reponse.getFirst().get("id");
+            return id == null ? null : String.valueOf(id);
+        } catch (HttpClientErrorException.NotFound absente) {
+            // Selon les versions, Dolibarr repond 404 sur une recherche sans resultat :
+            // c'est une absence, pas une panne.
+            return null;
+        } catch (RestClientException e) {
+            throw echec("/projects", e);
+        }
     }
 
     /**
