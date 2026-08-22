@@ -1,0 +1,35 @@
+package com.leadflow.common;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/**
+ * Traduction des exceptions applicatives en reponses HTTP. Premiere pierre de la gestion
+ * d'erreurs REST du projet : F2 est le premier endpoint.
+ */
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    /**
+     * Reponse deliberement avare et identique pour les cinq causes de refus. La raison
+     * exacte n'existe que dans ce log : la distinguer cote client donnerait un oracle sur
+     * les cles publiques existantes et sur l'etat d'activation des clients.
+     */
+    @ExceptionHandler(WebhookAuthenticationException.class)
+    ProblemDetail refusDAuthentification(WebhookAuthenticationException echec) {
+        log.warn("Webhook refuse : {}", echec.getMessage());
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, "Signature invalide ou expiree");
+    }
+
+    @ExceptionHandler(PayloadRejectedException.class)
+    ProblemDetail corpsRefuse(PayloadRejectedException echec) {
+        return ProblemDetail.forStatusAndDetail(echec.statut(), echec.getMessage());
+    }
+}
