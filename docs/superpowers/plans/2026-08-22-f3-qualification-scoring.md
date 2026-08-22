@@ -43,6 +43,15 @@ La sortie n'est ni l'un ni l'autre : on interroge Dolibarr par `ref` avant de cr
 
 ---
 
+**Le statut terminal n'est pas `FAILED`** (revue de branche). La spec §3.3 range l'evenement
+sans email exploitable sous `RawLeadEventStatus.FAILED` ; or `PendingEventRelay` rebalaye
+precisement ce statut, ce qui republierait sans fin un evenement que la qualification
+rejettera toujours a l'identique. Un statut `DISCARDED` a ete ajoute pour cela.
+
+**Le test « Postgres coupe -> DLQ apres trois tentatives »** de la spec §8 n'est pas ecrit :
+le comportement teste est celui de la configuration AMQP de F2 (`default-requeue-rejected`,
+trois tentatives, DLX), deja verrouille par cette feature. L'omission est assumee, pas oubliee.
+
 ## Structure des fichiers
 
 ```

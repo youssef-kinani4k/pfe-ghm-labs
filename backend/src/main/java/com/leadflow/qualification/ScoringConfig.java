@@ -63,13 +63,16 @@ public record ScoringConfig(
                 entier(document.get("seuilChaud"), defaut.seuilChaud()));
     }
 
-    /** Le poids d'une intention absente du document reste celui du bareme par defaut. */
+    /**
+     * Le poids d'une intention absente du document — ou ecrit de travers — reste celui du
+     * bareme par defaut, comme partout ailleurs dans cette classe.
+     */
     private static Map<LeadIntent, Integer> intentions(Object brut, Map<LeadIntent, Integer> defaut) {
         Map<LeadIntent, Integer> resultat = new HashMap<>(defaut);
         for (Map.Entry<String, Object> entree : objet(brut).entrySet()) {
             LeadIntent intention = intention(entree.getKey());
             if (intention != null) {
-                resultat.put(intention, entier(entree.getValue(), 0));
+                resultat.put(intention, entier(entree.getValue(), defaut.getOrDefault(intention, 0)));
             }
         }
         return resultat;

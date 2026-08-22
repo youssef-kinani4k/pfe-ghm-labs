@@ -156,7 +156,9 @@ couter un appel au modele.
 
 **Seul l'email peut faire echouer la qualification.** Les autres champs illisibles passent a
 `null`. Un evenement sans email exploitable n'ecrit aucun lead et marque `raw_lead_event` en
-`FAILED` : une erreur deterministe ne part jamais en DLQ.
+`DISCARDED` : une erreur deterministe ne part jamais en DLQ. Ce statut est **terminal**, et
+c'est pour cela qu'il ne reutilise pas le `FAILED` de la capture, que `PendingEventRelay`
+rebalaye — un echec deterministe range sous `FAILED` serait republie a chaque tour de filet.
 
 **L'analyse d'intention ne peut pas echouer.** `GeminiIntentAnalyzer` est `@Primary` sous
 `leadflow.intent.gemini.enabled` et decore `RuleBasedIntentAnalyzer` ; toute defaillance —

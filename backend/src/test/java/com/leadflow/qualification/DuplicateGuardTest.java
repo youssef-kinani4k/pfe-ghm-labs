@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -35,6 +36,7 @@ class DuplicateGuardTest {
     @Autowired private LeadRepository leadRepository;
     @Autowired private ClientRepository clientRepository;
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private UUID clientId;
 
@@ -119,5 +121,22 @@ class DuplicateGuardTest {
         }
 
         assertThat(leadRepository.findByRawEventId(evenement)).isPresent();
+    }
+
+    /**
+     * La fenetre est la seule chose que {@link DuplicateGuard} rende configurable : sans ce
+     * test, une inversion de signe ou un {@code CreatedAtBefore} laisserait toute la classe
+     * verte tout en rejetant chaque lead a jamais, ou en ne dedupliquant plus rien. Le lead
+     * est vieilli en base plutot que la fenetre raccourcie par propriete : cela evite de
+     * monter un second contexte Spring pour une seule assertion.
+     */
+    @Test
+    void neVoitPlusDeDoublonAuDelaDeLaFenetre() {
+        Lead ancien = writer.insere(lead("karim@acme.test", evenement()));
+        jdbcTemplate.update(
+                "update lead set created_at = created_at - interval '25 hours' where id = ?",
+                ancien.getId());
+
+        assertThat(garde.estDoublon(clientId, "karim@acme.test")).isFalse();
     }
 }

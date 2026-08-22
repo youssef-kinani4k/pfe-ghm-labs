@@ -60,6 +60,10 @@ public class DolibarrClient {
      * une reponse perdue se heurterait a {@code uk_projet_ref} — un echec deterministe, donc
      * trois tentatives puis DLQ, alors que l'objet existe deja et que tout va bien.
      *
+     * <p>Le filtre {@code sqlfilters} est construit par concatenation : la {@code ref} doit
+     * donc rester une reference {@code LF-} derivee du lead. Les apostrophes sont retirees
+     * plutot qu'echappees, ce qui suffit pour cette forme et pour elle seule.
+     *
      * @return l'identifiant de l'opportunite, ou {@code null} si l'ERP n'en connait aucune
      */
     @SuppressWarnings("unchecked")

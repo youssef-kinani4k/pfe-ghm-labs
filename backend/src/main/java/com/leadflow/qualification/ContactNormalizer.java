@@ -39,7 +39,7 @@ public class ContactNormalizer {
         return Optional.of(new ContactNormalise(
                 email,
                 telephone(bruts.phone()),
-                texte(bruts.message(), Integer.MAX_VALUE),
+                message(bruts.message()),
                 texte(bruts.companyName(), SOCIETE_MAX),
                 texte(bruts.firstName(), NOM_MAX),
                 texte(bruts.lastName(), NOM_MAX),
@@ -82,6 +82,19 @@ public class ContactNormalizer {
             return null;
         }
         return brut.trim().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Le message est le seul champ libre : il part tel quel vers l'analyseur d'intention et
+     * vers l'ERP, donc seuls ses bords sont rognes. Ecraser ses sauts de ligne comme le fait
+     * {@link #texte} aplatirait irreversiblement un texte en plusieurs paragraphes.
+     */
+    private String message(String brut) {
+        if (brut == null) {
+            return null;
+        }
+        String propre = brut.trim();
+        return propre.isEmpty() ? null : propre;
     }
 
     private String texte(String brut, int maximum) {

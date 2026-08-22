@@ -44,6 +44,10 @@ public class LeadScorer {
     /**
      * Le bonus ne se cumule pas : un lead du bon secteur <i>et</i> du bon pays reste un seul
      * lead cible, pas deux fois meilleur.
+     *
+     * <p>La correspondance de secteur est <b>exacte</b>, jamais partielle : {@code industrie}
+     * ne reconnait pas « industrie du textile ». Un client qui veut les deux les enumere tous
+     * les deux — une correspondance par prefixe ferait de {@code industrie} un piege silencieux.
      */
     private boolean estCible(ContactNormalise contact, ScoringConfig bareme) {
         boolean secteur = contact.sector() != null

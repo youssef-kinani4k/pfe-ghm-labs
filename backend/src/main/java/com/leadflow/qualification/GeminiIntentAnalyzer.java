@@ -115,7 +115,15 @@ public class GeminiIntentAnalyzer implements IntentAnalyzer {
     private String appelle(String message) {
         Map<String, Object> corps = Map.of(
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", CONSIGNE + message)))),
-                "generationConfig", Map.of("temperature", 0, "maxOutputTokens", 32));
+                // thinkingBudget a zero : gemini-2.5-flash reflechit par defaut, et ses
+                // jetons de reflexion se paient sur maxOutputTokens. Sans cela la reponse
+                // revient en MAX_TOKENS, sans « parts », et le mode degrade devient permanent
+                // sans que rien ne le distingue d'une panne. Classer un message dans un
+                // vocabulaire ferme ne demande aucune reflexion.
+                "generationConfig", Map.of(
+                        "temperature", 0,
+                        "maxOutputTokens", 32,
+                        "thinkingConfig", Map.of("thinkingBudget", 0)));
 
         Map<String, Object> reponse = builder.build()
                 .post()

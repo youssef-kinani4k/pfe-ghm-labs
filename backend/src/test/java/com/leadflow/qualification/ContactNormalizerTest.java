@@ -120,4 +120,14 @@ class ContactNormalizerTest {
         assertThat(normalizer.normalise(bruts).orElseThrow().message())
                 .hasSize(long_.trim().length());
     }
+
+    /** Le message part tel quel vers l'analyseur et vers l'ERP : ses paragraphes survivent. */
+    @Test
+    void conserveLesSautsDeLigneDuMessage() {
+        String message = "Bonjour,\n\nJe veux un devis.";
+        ChampsBruts bruts = new ChampsBruts(
+                "a@b.test", null, "  " + message + "  ", null, null, null, null, null);
+
+        assertThat(normalizer.normalise(bruts).orElseThrow().message()).isEqualTo(message);
+    }
 }

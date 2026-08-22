@@ -109,7 +109,9 @@ class LeadQualificationIntegrationTest {
         assertThat(leadRepository.count()).isZero();
 
         RawLeadEvent brut = rawLeadEventRepository.findById(id).orElseThrow();
-        assertThat(brut.getStatus()).isEqualTo(RawLeadEventStatus.FAILED);
+        // DISCARDED et non FAILED : ce dernier est rebalaye par PendingEventRelay, qui
+        // republierait sans fin un evenement que la qualification rejettera toujours.
+        assertThat(brut.getStatus()).isEqualTo(RawLeadEventStatus.DISCARDED);
         assertThat(brut.getFailureReason()).contains("email");
     }
 

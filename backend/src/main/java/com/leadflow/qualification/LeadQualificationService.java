@@ -120,9 +120,14 @@ public class LeadQualificationService {
                 .orElse(Map.of());
     }
 
+    /**
+     * {@code DISCARDED} et non {@code FAILED} : ce dernier appartient a la capture et
+     * signifie « publication a refaire », si bien que {@code PendingEventRelay} le rebalaye.
+     * Un evenement sans email n'a rien a rejouer — il echouerait a l'identique a chaque tour.
+     */
     private void marqueEnEchec(RawLeadEvent brut) {
         log.info("Evenement {} sans email exploitable : aucun lead ecrit", brut.getId());
-        brut.setStatus(RawLeadEventStatus.FAILED);
+        brut.setStatus(RawLeadEventStatus.DISCARDED);
         brut.setFailureReason(SANS_EMAIL);
         rawLeadEventRepository.save(brut);
     }
