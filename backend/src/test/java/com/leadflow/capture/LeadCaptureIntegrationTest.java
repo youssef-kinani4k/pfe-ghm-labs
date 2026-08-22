@@ -225,6 +225,49 @@ class LeadCaptureIntegrationTest {
     }
 
     @Test
+    void rejoueLaMemeRequeteSansCreerDeSecondEvenement() throws Exception {
+        String enTete = enTeteValide(SECRET, CORPS);
+
+        String premiere = mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", enTete)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+
+        String seconde = mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", enTete)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(seconde).isEqualTo(premiere);
+        assertThat(rawLeadEventRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    void deuxSoumissionsDistinctesRestentDeuxEvenements() throws Exception {
+        // Horodatages differents donc signatures differentes : ce n'est pas un rejeu, et
+        // deux vraies soumissions ne doivent surtout pas etre confondues.
+        long maintenant = Instant.now().getEpochSecond();
+
+        mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", signe(SECRET, maintenant, CORPS))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", signe(SECRET, maintenant - 1, CORPS))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted());
+
+        assertThat(rawLeadEventRepository.findAll()).hasSize(2);
+    }
+
+    @Test
     void refuseUnCorpsTropGros() throws Exception {
         String enorme = "{\"source\":\"formulaire\",\"message\":\"" + "a".repeat(70000) + "\"}";
 

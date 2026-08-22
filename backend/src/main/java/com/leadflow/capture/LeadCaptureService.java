@@ -56,6 +56,15 @@ public class LeadCaptureService {
 
         verificateur.verifie(client.getHmacSecret(), corpsBrut, enTeteSignature, Instant.now());
 
+        // Rejeu exact : meme client, meme en-tete signe. On rend l'identifiant deja attribue
+        // sans republier — si la premiere publication avait echoue, la ligne est restee
+        // RECEIVED et c'est le filet qui s'en charge, pas cette requete.
+        Optional<RawLeadEvent> dejaVu =
+                rawLeadEventRepository.findByClientIdAndSignature(client.getId(), enTeteSignature);
+        if (dejaVu.isPresent()) {
+            return new CaptureAccepted(dejaVu.get().getId());
+        }
+
         int taille = corpsBrut.getBytes(StandardCharsets.UTF_8).length;
         if (taille > properties.maxPayloadBytes()) {
             throw new PayloadRejectedException(
