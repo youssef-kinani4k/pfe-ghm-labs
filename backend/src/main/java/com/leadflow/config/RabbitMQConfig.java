@@ -25,6 +25,10 @@ public class RabbitMQConfig {
     public static final String LEADS_QUEUE = "leadflow.leads.captured";
     public static final String LEADS_ROUTING_KEY = "lead.captured";
 
+    /** Sortie de la qualification, consommee par le routage (F4). */
+    public static final String QUALIFIED_QUEUE = "leadflow.leads.qualified";
+    public static final String QUALIFIED_ROUTING_KEY = "lead.qualified";
+
     public static final String DLX_EXCHANGE = "leadflow.leads.dlx";
     public static final String DLQ_QUEUE = "leadflow.leads.dlq";
     public static final String DLQ_ROUTING_KEY = "lead.dead";
@@ -48,6 +52,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Queue qualifiedLeadsQueue() {
+        return QueueBuilder.durable(QUALIFIED_QUEUE)
+                .deadLetterExchange(DLX_EXCHANGE)
+                .deadLetterRoutingKey(DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_QUEUE).build();
     }
@@ -55,6 +67,13 @@ public class RabbitMQConfig {
     @Bean
     Binding leadsBinding(Queue leadsQueue, DirectExchange leadsExchange) {
         return BindingBuilder.bind(leadsQueue).to(leadsExchange).with(LEADS_ROUTING_KEY);
+    }
+
+    @Bean
+    Binding qualifiedLeadsBinding(Queue qualifiedLeadsQueue, DirectExchange leadsExchange) {
+        return BindingBuilder.bind(qualifiedLeadsQueue)
+                .to(leadsExchange)
+                .with(QUALIFIED_ROUTING_KEY);
     }
 
     @Bean
@@ -69,7 +88,8 @@ public class RabbitMQConfig {
      * correspondance est exacte — ni prefixe, ni joker. Une future feature qui ajoute un
      * contrat de file dans un autre paquet doit l'ajouter ici.
      */
-    private static final String[] PAQUETS_DE_CONFIANCE = {"com.leadflow.capture"};
+    private static final String[] PAQUETS_DE_CONFIANCE =
+            {"com.leadflow.capture", "com.leadflow.qualification"};
 
     /**
      * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par

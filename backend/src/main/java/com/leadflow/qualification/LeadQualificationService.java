@@ -27,6 +27,9 @@ import org.springframework.stereotype.Service;
  * est verifiee deux fois : une lecture optimiste, puis la contrainte unique
  * {@code raw_event_id}, seule a faire foi quand deux livraisons arrivent en parallele.
  *
+ * <p>La publication part apres le retour de {@link LeadWriter#insere}, donc apres le commit
+ * de l'ecriture : un message parti plus tot designerait une ligne que F4 ne trouverait pas.
+ *
  * <p>Ne choisit aucun commercial (F4) et n'appelle aucun ERP (F5) :
  * {@code assigned_sales_rep_id} reste nul.
  */
@@ -46,6 +49,7 @@ public class LeadQualificationService {
     private final IntentAnalyzer analyzer;
     private final LeadScorer scorer;
     private final LeadWriter writer;
+    private final QualifiedLeadPublisher publisher;
 
     public LeadQualificationService(
             RawLeadEventRepository rawLeadEventRepository,
@@ -56,7 +60,8 @@ public class LeadQualificationService {
             DuplicateGuard garde,
             IntentAnalyzer analyzer,
             LeadScorer scorer,
-            LeadWriter writer) {
+            LeadWriter writer,
+            QualifiedLeadPublisher publisher) {
         this.rawLeadEventRepository = rawLeadEventRepository;
         this.clientRepository = clientRepository;
         this.leadRepository = leadRepository;
@@ -66,6 +71,7 @@ public class LeadQualificationService {
         this.analyzer = analyzer;
         this.scorer = scorer;
         this.writer = writer;
+        this.publisher = publisher;
     }
 
     /**
@@ -98,7 +104,9 @@ public class LeadQualificationService {
 
         IntentAnalysis analyse = analyzer.analyse(contact.message());
         int score = scorer.score(contact, analyse.intent(), scoringConfig(brut.getClientId()));
-        return Optional.of(ecrit(brut, contact, analyse, score, LeadStatus.QUALIFIED));
+        Lead lead = ecrit(brut, contact, analyse, score, LeadStatus.QUALIFIED);
+        publisher.publie(lead);
+        return Optional.of(lead);
     }
 
     /**

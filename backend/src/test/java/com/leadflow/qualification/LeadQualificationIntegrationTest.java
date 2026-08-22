@@ -6,6 +6,7 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.config.RabbitMQConfig;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import java.util.HashMap;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -37,11 +39,16 @@ class LeadQualificationIntegrationTest {
     @Autowired private LeadRepository leadRepository;
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
     @Autowired private ClientRepository clientRepository;
+    @Autowired private RabbitTemplate rabbitTemplate;
 
     private UUID clientId;
 
     @BeforeEach
     void preparation() {
+        while (rabbitTemplate.receive(RabbitMQConfig.QUALIFIED_QUEUE) != null) {
+            // vide la file avant chaque test : sans quoi un test herite des messages du
+            // precedent et lit une publication qui n'est pas la sienne.
+        }
         leadRepository.deleteAll();
         rawLeadEventRepository.deleteAll();
         Client client = new Client();
@@ -183,5 +190,31 @@ class LeadQualificationIntegrationTest {
 
         assertThat(service.qualifie(id).orElseThrow().getStatus())
                 .isEqualTo(LeadStatus.QUALIFIED);
+    }
+
+    @Test
+    void publieLeLeadQualifieSurLaFileDeSortie() {
+        UUID id = evenement(Map.of(
+                "email", "karim@acme.test", "message", "Je veux un devis"));
+
+        Lead lead = service.qualifie(id).orElseThrow();
+
+        Object recu = rabbitTemplate.receiveAndConvert(RabbitMQConfig.QUALIFIED_QUEUE, 5000);
+        assertThat(recu).isInstanceOf(QualifiedLeadMessage.class);
+        QualifiedLeadMessage message = (QualifiedLeadMessage) recu;
+        assertThat(message.leadId()).isEqualTo(lead.getId());
+        assertThat(message.clientId()).isEqualTo(clientId);
+        assertThat(message.score()).isEqualTo(lead.getScore());
+        assertThat(message.qualifiedAt()).isNotNull();
+    }
+
+    @Test
+    void nePubliePasUnDoublonRejete() {
+        service.qualifie(evenement(Map.of("email", "karim@acme.test")));
+        rabbitTemplate.receiveAndConvert(RabbitMQConfig.QUALIFIED_QUEUE, 5000);
+
+        service.qualifie(evenement(Map.of("email", "karim@acme.test")));
+
+        assertThat(rabbitTemplate.receive(RabbitMQConfig.QUALIFIED_QUEUE, 2000)).isNull();
     }
 }

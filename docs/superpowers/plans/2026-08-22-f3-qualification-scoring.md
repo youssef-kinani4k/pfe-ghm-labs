@@ -2626,7 +2626,7 @@ git commit -m "feat: orchestration de la qualification et consommation de la fil
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Ajouter les tests de publication**
+- [x] **Step 1: Ajouter les tests de publication**
 
 Dans `LeadQualificationIntegrationTest`, ajouter les imports puis les deux tests.
 
@@ -2681,12 +2681,12 @@ Tests à ajouter :
     }
 ```
 
-- [ ] **Step 2: Lancer les tests et vérifier qu'ils échouent**
+- [x] **Step 2: Lancer les tests et vérifier qu'ils échouent**
 
 Run: `./mvnw test -Dtest=LeadQualificationIntegrationTest`
 Expected: échec de compilation — `QualifiedLeadMessage` et `RabbitMQConfig.QUALIFIED_QUEUE` n'existent pas.
 
-- [ ] **Step 3: Écrire le contrat de file**
+- [x] **Step 3: Écrire le contrat de file**
 
 Créer `backend/src/main/java/com/leadflow/qualification/QualifiedLeadMessage.java` :
 
@@ -2718,7 +2718,7 @@ public record QualifiedLeadMessage(
 }
 ```
 
-- [ ] **Step 4: Déclarer la file dans la topologie**
+- [x] **Step 4: Déclarer la file dans la topologie**
 
 Dans `backend/src/main/java/com/leadflow/config/RabbitMQConfig.java` :
 
@@ -2758,7 +2758,7 @@ Enfin, élargir la liste blanche — **sans quoi F4 ne pourra pas désérialiser
             {"com.leadflow.capture", "com.leadflow.qualification"};
 ```
 
-- [ ] **Step 5: Écrire le publieur**
+- [x] **Step 5: Écrire le publieur**
 
 Créer `backend/src/main/java/com/leadflow/qualification/QualifiedLeadPublisher.java` :
 
@@ -2817,7 +2817,7 @@ public class QualifiedLeadPublisher {
 }
 ```
 
-- [ ] **Step 6: Brancher le publieur dans l'orchestrateur**
+- [x] **Step 6: Brancher le publieur dans l'orchestrateur**
 
 Dans `LeadQualificationService`, ajouter le champ et le paramètre de constructeur :
 
@@ -2855,12 +2855,12 @@ Ajouter enfin cette phrase au Javadoc de la classe, après le paragraphe sur l'o
  * de l'ecriture : un message parti plus tot designerait une ligne que F4 ne trouverait pas.
 ```
 
-- [ ] **Step 7: Lancer le test et vérifier qu'il passe**
+- [x] **Step 7: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadQualificationIntegrationTest`
 Expected: 10 tests, 0 échec.
 
-- [ ] **Step 8: Lancer la suite complète et commiter**
+- [x] **Step 8: Lancer la suite complète et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte.
