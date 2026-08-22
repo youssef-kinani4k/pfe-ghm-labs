@@ -19,6 +19,13 @@ import org.springframework.stereotype.Component;
  * tentatives puis la DLQ. La ligne {@code crm_sync_attempt} en echec est deja ecrite par
  * {@link CrmSyncService}, en transaction propre, donc elle survit.
  *
+ * <p><b>Une synchronisation reussie suivie d'une ecriture de statut en echec ne pousse
+ * rien deux fois.</b> L'exception remonte, le message est rejoue, et {@code CrmSyncService}
+ * retrouve ses references dans {@code CrmSyncState} : l'adaptateur saute les etapes deja
+ * faites et l'ERP n'est pas duplique. Apres trois echecs, le lead reste {@code ROUTED} avec
+ * un ERP pourtant correct — situation rattrapable a la main, et que le filet de
+ * republication reporte a F6 fermera.
+ *
  * <p>Bean conditionnel pour la meme raison que les autres consommateurs du projet : la suite
  * de tests le retire, et un contexte remis en marche par le cache de tests redemarrerait ses
  * beans {@code Lifecycle} en ignorant {@code auto-startup}.

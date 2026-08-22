@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,14 @@ class LeadRoutingListenerTest {
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
     @Autowired private ClientRepository clientRepository;
     @Autowired private SalesRepRepository salesRepRepository;
+
+    @BeforeEach
+    void purgeDeLaFileDeSortie() {
+        while (rabbitTemplate.receive(RabbitMQConfig.ROUTED_QUEUE) != null) {
+            // vide la file avant le test : un message resteant d'un test precedent designe
+            // un lead supprime depuis, et ferait echouer la synchronisation en boucle.
+        }
+    }
 
     @AfterEach
     void nettoyage() {

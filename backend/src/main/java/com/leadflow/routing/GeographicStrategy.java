@@ -4,8 +4,9 @@ import com.leadflow.qualification.Lead;
 import com.leadflow.tenant.AssignmentStrategyType;
 import com.leadflow.tenant.SalesRep;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,9 +20,15 @@ import org.springframework.stereotype.Component;
  *
  * <p>Le departage entre plusieurs commerciaux du meme territoire est delegue au round-robin
  * — sans quoi le premier de la liste prendrait tout.
+ *
+ * <p>C'est la strategie elle-meme qui journalise son repli, et non l'orchestrateur : elle
+ * seule sait que son filtre est revenu vide, et le lui faire redeviner imposerait un
+ * {@code switch} sur le type de strategie que le registre existe justement pour eviter.
  */
 @Component
 public class GeographicStrategy implements AssignmentStrategy {
+
+    private static final Logger log = LoggerFactory.getLogger(GeographicStrategy.class);
 
     private final RoundRobinStrategy rotation;
 
@@ -37,19 +44,17 @@ public class GeographicStrategy implements AssignmentStrategy {
     @Override
     public Optional<SalesRep> choisit(Lead lead, List<SalesRep> eligibles) {
         List<SalesRep> duTerritoire = eligibles.stream()
-                .filter(commercial -> correspond(commercial.getZone(), lead.getCountryCode()))
+                .filter(commercial ->
+                        CritereTextuel.correspond(commercial.getZone(), lead.getCountryCode()))
                 .toList();
-        // Filtre vide : on rend la main au tour de role plutot que de laisser le lead en
-        // souffrance. Le service logue ce repli.
-        return rotation.choisit(lead, duTerritoire.isEmpty() ? eligibles : duTerritoire);
-    }
-
-    /** @return {@code false} des qu'une des deux valeurs manque : rien ne peut correspondre */
-    static boolean correspond(String valeur, String attendue) {
-        if (valeur == null || attendue == null) {
-            return false;
+        if (duTerritoire.isEmpty()) {
+            // On rend la main au tour de role plutot que de laisser le lead en souffrance :
+            // un prospect qui attend coute plus cher qu'une attribution imparfaite. Le log
+            // existe pour que la configuration incomplete du client se voie.
+            log.info("Aucune zone ne correspond au pays {} du lead {} : repli sur le tour de role",
+                    lead.getCountryCode(), lead.getId());
+            return rotation.choisit(lead, eligibles);
         }
-        return valeur.trim().toLowerCase(Locale.ROOT)
-                .equals(attendue.trim().toLowerCase(Locale.ROOT));
+        return rotation.choisit(lead, duTerritoire);
     }
 }

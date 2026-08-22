@@ -363,6 +363,26 @@ couvre le cas — mais cela veut dire que la stratégie géographique est, en pr
 stratégie « par code pays ». Le renommage de la colonne appartiendrait à une migration, donc
 à une autre feature.
 
+### 11.4 La clé de rotation est la date de qualification, pas celle d'attribution
+
+`RotationOrder` classe les commerciaux sur `max(lead.created_at)`, or `created_at` est
+l'heure à laquelle le lead a été **qualifié**, pas celle où il a été attribué — et la colonne
+est `updatable = false`.
+
+En flux nominal les deux dates sont séparées de quelques secondes, donc l'équité tient. Elle
+ne tient plus au **rejeu d'un arriéré** : attribuer un vieux lead à un commercial porte son
+`max` à `max(existant, ancien)`, souvent inchangé. Ce commercial reste alors en tête et prend
+aussi le lead rejoué suivant. Rejouer cinquante leads âgés peut donc les concentrer sur une
+seule personne — précisément dans le scénario de reprise que le découpage en deux files
+existe pour servir.
+
+Décision : on garde `created_at`. `max(updated_at)` serait plus proche de « dernier servi »
+et ne coûterait pas de migration, mais cette colonne est aussi poussée par le passage à
+`SYNCED`, donc elle ne dirait pas exactement la date d'attribution. Une colonne `assigned_at`
+dédiée serait exacte et imposerait une migration, que le périmètre de F4 s'interdit. À
+rouvrir si le rejeu d'arriéré devient une opération courante, ce qu'il n'est pas tant que la
+DLQ se rejoue à la main.
+
 ---
 
 ## 12. Prochaine étape

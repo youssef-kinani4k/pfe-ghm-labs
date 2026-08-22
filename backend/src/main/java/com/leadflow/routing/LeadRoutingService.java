@@ -24,10 +24,11 @@ import org.springframework.stereotype.Service;
  * commit : un message parti plus tot designerait un lead que l'etape suivante lirait encore
  * sans commercial.
  *
- * <p>C'est ici, et pas dans les strategies, que vivent les trois decisions qui ne sont pas
- * du calcul : ne pas reattribuer un lead qui porte deja un commercial, lever quand aucun
- * commercial n'est actif, et journaliser le repli d'une strategie qui n'a trouve personne
- * sur son critere.
+ * <p>C'est ici, et pas dans les strategies, que vivent les deux decisions qui ne sont pas
+ * du calcul : ne pas reattribuer un lead qui porte deja un commercial, et lever quand aucun
+ * commercial n'est actif. Le repli d'une strategie, lui, se journalise dans la strategie :
+ * elle seule sait que son filtre est revenu vide, et le rededuire ici demanderait un
+ * {@code switch} sur le type — exactement ce que le registre existe pour eviter.
  */
 @Service
 public class LeadRoutingService {
@@ -91,29 +92,9 @@ public class LeadRoutingService {
         SalesRep choisi = registre.pour(client.getAssignmentStrategy())
                 .choisit(lead, ordonnes)
                 .orElseThrow(() -> new AssignmentException(lead.getClientId(), leadId));
-        journaliseLeRepli(client, lead, choisi);
 
         Lead route = writer.attribue(leadId, choisi.getId());
         publisher.publie(route);
         return Optional.of(route);
-    }
-
-    /**
-     * Le repli est silencieux pour le prospect, il ne doit pas l'etre pour l'agence : sans
-     * cette trace, un client dont aucun commercial ne porte de zone verrait toutes ses
-     * attributions passer par le tour de role sans que rien ne signale la configuration
-     * incomplete.
-     */
-    private void journaliseLeRepli(Client client, Lead lead, SalesRep choisi) {
-        boolean repli = switch (client.getAssignmentStrategy()) {
-            case GEOGRAPHIC ->
-                    !GeographicStrategy.correspond(choisi.getZone(), lead.getCountryCode());
-            case SECTOR -> !GeographicStrategy.correspond(choisi.getSector(), lead.getSector());
-            case ROUND_ROBIN -> false;
-        };
-        if (repli) {
-            log.info("Strategie {} sans correspondance pour le lead {} : repli sur le tour de role",
-                    client.getAssignmentStrategy(), lead.getId());
-        }
     }
 }

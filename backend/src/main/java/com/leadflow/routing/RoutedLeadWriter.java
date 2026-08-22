@@ -18,6 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Bean distinct et non methode privee : Spring ne proxie pas l'auto-invocation, la
  * propagation serait silencieusement ignoree.
+ *
+ * <p><b>Ce que cette transaction ne protege pas.</b> Elle donne l'atomicite de l'ecriture,
+ * pas l'isolation vis-a-vis d'un lecteur concurrent : {@code BaseEntity} ne porte pas de
+ * {@code @Version}, et deux livraisons simultanees du meme {@code lead.qualified} liraient
+ * toutes deux un lead sans commercial, l'attribueraient, puis publieraient deux messages.
+ * Le deploiement est mono-instance et {@code concurrentConsumers} vaut 1, donc le cas ne se
+ * presente pas aujourd'hui ; le durcir demanderait une ecriture conditionnelle
+ * ({@code where assigned_sales_rep_id is null}) relue a zero ligne modifiee, ce qui ferait
+ * de l'attribution un compare-and-set sans migration ni verrou.
  */
 @Component
 public class RoutedLeadWriter {

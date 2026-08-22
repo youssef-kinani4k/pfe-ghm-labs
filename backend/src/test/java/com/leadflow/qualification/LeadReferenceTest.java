@@ -20,18 +20,32 @@ class LeadReferenceTest {
     }
 
     @Test
-    void deriveLaReferenceDesDerniersCaracteresDeLIdentifiant() {
-        assertThat(LeadReference.pour(LEAD)).isEqualTo("LF-0A1B2C3D4E5F");
+    void deriveLaReferenceDUneEmpreinteDeLIdentifiant() {
+        assertThat(LeadReference.pour(LEAD)).isEqualTo("LF-682775F7969B");
     }
 
     /**
-     * Le defaut trouve en verifiant F4 contre un vrai Dolibarr : les identifiants du projet
-     * sont ordonnes dans le temps, donc tous les leads d'une meme periode partagent leurs
-     * premiers caracteres. Une reference tiree de la tete de l'UUID etait la meme pour dix
-     * leads consecutifs, et l'ERP rendait l'opportunite deja creee au lieu d'en creer une.
+     * Aucun caractere de l'identifiant ne se retrouve tel quel dans la reference : c'est ce
+     * qui affranchit la classe de la disposition interne de l'UUID, dont deux parties se
+     * sont deja revelees non aleatoires.
      */
     @Test
-    void distingueDeuxIdentifiantsQuiPartagentLeurHorodatage() {
+    void neRecopieAucuneTrancheDeLIdentifiant() {
+        String hexadecimal = LEAD.toString().replace("-", "").toUpperCase();
+        String reference = LeadReference.pour(LEAD).substring(3);
+
+        assertThat(hexadecimal).doesNotContain(reference);
+    }
+
+    /**
+     * Le defaut trouve en verifiant F4 contre un vrai Dolibarr. Les 64 bits de poids fort
+     * de {@code Style.TIME} portent l'adresse IP et un identifiant de JVM, constants pour
+     * toute la duree d'un demarrage : une reference tiree de la tete de l'UUID etait la
+     * meme pour dix leads consecutifs, et l'ERP rendait l'opportunite deja creee au lieu
+     * d'en creer une. Les deux identifiants ci-dessous sont reels, tires de cette panne.
+     */
+    @Test
+    void distingueDeuxIdentifiantsQuiPartagentLeursBitsDePoidsFort() {
         UUID premier = UUID.fromString("a9fed6e8-a02b-1cd1-81a0-2bb43afc0005");
         UUID second = UUID.fromString("a9fed6e8-a02b-1cd1-81a0-2bc41d500014");
 

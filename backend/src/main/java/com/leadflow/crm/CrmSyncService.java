@@ -75,6 +75,17 @@ public class CrmSyncService {
             trace.echec(leadId, client.getCrmProviderId(),
                     fusionne(anterieur, echec.partialState()), echec.getMessage());
             throw echec;
+        } catch (RuntimeException echec) {
+            // Tout ce qui n'est pas une CrmSyncException doit laisser la meme trace. Un
+            // adaptateur n'enveloppe que ce qu'il a prevu : Dolibarr rend un en-tete
+            // WWW-Authenticate vide sur 401, et le parseur du JDK leve alors une
+            // IllegalArgumentException qui traverse le client sans etre enveloppee. Sans ce
+            // rattrapage, l'echec ERP le plus banal — une cle d'API fausse — partirait en
+            // DLQ sans aucune ligne dans crm_sync_attempt, alors que cette table est la
+            // source de verite du diagnostic et de l'etat anterieur au rejeu.
+            trace.echec(leadId, client.getCrmProviderId(), anterieur,
+                    echec.getClass().getSimpleName() + " : " + echec.getMessage());
+            throw new CrmSyncException(client.getCrmProviderId(), echec.getMessage(), echec);
         }
     }
 

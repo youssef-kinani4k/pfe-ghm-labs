@@ -5,20 +5,23 @@ import com.leadflow.tenant.AssignmentStrategyType;
 import com.leadflow.tenant.SalesRep;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
  * Attribution par secteur d'activite : {@code sales_rep.sector} contre {@code lead.sector}.
  *
- * <p>La correspondance est <b>exacte</b>, casse et espaces mis a part : « industrie » ne
- * reconnait pas « industrie du textile ». Une comparaison par prefixe ferait d'un secteur
- * court un piege silencieux qui capterait tout ce qui commence pareil. Meme regle que le
- * ciblage sectoriel du bareme de scoring de F3.
+ * <p>La correspondance est celle de {@link CritereTextuel} : <b>exacte</b>, casse et espaces
+ * mis a part. « industrie » ne reconnait donc pas « industrie du textile ». Meme regle que
+ * le ciblage sectoriel du bareme de scoring de F3.
  *
  * <p>Le departage entre plusieurs commerciaux du meme secteur est delegue au round-robin.
  */
 @Component
 public class SectorStrategy implements AssignmentStrategy {
+
+    private static final Logger log = LoggerFactory.getLogger(SectorStrategy.class);
 
     private final RoundRobinStrategy rotation;
 
@@ -35,8 +38,13 @@ public class SectorStrategy implements AssignmentStrategy {
     public Optional<SalesRep> choisit(Lead lead, List<SalesRep> eligibles) {
         List<SalesRep> duSecteur = eligibles.stream()
                 .filter(commercial ->
-                        GeographicStrategy.correspond(commercial.getSector(), lead.getSector()))
+                        CritereTextuel.correspond(commercial.getSector(), lead.getSector()))
                 .toList();
-        return rotation.choisit(lead, duSecteur.isEmpty() ? eligibles : duSecteur);
+        if (duSecteur.isEmpty()) {
+            log.info("Aucun secteur ne correspond a « {} » pour le lead {} : repli sur le tour"
+                    + " de role", lead.getSector(), lead.getId());
+            return rotation.choisit(lead, eligibles);
+        }
+        return rotation.choisit(lead, duSecteur);
     }
 }
