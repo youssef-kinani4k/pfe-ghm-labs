@@ -109,7 +109,7 @@ CLAUDE.md                                    (modifié, T11)
 - Consomme : rien.
 - Produit : `LeadReference.pour(UUID) -> String`, utilisé par T10.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/LeadReferenceTest.java` :
 
@@ -160,12 +160,12 @@ class LeadReferenceTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=LeadReferenceTest`
 Expected: échec de compilation — `LeadReference` n'existe pas.
 
-- [ ] **Step 3: Écrire la classe**
+- [x] **Step 3: Écrire la classe**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadReference.java` :
 
@@ -205,12 +205,12 @@ public final class LeadReference {
 }
 ```
 
-- [ ] **Step 4: Lancer le test et vérifier qu'il passe**
+- [x] **Step 4: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadReferenceTest`
 Expected: 5 tests, 0 échec.
 
-- [ ] **Step 5: Commiter**
+- [x] **Step 5: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/qualification/LeadReference.java \
@@ -231,7 +231,7 @@ git commit -m "feat: reference de lead deterministe derivee de l'UUID"
 - Consomme : rien.
 - Produit : `ChampsBruts(String email, String phone, String message, String companyName, String firstName, String lastName, String countryCode, String sector)` et `PayloadFieldMapper.extrait(Map<String,Object>) -> ChampsBruts`, consommés par T3 et T8.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/PayloadFieldMapperTest.java` :
 
@@ -337,12 +337,12 @@ class PayloadFieldMapperTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=PayloadFieldMapperTest`
 Expected: échec de compilation — `PayloadFieldMapper` et `ChampsBruts` n'existent pas.
 
-- [ ] **Step 3: Écrire le record de sortie**
+- [x] **Step 3: Écrire le record de sortie**
 
 Créer `backend/src/main/java/com/leadflow/qualification/ChampsBruts.java` :
 
@@ -365,7 +365,7 @@ public record ChampsBruts(
 }
 ```
 
-- [ ] **Step 4: Écrire le mapper**
+- [x] **Step 4: Écrire le mapper**
 
 Créer `backend/src/main/java/com/leadflow/qualification/PayloadFieldMapper.java` :
 
@@ -471,12 +471,12 @@ public class PayloadFieldMapper {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=PayloadFieldMapperTest`
 Expected: 8 tests, 0 échec.
 
-- [ ] **Step 6: Commiter**
+- [x] **Step 6: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/qualification/ChampsBruts.java \
@@ -498,7 +498,7 @@ git commit -m "feat: mapping du payload libre par alias en dur"
 - Consomme : `ChampsBruts` (T2).
 - Produit : `ContactNormalise(String email, String phone, String message, String companyName, String firstName, String lastName, String countryCode, String sector)` et `ContactNormalizer.normalise(ChampsBruts) -> Optional<ContactNormalise>`, consommés par T6 et T8.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/ContactNormalizerTest.java` :
 
@@ -628,12 +628,12 @@ class ContactNormalizerTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=ContactNormalizerTest`
 Expected: échec de compilation — `ContactNormalizer` et `ContactNormalise` n'existent pas.
 
-- [ ] **Step 3: Écrire le record de sortie**
+- [x] **Step 3: Écrire le record de sortie**
 
 Créer `backend/src/main/java/com/leadflow/qualification/ContactNormalise.java` :
 
@@ -656,7 +656,7 @@ public record ContactNormalise(
 }
 ```
 
-- [ ] **Step 4: Écrire le normaliseur**
+- [x] **Step 4: Écrire le normaliseur**
 
 Créer `backend/src/main/java/com/leadflow/qualification/ContactNormalizer.java` :
 
@@ -760,12 +760,12 @@ public class ContactNormalizer {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=ContactNormalizerTest`
 Expected: 13 tests, 0 échec.
 
-- [ ] **Step 6: Commiter**
+- [x] **Step 6: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/qualification/ContactNormalise.java \
@@ -789,7 +789,7 @@ git commit -m "feat: normalisation du contact, seul l'email peut rejeter"
 - Consomme : `IntentSource` (existant).
 - Produit : `LeadIntent` (enum `DEVIS`, `ACHAT`, `INFORMATION`, `SUPPORT`, `AUTRE`), `IntentAnalysis(LeadIntent intent, IntentSource source)`, `IntentAnalyzer.analyse(String) -> IntentAnalysis`, `RuleBasedIntentAnalyzer`. Consommés par T5, T6 et T8.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/RuleBasedIntentAnalyzerTest.java` :
 
@@ -871,12 +871,12 @@ class RuleBasedIntentAnalyzerTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=RuleBasedIntentAnalyzerTest`
 Expected: échec de compilation — les quatre types n'existent pas.
 
-- [ ] **Step 3: Écrire l'énumération et le record**
+- [x] **Step 3: Écrire l'énumération et le record**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadIntent.java` :
 
@@ -913,7 +913,7 @@ public record IntentAnalysis(LeadIntent intent, IntentSource source) {
 }
 ```
 
-- [ ] **Step 4: Écrire le port**
+- [x] **Step 4: Écrire le port**
 
 Créer `backend/src/main/java/com/leadflow/qualification/IntentAnalyzer.java` :
 
@@ -934,7 +934,7 @@ public interface IntentAnalyzer {
 }
 ```
 
-- [ ] **Step 5: Écrire l'analyseur à base de règles**
+- [x] **Step 5: Écrire l'analyseur à base de règles**
 
 Créer `backend/src/main/java/com/leadflow/qualification/RuleBasedIntentAnalyzer.java` :
 
@@ -1027,14 +1027,14 @@ public class RuleBasedIntentAnalyzer implements IntentAnalyzer {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=RuleBasedIntentAnalyzerTest`
 Expected: 10 tests, 0 échec.
 
 Si `detecteUneDemandeDeSupport` échoue en rendant `AUTRE` : le message contient `probleme` (SUPPORT) et `commande` plus `livree` — vérifier que `livree` n'est pas dans le lexique ACHAT. Il ne doit pas y être : seuls `livraison` et `livrer` y figurent, et le découpage ne fait pas de lemmatisation. Le score est donc SUPPORT 1, ACHAT 1 — égalité, donc `AUTRE`. **Corriger le test**, pas le lexique : remplacer le message par `"J'ai un probleme, le produit est defectueux"`.
 
-- [ ] **Step 7: Commiter**
+- [x] **Step 7: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/qualification/LeadIntent.java \
@@ -1059,7 +1059,7 @@ git commit -m "feat: port d'analyse d'intention et analyseur lexical de repli"
 - Consomme : `IntentAnalyzer`, `IntentAnalysis`, `LeadIntent`, `IntentSource` (T4).
 - Produit : `IntentProperties` (record avec sous-record `Gemini`), `GeminiIntentAnalyzer` — bean `@Primary` quand `leadflow.intent.gemini.enabled` vaut `true`. Consommé par T8 via le port.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/GeminiIntentAnalyzerTest.java` :
 
@@ -1221,12 +1221,12 @@ class GeminiIntentAnalyzerTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=GeminiIntentAnalyzerTest`
 Expected: échec de compilation — `IntentProperties` et `GeminiIntentAnalyzer` n'existent pas.
 
-- [ ] **Step 3: Écrire les propriétés**
+- [x] **Step 3: Écrire les propriétés**
 
 Créer `backend/src/main/java/com/leadflow/config/IntentProperties.java` :
 
@@ -1267,7 +1267,7 @@ public record IntentProperties(Gemini gemini) {
 }
 ```
 
-- [ ] **Step 4: Écrire l'analyseur Gemini**
+- [x] **Step 4: Écrire l'analyseur Gemini**
 
 Créer `backend/src/main/java/com/leadflow/qualification/GeminiIntentAnalyzer.java` :
 
@@ -1422,7 +1422,7 @@ public class GeminiIntentAnalyzer implements IntentAnalyzer {
 }
 ```
 
-- [ ] **Step 5: Ajouter la configuration**
+- [x] **Step 5: Ajouter la configuration**
 
 Dans `backend/src/main/resources/application.yml`, sous la clé `leadflow:`, ajouter le bloc `intent:` **entre** `webhook:` et `crm:` :
 
@@ -1441,14 +1441,14 @@ Dans `backend/src/main/resources/application.yml`, sous la clé `leadflow:`, ajo
       max-message-chars: 2000
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=GeminiIntentAnalyzerTest`
 Expected: 9 tests, 0 échec.
 
 Si `appelleLeBonModeleEtEnvoieLeMessageDuProspect` échoue sur l'identifiant du modèle : vérifier l'identifiant courant dans la documentation Google et l'aligner dans le test, dans `application.yml` et dans la spec §5. C'est la seule valeur de ce plan qui dépend d'un service externe.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte. `BackendApplicationTests` démarre le contexte : si `IntentProperties` était mal formée, c'est là que ça casserait.
@@ -1474,7 +1474,7 @@ git commit -m "feat: analyse d'intention Gemini avec repli sur les regles"
 - Consomme : `ContactNormalise` (T3), `LeadIntent` (T4).
 - Produit : `ScoringConfig.defaut()`, `ScoringConfig.depuis(Map<String,Object>)`, `LeadScorer.score(ContactNormalise, LeadIntent, Map<String,Object>) -> int`. Consommé par T8.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/LeadScorerTest.java` :
 
@@ -1625,12 +1625,12 @@ class LeadScorerTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=LeadScorerTest`
 Expected: échec de compilation — `LeadScorer` et `ScoringConfig` n'existent pas.
 
-- [ ] **Step 3: Écrire la configuration de scoring**
+- [x] **Step 3: Écrire la configuration de scoring**
 
 Créer `backend/src/main/java/com/leadflow/qualification/ScoringConfig.java` :
 
@@ -1752,7 +1752,7 @@ public record ScoringConfig(
 }
 ```
 
-- [ ] **Step 4: Écrire le calculateur de score**
+- [x] **Step 4: Écrire le calculateur de score**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadScorer.java` :
 
@@ -1814,12 +1814,12 @@ public class LeadScorer {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadScorerTest`
 Expected: 12 tests, 0 échec.
 
-- [ ] **Step 6: Commiter**
+- [x] **Step 6: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/qualification/ScoringConfig.java \
@@ -1845,7 +1845,7 @@ git commit -m "feat: bareme de scoring additif a lecture tolerante"
 
 **Testcontainers requis** — le daemon Docker doit tourner.
 
-- [ ] **Step 1: Écrire le test**
+- [x] **Step 1: Écrire le test**
 
 Créer `backend/src/test/java/com/leadflow/qualification/DuplicateGuardTest.java` :
 
@@ -1958,12 +1958,12 @@ class DuplicateGuardTest {
 
 Le test `refuseUnSecondLeadPourLeMemeEvenementBrut` a besoin d'un `raw_lead_event` existant, car `lead.raw_event_id` porte une clé étrangère. **Avant d'écrire le code**, vérifier ce point à l'étape 2 : si la contrainte de clé étrangère se déclenche avant la contrainte d'unicité, insérer d'abord une ligne `raw_lead_event` via `RawLeadEventRepository` dans `preparation()` et utiliser son identifiant.
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=DuplicateGuardTest`
 Expected: échec de compilation — `DuplicateGuard`, `LeadWriter` et `QualificationProperties` n'existent pas.
 
-- [ ] **Step 3: Écrire les propriétés**
+- [x] **Step 3: Écrire les propriétés**
 
 Créer `backend/src/main/java/com/leadflow/config/QualificationProperties.java` :
 
@@ -1986,7 +1986,7 @@ public record QualificationProperties(Duration dedupWindow) {
 }
 ```
 
-- [ ] **Step 4: Écrire la garde de déduplication**
+- [x] **Step 4: Écrire la garde de déduplication**
 
 Créer `backend/src/main/java/com/leadflow/qualification/DuplicateGuard.java` :
 
@@ -2028,7 +2028,7 @@ public class DuplicateGuard {
 }
 ```
 
-- [ ] **Step 5: Écrire l'écrivain isolé**
+- [x] **Step 5: Écrire l'écrivain isolé**
 
 Créer `backend/src/main/java/com/leadflow/qualification/LeadWriter.java` :
 
@@ -2075,7 +2075,7 @@ public class LeadWriter {
 }
 ```
 
-- [ ] **Step 6: Ajouter la configuration**
+- [x] **Step 6: Ajouter la configuration**
 
 Dans `backend/src/main/resources/application.yml`, sous la clé `leadflow:`, ajouter le bloc `qualification:` **juste avant** le bloc `intent:` créé en T5 :
 
@@ -2085,12 +2085,12 @@ Dans `backend/src/main/resources/application.yml`, sous la clé `leadflow:`, ajo
     dedup-window: 24h
 ```
 
-- [ ] **Step 7: Lancer le test et vérifier qu'il passe**
+- [x] **Step 7: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=DuplicateGuardTest`
 Expected: 6 tests, 0 échec.
 
-- [ ] **Step 8: Lancer la suite complète et commiter**
+- [x] **Step 8: Lancer la suite complète et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte.
