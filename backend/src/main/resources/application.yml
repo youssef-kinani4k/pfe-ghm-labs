@@ -50,8 +50,14 @@ leadflow:
     master-key: ${LEADFLOW_MASTER_KEY:}
   webhook:
     signature-header: X-Leadflow-Signature
-    # Fenetre de tolerance anti-rejeu sur l'horodatage de la requete.
+    # Fenetre de tolerance anti-rejeu sur l'horodatage de la requete, dans les deux sens.
     tolerance: 5m
+    # Applique apres lecture du corps : protege la base et la file, pas la memoire du
+    # serveur. Un vrai garde-fou memoire releve du reverse-proxy (F7).
+    max-payload-bytes: 65536
+    # Filet de republication : age minimal d'une ligne non publiee, et periode de balayage.
+    relay-after: 2m
+    relay-interval: 30s
   crm:
     # Reglages techniques uniquement. L'URL et les identifiants de chaque instance ERP
     # vivent sur la ligne client, chiffres.
