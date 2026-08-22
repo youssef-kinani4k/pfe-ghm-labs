@@ -8,8 +8,8 @@ import com.leadflow.tenant.ClientRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +34,7 @@ public class LeadCaptureService {
     private final ObjectMapper objectMapper;
     private final WebhookProperties properties;
     private final ApplicationEventPublisher evenements;
+    private final RawLeadEventWriter ecrivain;
 
     public LeadCaptureService(
             ClientRepository clientRepository,
@@ -41,13 +42,15 @@ public class LeadCaptureService {
             HmacSignatureVerifier verificateur,
             ObjectMapper objectMapper,
             WebhookProperties properties,
-            ApplicationEventPublisher evenements) {
+            ApplicationEventPublisher evenements,
+            RawLeadEventWriter ecrivain) {
         this.clientRepository = clientRepository;
         this.rawLeadEventRepository = rawLeadEventRepository;
         this.verificateur = verificateur;
         this.objectMapper = objectMapper;
         this.properties = properties;
         this.evenements = evenements;
+        this.ecrivain = ecrivain;
     }
 
     @Transactional
@@ -58,16 +61,10 @@ public class LeadCaptureService {
                 .orElseThrow(() -> new WebhookAuthenticationException(
                         "Cle publique inconnue ou client desactive : " + clientKey));
 
-        verificateur.verifie(client.getHmacSecret(), corpsBrut, enTeteSignature, Instant.now());
-
-        // Rejeu exact : meme client, meme en-tete signe. On rend l'identifiant deja attribue
-        // sans republier — si la premiere publication avait echoue, la ligne est restee
-        // RECEIVED et c'est le filet qui s'en charge, pas cette requete.
-        Optional<RawLeadEvent> dejaVu =
-                rawLeadEventRepository.findByClientIdAndSignature(client.getId(), enTeteSignature);
-        if (dejaVu.isPresent()) {
-            return new CaptureAccepted(dejaVu.get().getId());
-        }
+        // La forme canonique, et non le texte recu : deux en-tetes differemment espaces
+        // signent la meme soumission et doivent donc porter la meme cle d'idempotence.
+        String signature = verificateur.verifie(
+                client.getHmacSecret(), corpsBrut, enTeteSignature, Instant.now());
 
         int taille = corpsBrut.getBytes(StandardCharsets.UTF_8).length;
         if (taille > properties.maxPayloadBytes()) {
@@ -87,11 +84,23 @@ public class LeadCaptureService {
         evenement.setClientId(client.getId());
         evenement.setSource(canal);
         evenement.setPayload(payload);
-        evenement.setSignature(enTeteSignature);
+        evenement.setSignature(signature);
         evenement.setReceivedAt(Instant.now());
         evenement.setStatus(RawLeadEventStatus.RECEIVED);
 
-        RawLeadEvent enregistre = rawLeadEventRepository.saveAndFlush(evenement);
+        RawLeadEvent enregistre;
+        try {
+            enregistre = ecrivain.insere(evenement);
+        } catch (DataIntegrityViolationException rejeu) {
+            // Rejeu : c'est l'index unique qui tranche, jamais un « existe-t-il deja ? »
+            // prealable, que deux requetes concurrentes passeraient toutes les deux. On rend
+            // l'identifiant gagnant sans republier — si sa publication avait echoue, la ligne
+            // est restee RECEIVED et c'est le filet qui s'en charge, pas cette requete.
+            return new CaptureAccepted(rawLeadEventRepository
+                    .findByClientIdAndSignature(client.getId(), signature)
+                    .orElseThrow(() -> rejeu)
+                    .getId());
+        }
 
         // Publie DANS la transaction, consomme APRES son commit : c'est tout le mecanisme
         // du @TransactionalEventListener(AFTER_COMMIT) cote publieur.

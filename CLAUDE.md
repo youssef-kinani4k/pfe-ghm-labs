@@ -114,9 +114,14 @@ l'origine. Un test le verrouille — corps JSON invalide plus signature invalide
 desactive, en-tete absent, signature fausse, horodatage hors fenetre. Distinguer les codes
 donnerait un oracle sur les cles publiques existantes. Le detail n'existe que dans les logs.
 
-**L'idempotence est en base**, par l'index unique `(client_id, signature)` de `V3` : un
-rejeu exact rend le `eventId` deja attribue. Une verification applicative ne suffirait pas,
-deux requetes concurrentes la passeraient toutes les deux.
+**L'idempotence est tranchee par la base**, par l'index unique `(client_id, signature)` de
+`V3` : l'insertion est tentee dans une transaction a part, et la violation de contrainte
+est rattrapee pour rendre le `eventId` deja attribue. Il n'y a volontairement aucun
+« existe-t-il deja ? » prealable, que deux requetes concurrentes passeraient toutes les deux.
+
+La cle stockee est la **forme canonique** de la signature rendue par `HmacSignatureVerifier`,
+jamais le texte recu : l'analyse de l'en-tete tolere les espaces et les parametres inconnus,
+donc plusieurs textes valides decrivent la meme soumission et doivent partager une seule cle.
 
 **La publication est at-least-once.** Elle part apres le commit
 (`@TransactionalEventListener(AFTER_COMMIT)`), et `PendingEventRelay` reprend

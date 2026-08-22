@@ -49,13 +49,21 @@ public class PendingEventRelay {
         log.info("Republication de {} evenement(s) restes non publies", enAttente.size());
 
         for (RawLeadEvent evenement : enAttente) {
-            // Appel a travers le proxy : c'est ce qui donne au publieur sa transaction
-            // REQUIRES_NEW, exactement comme lorsqu'il est declenche par le listener.
-            publieur.publie(new LeadCapturedEvent(
-                    evenement.getId(),
-                    evenement.getClientId(),
-                    evenement.getSource(),
-                    evenement.getReceivedAt()));
+            try {
+                // Appel a travers le proxy : c'est ce qui donne au publieur sa transaction
+                // REQUIRES_NEW, exactement comme lorsqu'il est declenche par le listener.
+                publieur.publie(new LeadCapturedEvent(
+                        evenement.getId(),
+                        evenement.getClientId(),
+                        evenement.getSource(),
+                        evenement.getReceivedAt()));
+            } catch (RuntimeException echec) {
+                // Un evenement empoisonne ne doit pas emporter le reste du lot : le filet
+                // s'active precisement quand l'environnement va mal, c'est le moment ou il
+                // doit etre le plus robuste. On passe au suivant, le prochain tour reessaiera.
+                log.warn("Republication de l'evenement {} en echec, on continue le lot",
+                        evenement.getId(), echec);
+            }
         }
     }
 }

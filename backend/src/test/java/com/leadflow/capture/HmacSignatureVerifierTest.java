@@ -1,6 +1,7 @@
 package com.leadflow.capture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -45,6 +46,29 @@ class HmacSignatureVerifierTest {
 
         assertThatCode(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rendUneFormeCanoniqueQuelQueSoitLEspacementDeLEnTete() {
+        // Deux textes valides pour une meme soumission : sans canonisation, ils
+        // produiraient deux cles d'idempotence et donc deux leads.
+        String enTete = signe(SECRET, MAINTENANT.getEpochSecond(), CORPS);
+        String repadde = enTete.replace(",", " , ") + " , x=9";
+
+        String canonique = verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT);
+
+        assertThat(verificateur.verifie(SECRET, CORPS, repadde, MAINTENANT))
+                .isEqualTo(canonique);
+        assertThat(canonique).isEqualTo(enTete);
+    }
+
+    @Test
+    void refuseUnHorodatageHorsDesBornesRepresentables() {
+        // Long.parseLong l'accepte, Instant non : sans garde, la seule route ouverte du
+        // projet rendrait une erreur serveur sur une entree non authentifiee.
+        assertThatThrownBy(() -> verificateur.verifie(
+                        SECRET, CORPS, "t=99999999999999999,v1=abcdef", MAINTENANT))
+                .isInstanceOf(WebhookAuthenticationException.class);
     }
 
     @Test

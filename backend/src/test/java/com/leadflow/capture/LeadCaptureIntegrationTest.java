@@ -279,6 +279,30 @@ class LeadCaptureIntegrationTest {
     }
 
     @Test
+    void unEnTeteRepaddeResteLeMemeRejeu() throws Exception {
+        // Meme soumission signee, en-tete ecrit autrement : la cle d'idempotence est la
+        // forme canonique, pas le texte recu, sinon on injecte des doublons en repaddant.
+        String enTete = enTeteValide(SECRET, CORPS);
+
+        String premiere = mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", enTete)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+
+        String seconde = mockMvc.perform(post("/api/webhooks/leads/{cle}", clePublique)
+                        .header("X-Leadflow-Signature", enTete.replace(",", " , ") + " , x=9")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(seconde).isEqualTo(premiere);
+        assertThat(rawLeadEventRepository.findAll()).hasSize(1);
+    }
+
+    @Test
     void deuxSoumissionsDistinctesRestentDeuxEvenements() throws Exception {
         // Horodatages differents donc signatures differentes : ce n'est pas un rejeu, et
         // deux vraies soumissions ne doivent surtout pas etre confondues.

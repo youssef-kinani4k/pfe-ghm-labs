@@ -24,6 +24,10 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:leadflow}
     password: ${RABBITMQ_PASSWORD:leadflow}
+    # La publication du webhook part sur le thread de la requete, apres le commit : sans
+    # delai borne, un broker qui accepte la connexion sans repondre bloquerait les threads
+    # Tomcat alors meme que le filet de republication existe pour couvrir ce cas.
+    connection-timeout: 5s
     listener:
       simple:
         # Un lead qui echoue est rejete vers la DLQ plutot que reboucle a l'infini.

@@ -6,6 +6,7 @@ import com.leadflow.common.WebhookAuthenticationException;
 import com.leadflow.config.WebhookProperties;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -36,10 +37,16 @@ public class HmacSignatureVerifier {
     }
 
     /**
+     * @return la forme <b>canonique</b> de la signature, {@code t=<epoch>,v1=<hex>}, a
+     *     utiliser comme cle d'idempotence. Elle est reconstruite a partir des valeurs
+     *     validees et jamais reprise du texte recu : l'analyse tolere les espaces et les
+     *     parametres inconnus, si bien que {@code t=1,v1=ab}, {@code t=1, v1=ab} et
+     *     {@code t=1,v1=ab,x=9} sont trois textes valides pour une meme soumission. Les
+     *     stocker tels quels laisserait injecter des doublons en repaddant l'en-tete.
      * @throws WebhookAuthenticationException si l'en-tete est absent, malforme, hors
      *     fenetre, ou si la signature ne correspond pas. Le message est destine aux logs.
      */
-    public void verifie(
+    public String verifie(
             String secret, String corpsBrut, String enTeteSignature, Instant maintenant) {
         if (enTeteSignature == null || enTeteSignature.isBlank()) {
             throw new WebhookAuthenticationException("En-tete de signature absent");
@@ -48,7 +55,7 @@ public class HmacSignatureVerifier {
         long horodatage = horodatage(enTeteSignature);
         String signatureFournie = valeur(enTeteSignature, "v1");
 
-        Duration ecart = Duration.between(Instant.ofEpochSecond(horodatage), maintenant).abs();
+        Duration ecart = Duration.between(instant(horodatage), maintenant).abs();
         if (ecart.compareTo(properties.tolerance()) > 0) {
             throw new WebhookAuthenticationException(
                     "Horodatage hors fenetre : ecart de " + ecart.toSeconds() + "s");
@@ -59,6 +66,20 @@ public class HmacSignatureVerifier {
         // premier octet different et laisse deduire la signature attendue octet par octet.
         if (!MessageDigest.isEqual(attendue.getBytes(UTF_8), signatureFournie.getBytes(UTF_8))) {
             throw new WebhookAuthenticationException("Signature invalide");
+        }
+        return "t=" + horodatage + ",v1=" + attendue;
+    }
+
+    /**
+     * {@code Long.parseLong} accepte des valeurs qu'{@code Instant} refuse : sans cette
+     * conversion gardee, un horodatage absurde ferait une erreur serveur sur la seule route
+     * ouverte du projet, a partir d'une entree non authentifiee.
+     */
+    private Instant instant(long horodatage) {
+        try {
+            return Instant.ofEpochSecond(horodatage);
+        } catch (DateTimeException e) {
+            throw new WebhookAuthenticationException("Horodatage hors des bornes representables");
         }
     }
 
