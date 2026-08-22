@@ -341,6 +341,9 @@ leadflow:
       enabled: true
       # Absente ou vide : l'application démarre et qualifie en mode RULES.
       api-key: ${GEMINI_API_KEY:}
+      # Propriete et non constante : un test d'integration peut la pointer vers un port mort
+      # et verifier que le mode degrade est cable de bout en bout, sans appel reseau sortant.
+      base-url: https://generativelanguage.googleapis.com/v1beta/models/
       model: gemini-2.5-flash
       connect-timeout: 3s
       read-timeout: 8s
