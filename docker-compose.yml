@@ -50,7 +50,9 @@ services:
       - dolibarr-db-data:/var/lib/mysql
 
   dolibarr:
-    image: dolibarr/dolibarr:latest
+    # Version epinglee : F5 teste la conformite d'une API, un tag flottant rendrait les
+    # tests d'integration non reproductibles. Version relevee par la sonde de la tache 1.
+    image: dolibarr/dolibarr:23.0.2
     container_name: leadflow-dolibarr
     profiles: ["dolibarr"]
     depends_on:
@@ -80,7 +82,8 @@ services:
       - odoo-db-data:/var/lib/postgresql/data
 
   odoo:
-    image: odoo:17
+    # Version epinglee, meme raison que Dolibarr (17.0-20260817 releve par la sonde).
+    image: odoo:17.0
     container_name: leadflow-odoo
     profiles: ["odoo"]
     depends_on:

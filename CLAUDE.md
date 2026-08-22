@@ -86,6 +86,17 @@ Testcontainers : c'est le moyen le plus rapide de lancer le backend sans avoir a
 l'infrastructure via `docker compose`. Les images des conteneurs de test sont epinglees sur
 les memes versions que `docker-compose.yml` — les garder alignees.
 
+Les tests des adaptateurs ERP ont deux etages. L'etage contractuel tourne a chaque
+`./mvnw test` contre `MockRestServiceServer` — il asserte les corps envoyes, pas seulement
+les codes retour. L'etage d'integration, marque `@Tag("erp")`, est exclu par defaut et
+demande de vrais conteneurs :
+
+```bash
+docker compose --profile dolibarr --profile odoo up -d
+# puis docs/erp-integration-setup.md pour la cle d'API et la base Odoo
+./mvnw verify -Perp-it
+```
+
 ### Frontend
 
 ```bash
@@ -177,12 +188,15 @@ d'attente » du dashboard doit s'appuyer dessus.
 
 ```
 crm/
-├── CrmConnector.java          port : providerId() + sync(CrmLead, CrmTarget)
-├── CrmConnectorRegistry.java  resout l'adaptateur par providerId
+├── CrmConnector.java          port : providerId(), sync(CrmLead, CrmTarget, CrmSyncState), resolveAssignee
+├── CrmConnectorRegistry.java  resout l'adaptateur par providerId, applique `enabled`
+├── CrmSyncService.java        orchestration : cible, etat anterieur, trace
+├── CrmSyncTraceWriter.java    ecriture de la trace en transaction propre
+├── CrmHttpConfig.java         builderPour(providerId) : un RestClient.Builder par ERP, avec ses delais
 ├── CrmSyncAttempt.java        trace append-only des synchronisations
-├── model/                     modele pivot : CrmLead, CrmTarget, CrmSyncResult, CrmSyncException
-├── dolibarr/                  adaptateur REST
-└── odoo/                      adaptateur JSON-RPC
+├── model/                     modele pivot : CrmLead, CrmTarget, CrmSyncState, CrmAssignee, ...
+├── dolibarr/                  adaptateur REST : DolibarrConnector + DolibarrClient
+└── odoo/                      adaptateur JSON-RPC : OdooConnector + OdooClient
 ```
 
 **Le modele pivot de `crm/model` ne doit contenir aucun terme propre a un fournisseur** —
@@ -209,6 +223,30 @@ l'ERP a ajouter quelque part.
 `sync` prend un `CrmTarget(providerId, settings)` decrivant **l'instance** ERP visee, car
 deux clients sur le meme type d'ERP ont chacun leur serveur. Les cles de `settings`
 viennent de `client.crm_config` et sont interpretees par l'adaptateur seul.
+
+**Un adaptateur ne lit jamais la base.** Il recoit `CrmSyncState` — les references deja
+obtenues lors des tentatives precedentes — et saute toute etape dont la reference est
+connue. C'est la, et nulle part ailleurs, que se joue l'absence de doublon au rejeu. En cas
+d'echec partiel, il leve une `CrmSyncException` enrichie de ce qu'il avait obtenu, sans
+quoi le rejeu recreerait ce qui existe deja.
+
+Deux limitations connues vivent dans cette modelisation, documentees dans le Javadoc de
+`DolibarrConnector` : le rattachement du responsable Dolibarr n'a pas de logement dans
+`CrmSyncState` — s'il echoue apres la creation de l'opportunite, le rejeu saute l'etape sans
+le signaler — et la `ref` d'opportunite est tiree au hasard faute de reference de lead dans
+le pivot. Les deux appellent la meme decision : elargir le pivot, ou passer d'un triplet de
+references a une carte par etape. Elle se prendra avec F3, quand le consommateur de file
+dira ce qu'il peut fournir comme identifiant.
+
+Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
+`docs/erp-integration-setup.md`.
+
+`CrmSyncService` porte tout ce qui est propre a LeadFlow : resolution de `CrmTarget` depuis
+`client.crm_config` dechiffre, reconstruction de l'etat anterieur (valeur non nulle la plus
+recente, champ par champ), resolution et memorisation de `sales_rep.crm_ref`, ecriture de la
+trace. Il ne choisit aucun commercial (F4), ne consomme aucune file (F3) et ne reessaie pas :
+la reprise appartient a la DLQ. La trace s'ecrit en `REQUIRES_NEW` pour survivre au rollback
+d'un appelant transactionnel.
 
 Il n'y a **pas de connecteur par defaut** : tout lead appartient a un client, et tout
 client nomme son fournisseur. `CrmConnectorRegistry.defaultConnector()` et la propriete
@@ -256,14 +294,14 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le squelette compile de bout en bout et **le modele de donnees est complet** (F1 livree).
+Le modele de donnees est complet (F1) et **les deux adaptateurs ERP existent** (F5).
 
-Ce qui existe : la configuration (Rabbit, Security, proprietes typees), le chiffrement des
-secrets, les cinq entites et leurs repositories, les migrations `V1` et `V2`, le port
-`CrmConnector` et son registre, le modele pivot.
+Ce qui existe : la configuration, le chiffrement des secrets, les cinq entites et leurs
+repositories, les migrations `V1` et `V2`, le port `CrmConnector` et son registre, les
+adaptateurs Dolibarr et Odoo, et `CrmSyncService` qui les orchestre.
 
-Ce qui n'existe pas : **aucun comportement au runtime**. Pas d'endpoint webhook, pas de
-consommateur RabbitMQ, aucun adaptateur ERP — `crm/dolibarr/` et `crm/odoo/` ne contiennent
-que leur `package-info.java` — et les quatre composants de `features/` sont des
-placeholders. Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de
-referencer.
+Ce qui n'existe pas : **l'entree et le milieu du pipeline**. Pas d'endpoint webhook (F2),
+pas de consommateur RabbitMQ ni de qualification (F3), pas de routage (F4), pas d'API de
+monitoring (F6) ; les quatre composants de `features/` sont des placeholders. Rien n'appelle
+donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'existence d'un service
+ou d'un endpoint : verifier avant de referencer.

@@ -3,9 +3,13 @@ package com.leadflow.crm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.leadflow.config.CrmProperties;
+import com.leadflow.crm.model.CrmAssignee;
 import com.leadflow.crm.model.CrmLead;
 import com.leadflow.crm.model.CrmSyncResult;
+import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -18,10 +22,9 @@ class CrmConnectorRegistryTest {
 
         private final String providerId;
 
-        /** Derniers arguments recus par {@link #sync} : ce que le registre a reellement transmis. */
         private CrmLead leadRecu;
-
         private CrmTarget cibleRecue;
+        private CrmSyncState etatRecu;
 
         private ConnecteurFactice(String providerId) {
             this.providerId = providerId;
@@ -33,27 +36,45 @@ class CrmConnectorRegistryTest {
         }
 
         @Override
-        public CrmSyncResult sync(CrmLead lead, CrmTarget target) {
+        public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {
             this.leadRecu = lead;
             this.cibleRecue = target;
-            return new CrmSyncResult(providerId, "1", "2", "3", "4", Instant.now());
+            this.etatRecu = previous;
+            return new CrmSyncResult(providerId, "1", "2", "3", null, Instant.now());
         }
+
+        @Override
+        public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
+            return "u-" + assignee.email();
+        }
+    }
+
+    private static CrmProperties proprietes(boolean odooActive) {
+        CrmProperties.Provider actif =
+                new CrmProperties.Provider(true, Duration.ofSeconds(5), Duration.ofSeconds(15));
+        CrmProperties.Provider odoo =
+                new CrmProperties.Provider(odooActive, Duration.ofSeconds(5), Duration.ofSeconds(15));
+        return new CrmProperties(Map.of("dolibarr", actif, "odoo", odoo));
     }
 
     private final ConnecteurFactice dolibarr = new ConnecteurFactice("dolibarr");
 
     private final ConnecteurFactice odoo = new ConnecteurFactice("odoo");
 
-    private final CrmConnectorRegistry registry = new CrmConnectorRegistry(List.of(dolibarr, odoo));
+    private final CrmConnectorRegistry registry =
+            new CrmConnectorRegistry(List.of(dolibarr, odoo), proprietes(true));
 
     @Test
     void resoutUnConnecteurParSonIdentifiant() {
-        assertThat(registry.forProvider("odoo").providerId()).isEqualTo("odoo");
+        assertThat(registry.forProvider("odoo")).isSameAs(odoo);
     }
 
     @Test
-    void listeLesFournisseursDisponibles() {
-        assertThat(registry.availableProviders()).containsExactlyInAnyOrder("dolibarr", "odoo");
+    void listeLesFournisseursActives() {
+        CrmConnectorRegistry avecOdooDesactive =
+                new CrmConnectorRegistry(List.of(dolibarr, odoo), proprietes(false));
+
+        assertThat(avecOdooDesactive.availableProviders()).containsExactly("dolibarr");
     }
 
     @Test
@@ -65,15 +86,35 @@ class CrmConnectorRegistryTest {
     }
 
     @Test
-    void transmetLaCibleAuConnecteur() {
+    void refuseUnFournisseurDesactiveAvecUnMessageDistinct() {
+        CrmConnectorRegistry avecOdooDesactive =
+                new CrmConnectorRegistry(List.of(dolibarr, odoo), proprietes(false));
+
+        assertThatThrownBy(() -> avecOdooDesactive.forProvider("odoo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("desactive")
+                .hasMessageContaining("leadflow.crm.providers.odoo.enabled");
+    }
+
+    @Test
+    void refuseUnIdentifiantNulSansLeverDeNullPointerException() {
+        assertThatThrownBy(() -> registry.forProvider(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("null");
+    }
+
+    @Test
+    void transmetLeLeadLaCibleEtLEtatAnterieurAuConnecteur() {
         CrmTarget cible = new CrmTarget("dolibarr", Map.of("baseUrl", "http://client-a:8081"));
         CrmLead lead = new CrmLead("Acme", "Amina", "Bensalem", "amina@exemple.test",
                 "+212600000000", "Demande de devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "7");
+        CrmSyncState etat = new CrmSyncState("42", null, null);
 
-        registry.forProvider("dolibarr").sync(lead, cible);
+        registry.forProvider("dolibarr").sync(lead, cible, etat);
 
-        assertThat(dolibarr.cibleRecue).isSameAs(cible);
         assertThat(dolibarr.leadRecu).isSameAs(lead);
+        assertThat(dolibarr.cibleRecue).isSameAs(cible);
+        assertThat(dolibarr.etatRecu).isSameAs(etat);
         assertThat(odoo.cibleRecue).isNull();
     }
 }
