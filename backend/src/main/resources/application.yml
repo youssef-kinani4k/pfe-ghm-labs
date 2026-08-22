@@ -69,6 +69,11 @@ leadflow:
       # Presence du consommateur de la file. Toujours vrai en production ; la suite de
       # tests le retire pour lire elle-meme ce que la capture a publie.
       enabled: true
+  routing:
+    listener:
+      # Presence du consommateur de leadflow.leads.qualified. Toujours vrai en production ;
+      # la suite de tests le retire pour lire elle-meme ce que la qualification a publie.
+      enabled: true
   intent:
     gemini:
       enabled: true
