@@ -76,7 +76,7 @@ Fichiers modifiés hors de ces packages : `config/RabbitMQConfig.java`,
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Écrire le test d'intégration**
+- [x] **Step 1: Écrire le test d'intégration**
 
 Créer `backend/src/test/java/com/leadflow/routing/RotationOrderTest.java` :
 
@@ -214,12 +214,12 @@ class RotationOrderTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=RotationOrderTest`
 Expected: échec de compilation — `RotationOrder` n'existe pas.
 
-- [ ] **Step 3: Écrire la projection**
+- [x] **Step 3: Écrire la projection**
 
 Créer `backend/src/main/java/com/leadflow/routing/AttributionRecente.java` :
 
@@ -243,7 +243,7 @@ public interface AttributionRecente {
 }
 ```
 
-- [ ] **Step 4: Ajouter la requête au repository**
+- [x] **Step 4: Ajouter la requête au repository**
 
 Dans `backend/src/main/java/com/leadflow/qualification/LeadRepository.java`, ajouter les
 imports puis la méthode :
@@ -269,7 +269,7 @@ import org.springframework.data.repository.query.Param;
     List<AttributionRecente> derniereAttributionParCommercial(@Param("clientId") UUID clientId);
 ```
 
-- [ ] **Step 5: Écrire `RotationOrder`**
+- [x] **Step 5: Écrire `RotationOrder`**
 
 Créer `backend/src/main/java/com/leadflow/routing/RotationOrder.java` :
 
@@ -330,12 +330,12 @@ public class RotationOrder {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=RotationOrderTest`
 Expected: 4 tests, 0 échec.
 
-- [ ] **Step 7: Commiter**
+- [x] **Step 7: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/AttributionRecente.java \
@@ -362,7 +362,7 @@ git commit -m "feat: ordre de rotation deduit des attributions passees"
 
 **Sans Spring ni base.**
 
-- [ ] **Step 1: Écrire les tests du round-robin**
+- [x] **Step 1: Écrire les tests du round-robin**
 
 Créer `backend/src/test/java/com/leadflow/routing/RoundRobinStrategyTest.java` :
 
@@ -423,7 +423,7 @@ class RoundRobinStrategyTest {
 }
 ```
 
-- [ ] **Step 2: Écrire le test du registre**
+- [x] **Step 2: Écrire le test du registre**
 
 Créer `backend/src/test/java/com/leadflow/routing/AssignmentStrategyRegistryTest.java` :
 
@@ -492,12 +492,12 @@ class AssignmentStrategyRegistryTest {
 }
 ```
 
-- [ ] **Step 3: Lancer les tests et vérifier qu'ils échouent**
+- [x] **Step 3: Lancer les tests et vérifier qu'ils échouent**
 
 Run: `./mvnw test -Dtest='RoundRobinStrategyTest,AssignmentStrategyRegistryTest'`
 Expected: échec de compilation — `AssignmentStrategy`, `RoundRobinStrategy` et `AssignmentStrategyRegistry` n'existent pas.
 
-- [ ] **Step 4: Écrire le port**
+- [x] **Step 4: Écrire le port**
 
 Créer `backend/src/main/java/com/leadflow/routing/AssignmentStrategy.java` :
 
@@ -532,7 +532,7 @@ public interface AssignmentStrategy {
 }
 ```
 
-- [ ] **Step 5: Écrire le round-robin**
+- [x] **Step 5: Écrire le round-robin**
 
 Créer `backend/src/main/java/com/leadflow/routing/RoundRobinStrategy.java` :
 
@@ -568,7 +568,7 @@ public class RoundRobinStrategy implements AssignmentStrategy {
 }
 ```
 
-- [ ] **Step 6: Écrire le registre**
+- [x] **Step 6: Écrire le registre**
 
 Créer `backend/src/main/java/com/leadflow/routing/AssignmentStrategyRegistry.java` :
 
@@ -628,12 +628,12 @@ n'existent qu'en T3. Tant que T3 n'est pas faite, **tout `@SpringBootTest` écho
 démarrage**. C'est voulu — le registre fait précisément ce pour quoi il est écrit — mais
 cela implique d'enchaîner T2 et T3 sans lancer la suite complète entre les deux.
 
-- [ ] **Step 7: Lancer les tests et vérifier qu'ils passent**
+- [x] **Step 7: Lancer les tests et vérifier qu'ils passent**
 
 Run: `./mvnw test -Dtest='RoundRobinStrategyTest,AssignmentStrategyRegistryTest'`
 Expected: 6 tests, 0 échec.
 
-- [ ] **Step 8: Commiter**
+- [x] **Step 8: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/AssignmentStrategy.java \
@@ -660,7 +660,7 @@ git commit -m "feat: port de strategie d'attribution, round-robin et registre"
 
 **Sans Spring ni base.**
 
-- [ ] **Step 1: Écrire le test de la stratégie géographique**
+- [x] **Step 1: Écrire le test de la stratégie géographique**
 
 Créer `backend/src/test/java/com/leadflow/routing/GeographicStrategyTest.java` :
 
@@ -742,7 +742,7 @@ class GeographicStrategyTest {
 }
 ```
 
-- [ ] **Step 2: Écrire le test de la stratégie sectorielle**
+- [x] **Step 2: Écrire le test de la stratégie sectorielle**
 
 Créer `backend/src/test/java/com/leadflow/routing/SectorStrategyTest.java` :
 
@@ -813,12 +813,12 @@ class SectorStrategyTest {
 }
 ```
 
-- [ ] **Step 3: Lancer les tests et vérifier qu'ils échouent**
+- [x] **Step 3: Lancer les tests et vérifier qu'ils échouent**
 
 Run: `./mvnw test -Dtest='GeographicStrategyTest,SectorStrategyTest'`
 Expected: échec de compilation — `GeographicStrategy` et `SectorStrategy` n'existent pas.
 
-- [ ] **Step 4: Écrire la stratégie géographique**
+- [x] **Step 4: Écrire la stratégie géographique**
 
 Créer `backend/src/main/java/com/leadflow/routing/GeographicStrategy.java` :
 
@@ -880,7 +880,7 @@ public class GeographicStrategy implements AssignmentStrategy {
 }
 ```
 
-- [ ] **Step 5: Écrire la stratégie sectorielle**
+- [x] **Step 5: Écrire la stratégie sectorielle**
 
 Créer `backend/src/main/java/com/leadflow/routing/SectorStrategy.java` :
 
@@ -929,18 +929,18 @@ public class SectorStrategy implements AssignmentStrategy {
 }
 ```
 
-- [ ] **Step 6: Lancer les tests et vérifier qu'ils passent**
+- [x] **Step 6: Lancer les tests et vérifier qu'ils passent**
 
 Run: `./mvnw test -Dtest='GeographicStrategyTest,SectorStrategyTest,AssignmentStrategyRegistryTest,RoundRobinStrategyTest'`
 Expected: 19 tests, 0 échec.
 
-- [ ] **Step 7: Lancer la suite complète**
+- [x] **Step 7: Lancer la suite complète**
 
 Run: `./mvnw test`
 Expected: toute la suite verte — le registre trouve maintenant ses trois titulaires, donc
 les contextes Spring redémarrent.
 
-- [ ] **Step 8: Commiter**
+- [x] **Step 8: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/GeographicStrategy.java \
@@ -966,7 +966,7 @@ git commit -m "feat: strategies geographique et sectorielle avec repli sur la ro
 
 **Testcontainers requis.** La publication n'existe pas encore : elle est ajoutée en T5.
 
-- [ ] **Step 1: Écrire le test d'intégration**
+- [x] **Step 1: Écrire le test d'intégration**
 
 Créer `backend/src/test/java/com/leadflow/routing/LeadRoutingServiceTest.java` :
 
@@ -1123,12 +1123,12 @@ class LeadRoutingServiceTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=LeadRoutingServiceTest`
 Expected: échec de compilation — `LeadRoutingService` et `AssignmentException` n'existent pas.
 
-- [ ] **Step 3: Écrire l'exception**
+- [x] **Step 3: Écrire l'exception**
 
 Créer `backend/src/main/java/com/leadflow/routing/AssignmentException.java` :
 
@@ -1154,7 +1154,7 @@ public class AssignmentException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 4: Écrire l'écrivain transactionnel**
+- [x] **Step 4: Écrire l'écrivain transactionnel**
 
 Créer `backend/src/main/java/com/leadflow/routing/RoutedLeadWriter.java` :
 
@@ -1200,7 +1200,7 @@ public class RoutedLeadWriter {
 }
 ```
 
-- [ ] **Step 5: Écrire l'orchestrateur**
+- [x] **Step 5: Écrire l'orchestrateur**
 
 Créer `backend/src/main/java/com/leadflow/routing/LeadRoutingService.java` :
 
@@ -1313,12 +1313,12 @@ public class LeadRoutingService {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadRoutingServiceTest`
 Expected: 6 tests, 0 échec.
 
-- [ ] **Step 7: Commiter**
+- [x] **Step 7: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/AssignmentException.java \
@@ -1347,7 +1347,7 @@ git commit -m "feat: orchestration de l'attribution et ecriture du lead route"
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Étendre le test d'intégration**
+- [x] **Step 1: Étendre le test d'intégration**
 
 Dans `LeadRoutingServiceTest`, ajouter les imports :
 
@@ -1407,12 +1407,12 @@ puis les deux tests :
     }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=LeadRoutingServiceTest`
 Expected: échec de compilation — `RoutedLeadMessage` et `RabbitMQConfig.ROUTED_QUEUE` n'existent pas.
 
-- [ ] **Step 3: Écrire le contrat de file**
+- [x] **Step 3: Écrire le contrat de file**
 
 Créer `backend/src/main/java/com/leadflow/routing/RoutedLeadMessage.java` :
 
@@ -1444,7 +1444,7 @@ public record RoutedLeadMessage(
 }
 ```
 
-- [ ] **Step 4: Déclarer la file dans la topologie**
+- [x] **Step 4: Déclarer la file dans la topologie**
 
 Dans `backend/src/main/java/com/leadflow/config/RabbitMQConfig.java`, après les constantes
 `QUALIFIED_*` :
@@ -1485,7 +1485,7 @@ et enfin la liste blanche — **sans quoi le consommateur de T7 refusera de dés
             {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing"};
 ```
 
-- [ ] **Step 5: Écrire le publieur**
+- [x] **Step 5: Écrire le publieur**
 
 Créer `backend/src/main/java/com/leadflow/routing/RoutedLeadPublisher.java` :
 
@@ -1545,7 +1545,7 @@ public class RoutedLeadPublisher {
 }
 ```
 
-- [ ] **Step 6: Brancher le publieur dans l'orchestrateur**
+- [x] **Step 6: Brancher le publieur dans l'orchestrateur**
 
 Dans `LeadRoutingService`, ajouter le champ :
 
@@ -1593,12 +1593,12 @@ transactionnalité :
  * sans commercial.
 ```
 
-- [ ] **Step 7: Lancer le test et vérifier qu'il passe**
+- [x] **Step 7: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadRoutingServiceTest`
 Expected: 8 tests, 0 échec.
 
-- [ ] **Step 8: Commiter**
+- [x] **Step 8: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/RoutedLeadMessage.java \
@@ -1625,7 +1625,7 @@ git commit -m "feat: publication du lead attribue sur leadflow.leads.routed"
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Écrire le listener**
+- [x] **Step 1: Écrire le listener**
 
 Créer `backend/src/main/java/com/leadflow/routing/LeadRoutingListener.java` :
 
@@ -1671,7 +1671,7 @@ public class LeadRoutingListener {
 }
 ```
 
-- [ ] **Step 2: Déclarer le commutateur**
+- [x] **Step 2: Déclarer le commutateur**
 
 Dans `backend/src/main/resources/application.yml`, ajouter sous `leadflow:`, après le bloc
 `qualification:` :
@@ -1693,7 +1693,7 @@ Dans `backend/src/test/resources/application.properties`, ajouter :
 leadflow.routing.listener.enabled=false
 ```
 
-- [ ] **Step 3: Écrire le test de câblage**
+- [x] **Step 3: Écrire le test de câblage**
 
 Créer `backend/src/test/java/com/leadflow/routing/LeadRoutingListenerTest.java` :
 
@@ -1802,7 +1802,7 @@ class LeadRoutingListenerTest {
 }
 ```
 
-- [ ] **Step 4: Lancer le test et vérifier qu'il passe**
+- [x] **Step 4: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=LeadRoutingListenerTest`
 Expected: 1 test, 0 échec.
@@ -1810,12 +1810,12 @@ Expected: 1 test, 0 échec.
 **Note :** `leadflow.crm.listener.enabled` n'a pas encore de titulaire — la propriété est
 simplement inconnue, ce qui est sans effet. T7 crée le bean qu'elle commande.
 
-- [ ] **Step 5: Lancer la suite complète**
+- [x] **Step 5: Lancer la suite complète**
 
 Run: `./mvnw test`
 Expected: toute la suite verte.
 
-- [ ] **Step 6: Commiter**
+- [x] **Step 6: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/routing/LeadRoutingListener.java \
@@ -1842,7 +1842,7 @@ git commit -m "feat: consommation de leadflow.leads.qualified par le routage"
 
 **Testcontainers requis.**
 
-- [ ] **Step 1: Écrire le test de bout en bout**
+- [x] **Step 1: Écrire le test de bout en bout**
 
 Créer `backend/src/test/java/com/leadflow/crm/CrmSyncListenerTest.java` :
 
@@ -1987,13 +1987,13 @@ class CrmSyncListenerTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 Run: `./mvnw test -Dtest=CrmSyncListenerTest`
 Expected: le lead reste `ROUTED` et le test expire — aucun consommateur de
 `leadflow.leads.routed` n'existe.
 
-- [ ] **Step 3: Écrire l'écrivain du statut**
+- [x] **Step 3: Écrire l'écrivain du statut**
 
 Créer `backend/src/main/java/com/leadflow/crm/SyncedLeadWriter.java` :
 
@@ -2037,7 +2037,7 @@ public class SyncedLeadWriter {
 }
 ```
 
-- [ ] **Step 4: Écrire le listener**
+- [x] **Step 4: Écrire le listener**
 
 Créer `backend/src/main/java/com/leadflow/crm/CrmSyncListener.java` :
 
@@ -2087,7 +2087,7 @@ public class CrmSyncListener {
 }
 ```
 
-- [ ] **Step 5: Déclarer le commutateur**
+- [x] **Step 5: Déclarer le commutateur**
 
 Dans `backend/src/main/resources/application.yml`, sous `leadflow.crm:`, avant `providers:` :
 
@@ -2104,17 +2104,17 @@ Dans `backend/src/test/resources/application.properties`, ajouter :
 leadflow.crm.listener.enabled=false
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 Run: `./mvnw test -Dtest=CrmSyncListenerTest`
 Expected: 1 test, 0 échec.
 
-- [ ] **Step 7: Lancer la suite complète**
+- [x] **Step 7: Lancer la suite complète**
 
 Run: `./mvnw test`
 Expected: toute la suite verte.
 
-- [ ] **Step 8: Commiter**
+- [x] **Step 8: Commiter**
 
 ```bash
 git add backend/src/main/java/com/leadflow/crm/SyncedLeadWriter.java \
@@ -2135,7 +2135,7 @@ git commit -m "feat: synchronisation ERP declenchee par la file, lead marque SYN
 
 **Interfaces:** aucune — tâche documentaire.
 
-- [ ] **Step 1: Enrichir le `package-info`**
+- [x] **Step 1: Enrichir le `package-info`**
 
 Remplacer `backend/src/main/java/com/leadflow/routing/package-info.java` :
 
@@ -2167,7 +2167,7 @@ Remplacer `backend/src/main/java/com/leadflow/routing/package-info.java` :
 package com.leadflow.routing;
 ```
 
-- [ ] **Step 2: Ajouter la section « Routage » à `CLAUDE.md`**
+- [x] **Step 2: Ajouter la section « Routage » à `CLAUDE.md`**
 
 Insérer après la section « Qualification — ce qui sort de la file » :
 
@@ -2204,7 +2204,7 @@ puis DLQ. C'est le seul echec du routage qui merite la DLQ, parce qu'un humain p
 reparer : activer un commercial, puis rejouer.
 ```
 
-- [ ] **Step 3: Mettre à jour la section « État actuel » de `CLAUDE.md`**
+- [x] **Step 3: Mettre à jour la section « État actuel » de `CLAUDE.md`**
 
 Remplacer la section entière :
 
@@ -2229,7 +2229,7 @@ d'agenda dans l'ERP, ni alerte pour les leads chauds. Ne pas supposer l'existenc
 service ou d'un endpoint : verifier avant de referencer.
 ```
 
-- [ ] **Step 4: Vérifier et commiter**
+- [x] **Step 4: Vérifier et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte — le `package-info` est compilé.
