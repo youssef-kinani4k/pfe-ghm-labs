@@ -7,6 +7,7 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.config.RabbitMQConfig;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -33,11 +35,15 @@ class LeadRoutingServiceTest {
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
     @Autowired private ClientRepository clientRepository;
     @Autowired private SalesRepRepository salesRepRepository;
+    @Autowired private RabbitTemplate rabbitTemplate;
 
     private Client client;
 
     @BeforeEach
     void preparation() {
+        while (rabbitTemplate.receive(RabbitMQConfig.ROUTED_QUEUE) != null) {
+            // vide la file avant chaque test : sans quoi un test lit la publication du precedent.
+        }
         leadRepository.deleteAll();
         rawLeadEventRepository.deleteAll();
         salesRepRepository.deleteAll();
@@ -146,5 +152,38 @@ class LeadRoutingServiceTest {
     @Test
     void acquitteUnLeadIntrouvableSansLever() {
         assertThat(service.route(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void publieLeLeadRouteSurLaFileDeSortie() {
+        SalesRep amina = commercial("amina@demo.test", true);
+
+        Lead route = service.route(leadQualifie()).orElseThrow();
+
+        Object recu = rabbitTemplate.receiveAndConvert(RabbitMQConfig.ROUTED_QUEUE, 5000);
+        assertThat(recu).isInstanceOf(RoutedLeadMessage.class);
+        RoutedLeadMessage message = (RoutedLeadMessage) recu;
+        assertThat(message.leadId()).isEqualTo(route.getId());
+        assertThat(message.clientId()).isEqualTo(client.getId());
+        assertThat(message.salesRepId()).isEqualTo(amina.getId());
+        assertThat(message.routedAt()).isNotNull();
+    }
+
+    /**
+     * Republier un lead deja attribue est sans danger — CrmSyncService rejoue via
+     * CrmSyncState — alors que ne pas republier laisserait un lead ROUTED que plus rien ne
+     * synchroniserait.
+     */
+    @Test
+    void republieUnLeadDejaRouteSansLeReattribuer() {
+        commercial("amina@demo.test", true);
+        UUID leadId = leadQualifie();
+        service.route(leadId);
+        rabbitTemplate.receiveAndConvert(RabbitMQConfig.ROUTED_QUEUE, 5000);
+
+        service.route(leadId);
+
+        assertThat(rabbitTemplate.receiveAndConvert(RabbitMQConfig.ROUTED_QUEUE, 5000))
+                .isInstanceOf(RoutedLeadMessage.class);
     }
 }

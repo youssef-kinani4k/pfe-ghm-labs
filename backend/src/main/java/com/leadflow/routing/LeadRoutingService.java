@@ -20,6 +20,10 @@ import org.springframework.stereotype.Service;
  * l'ecriture a sa propre transaction, portee par {@link RoutedLeadWriter}, et la suite du
  * traitement part apres son commit.
  *
+ * <p>La publication part apres le retour de {@link RoutedLeadWriter#attribue}, donc apres le
+ * commit : un message parti plus tot designerait un lead que l'etape suivante lirait encore
+ * sans commercial.
+ *
  * <p>C'est ici, et pas dans les strategies, que vivent les trois decisions qui ne sont pas
  * du calcul : ne pas reattribuer un lead qui porte deja un commercial, lever quand aucun
  * commercial n'est actif, et journaliser le repli d'une strategie qui n'a trouve personne
@@ -36,6 +40,7 @@ public class LeadRoutingService {
     private final RotationOrder rotation;
     private final AssignmentStrategyRegistry registre;
     private final RoutedLeadWriter writer;
+    private final RoutedLeadPublisher publisher;
 
     public LeadRoutingService(
             LeadRepository leadRepository,
@@ -43,13 +48,15 @@ public class LeadRoutingService {
             SalesRepRepository salesRepRepository,
             RotationOrder rotation,
             AssignmentStrategyRegistry registre,
-            RoutedLeadWriter writer) {
+            RoutedLeadWriter writer,
+            RoutedLeadPublisher publisher) {
         this.leadRepository = leadRepository;
         this.clientRepository = clientRepository;
         this.salesRepRepository = salesRepRepository;
         this.rotation = rotation;
         this.registre = registre;
         this.writer = writer;
+        this.publisher = publisher;
     }
 
     /**
@@ -64,7 +71,10 @@ public class LeadRoutingService {
             return Optional.empty();
         }
         if (lead.getAssignedSalesRepId() != null) {
-            // Rejeu : ne pas reattribuer, sous peine de decaler la rotation.
+            // Rejeu : ne pas reattribuer, sous peine de decaler la rotation. Republier, en
+            // revanche, est necessaire — un message perdu entre les deux etapes laisserait
+            // un lead ROUTED que plus rien ne synchroniserait.
+            publisher.publie(lead);
             return Optional.of(lead);
         }
 
@@ -83,7 +93,9 @@ public class LeadRoutingService {
                 .orElseThrow(() -> new AssignmentException(lead.getClientId(), leadId));
         journaliseLeRepli(client, lead, choisi);
 
-        return Optional.of(writer.attribue(leadId, choisi.getId()));
+        Lead route = writer.attribue(leadId, choisi.getId());
+        publisher.publie(route);
+        return Optional.of(route);
     }
 
     /**

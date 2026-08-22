@@ -29,6 +29,10 @@ public class RabbitMQConfig {
     public static final String QUALIFIED_QUEUE = "leadflow.leads.qualified";
     public static final String QUALIFIED_ROUTING_KEY = "lead.qualified";
 
+    /** Sortie du routage, consommee par la synchronisation ERP. */
+    public static final String ROUTED_QUEUE = "leadflow.leads.routed";
+    public static final String ROUTED_ROUTING_KEY = "lead.routed";
+
     public static final String DLX_EXCHANGE = "leadflow.leads.dlx";
     public static final String DLQ_QUEUE = "leadflow.leads.dlq";
     public static final String DLQ_ROUTING_KEY = "lead.dead";
@@ -60,6 +64,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Queue routedLeadsQueue() {
+        return QueueBuilder.durable(ROUTED_QUEUE)
+                .deadLetterExchange(DLX_EXCHANGE)
+                .deadLetterRoutingKey(DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_QUEUE).build();
     }
@@ -77,6 +89,13 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Binding routedLeadsBinding(Queue routedLeadsQueue, DirectExchange leadsExchange) {
+        return BindingBuilder.bind(routedLeadsQueue)
+                .to(leadsExchange)
+                .with(ROUTED_ROUTING_KEY);
+    }
+
+    @Bean
     Binding deadLetterBinding(Queue deadLetterQueue, DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with(DLQ_ROUTING_KEY);
     }
@@ -89,7 +108,7 @@ public class RabbitMQConfig {
      * contrat de file dans un autre paquet doit l'ajouter ici.
      */
     private static final String[] PAQUETS_DE_CONFIANCE =
-            {"com.leadflow.capture", "com.leadflow.qualification"};
+            {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing"};
 
     /**
      * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par
