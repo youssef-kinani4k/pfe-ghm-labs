@@ -176,7 +176,39 @@ tolerante — un document malforme donne les defauts, jamais une erreur.
 retour de `LeadWriter.insere`, donc apres le commit — et non un
 `@TransactionalEventListener` comme en F2, qui serait silencieusement ignore hors
 transaction. Un doublon `REJECTED` n'est pas publie. **Il n'y a pas de filet de
-republication** : voir le Javadoc de `QualifiedLeadPublisher`, la dette appartient a F4.
+republication** : voir le Javadoc de `QualifiedLeadPublisher`. F4 n'a pas repris cette
+dette et a produit la meme sur `lead.routed` ; les deux filets sont reportes a F6.
+
+### Routage — le dernier maillon
+
+Deux etapes, deux files : `routing` consomme `leadflow.leads.qualified`, attribue et publie
+sur `leadflow.leads.routed` ; `crm/CrmSyncListener` consomme cette file et appelle
+`CrmSyncService`. Les deux consommateurs sont des beans conditionnels
+(`leadflow.routing.listener.enabled`, `leadflow.crm.listener.enabled`), retires dans la
+suite de tests.
+
+**Le decoupage en deux etapes n'est pas cosmetique.** Le tour de role n'est pas idempotent :
+rejouer une attribution decale la rotation. Un ERP injoignable — le cas le plus frequent —
+ne doit donc jamais renvoyer l'attribution au consommateur. Avec deux files, la DLQ ne
+contient que ce qui a reellement echoue.
+
+**Aucun `switch` sur la strategie.** `AssignmentStrategyRegistry` collecte les
+implementations par injection de `List<AssignmentStrategy>` et refuse de demarrer si une
+valeur de `AssignmentStrategyType` n'a pas de titulaire, ou si deux la revendiquent.
+
+**Le tour de role se lit dans la table `lead`**, pas dans un compteur : le commercial dont
+`max(created_at)` est le plus ancien prend le lead suivant, et celui qui n'a jamais rien recu
+passe devant. Aucun etat a maintenir, donc rien qui puisse diverger de la realite apres un
+redemarrage ou une desactivation.
+
+**Les strategies geographique et sectorielle filtrent puis retombent sur le tour de role**
+quand leur critere ne trouve personne, et le repli est logue. Un prospect qui attend coute
+plus cher qu'une attribution imparfaite ; le log existe pour que la configuration incomplete
+du client se voie.
+
+**Un client sans aucun commercial actif fait lever `AssignmentException`** — trois tentatives
+puis DLQ. C'est le seul echec du routage qui merite la DLQ, parce qu'un humain peut le
+reparer : activer un commercial, puis rejouer.
 
 ### Frontend
 
@@ -377,18 +409,19 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le modele de donnees est complet (F1), les deux adaptateurs ERP existent (F5), l'entree du
-pipeline est ouverte (F2) et **le milieu est branche** (F3).
+Le pipeline est **complet de bout en bout** : capture (F2), qualification (F3), routage et
+synchronisation ERP (F4), sur le socle multi-tenant de F1 et les adaptateurs de F5.
 
 Ce qui existe : la configuration, le chiffrement des secrets, les cinq entites et leurs
 repositories, les migrations `V1` a `V3`, le port `CrmConnector` et son registre, les
-adaptateurs Dolibarr et Odoo, `CrmSyncService`, la couche `capture` complete, et la couche
-`qualification` complete — consommation de la file, mapping du payload libre, normalisation,
-deduplication, analyse d'intention Gemini avec repli lexical, scoring, et publication sur
-`leadflow.leads.qualified`.
+adaptateurs Dolibarr et Odoo, `CrmSyncService`, la couche `capture`, la couche
+`qualification`, et la couche `routing` — trois strategies d'attribution, publication sur
+`leadflow.leads.routed`, et la synchronisation ERP enfin declenchee par la file. Un lead
+traverse desormais `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention.
 
-Ce qui n'existe pas : **la sortie du pipeline**. Personne ne consomme
-`leadflow.leads.qualified` : pas de routage (F4), donc `lead.assigned_sales_rep_id` reste
-toujours nul et rien n'appelle `CrmSyncService` en dehors des tests ; pas d'API de
-monitoring (F6), et les quatre composants de `features/` sont des placeholders. Ne pas
-supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.
+Ce qui n'existe pas : **l'observabilite**. Pas d'API de monitoring ni de dashboard (F6) : les
+quatre composants de `features/` sont des placeholders, la DLQ ne se rejoue qu'a la main
+depuis la console RabbitMQ, et les filets de republication de `lead.qualified` et
+`lead.routed` restent a ecrire. Aucune notification n'est envoyee au commercial : ni tache
+d'agenda dans l'ERP, ni alerte pour les leads chauds. Ne pas supposer l'existence d'un
+service ou d'un endpoint : verifier avant de referencer.
