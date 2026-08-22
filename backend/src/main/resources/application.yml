@@ -62,6 +62,9 @@ leadflow:
     # Filet de republication : age minimal d'une ligne non publiee, et periode de balayage.
     relay-after: 2m
     relay-interval: 30s
+  qualification:
+    # Fenetre de deduplication : meme client, meme email normalise.
+    dedup-window: 24h
   intent:
     gemini:
       enabled: true
