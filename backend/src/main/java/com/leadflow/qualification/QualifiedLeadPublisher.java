@@ -20,10 +20,11 @@ import org.springframework.stereotype.Component;
  * <p><b>Dette assumee : aucun filet de republication.</b> Si l'envoi echoue, le lead reste
  * en base avec {@code status = QUALIFIED} — rien n'est perdu, mais rien ne le republie. Le
  * filet symetrique de {@code PendingEventRelay} consisterait a rebalayer les leads
- * {@code QUALIFIED} plus vieux que N minutes ; il est impossible tant que F4 n'existe pas,
- * puisque aucun lead ne quitte jamais cet etat et que le balayage republierait la table
- * entiere en boucle. C'est F4, qui fait passer le lead a {@code ROUTED}, qui rendra ce
- * filet possible et borne : {@code findByStatusAndCreatedAtBefore(QUALIFIED, seuil)}.
+ * {@code QUALIFIED} plus vieux que N minutes. Il etait impossible avant F4, puisque aucun
+ * lead ne quittait cet etat et que le balayage aurait republie la table entiere en boucle.
+ * F4 fait passer le lead a {@code ROUTED} : le filet est desormais bornable
+ * ({@code findByStatusAndCreatedAtBefore(QUALIFIED, seuil)}), et il est reporte a F6 avec
+ * son jumeau sur {@code lead.routed}.
  */
 @Component
 public class QualifiedLeadPublisher {

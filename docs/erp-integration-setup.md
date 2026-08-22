@@ -43,15 +43,23 @@ docker exec leadflow-dolibarr-db mariadb -udolibarr -pdolibarr dolibarr -e \
   "INSERT INTO llx_const (name, entity, value, type, visible, note)
    VALUES ('MAIN_MODULE_API', 1, '1', 'chaine', 0, 'Active pour les tests LeadFlow')
    ON DUPLICATE KEY UPDATE value='1';
-   UPDATE llx_user SET api_key='cle-de-sonde-leadflow', email='amina@demo.test' WHERE login='admin';"
+   UPDATE llx_user SET api_key='cle-dolibarr-de-demo', email='amina@demo.test' WHERE login='admin';"
 ```
 
 Vérifier :
 
 ```bash
-curl -s http://localhost:8081/api/index.php/status -H "DOLAPIKEY: cle-de-sonde-leadflow"
+curl -s http://localhost:8081/api/index.php/status -H "DOLAPIKEY: cle-dolibarr-de-demo"
 # {"success":{"code":200,"dolibarr_version":"23.0.2","access_locked":"0"}}
 ```
+
+**La valeur de la cle n'est pas libre.** `cle-dolibarr-de-demo` est celle que porte le
+`crm_config` chiffre du client de demonstration de
+`backend/src/main/resources/db/dev/R__demo_data.sql`. En poser une autre fait echouer toute
+verification manuelle du pipeline sous le profil `dev` : le backend s'authentifie avec la
+valeur de la base, pas avec celle du bocal. Les tests `@Tag("erp")`, eux, lisent la cle dans
+`LEADFLOW_DOLIBARR_API_KEY` (section 5) et acceptent donc n'importe quelle valeur, pourvu
+qu'elle soit la meme des deux cotes.
 
 ### 2.2 Activer `Societe` et `Projet` (session web)
 
@@ -89,6 +97,22 @@ docker exec leadflow-dolibarr-db mariadb -udolibarr -pdolibarr dolibarr \
 Équivalent par l'interface, si le script échoue : `http://localhost:8081`, `admin` / `admin`
 → Accueil → Configuration → Modules → activer **Tiers** et **Projets**, puis Utilisateurs →
 `admin` → onglet Utilisateur → « Initialiser la clé d'API ».
+
+### 2.3 Un 401 de Dolibarr ne ressemble pas a un 401
+
+Dolibarr repond a une cle refusee par un en-tete `WWW-Authenticate:` **vide**. Le parseur du
+JDK (`sun.net.www.HeaderParser`) ne sait pas lire cet en-tete et leve
+`IllegalArgumentException: invalid start or end` avant que Spring n'ait pu transformer la
+reponse en erreur HTTP. Comme `DolibarrClient` ne rattrape que `RestClientException`, cette
+exception lui echappe : la trace remonte sans jamais mentionner « 401 », et l'erreur
+ressemble a un defaut de construction d'URL.
+
+Reflexe en cas de trace opaque contenant `invalid start or end` : verifier la cle d'API, puis
+regarder le journal d'acces du conteneur, qui donne le vrai code retour.
+
+```bash
+docker logs leadflow-dolibarr 2>&1 | grep "api/index.php" | tail -5
+```
 
 ---
 
@@ -138,7 +162,7 @@ l'adaptateur seul, qui refuse la synchronisation avec un message nommant la clé
 | Fournisseur | Clé | Rôle | Exemple |
 | --- | --- | --- | --- |
 | `dolibarr` | `baseUrl` | racine de l'API REST, `/api/index.php` compris | `http://localhost:8081/api/index.php` |
-| `dolibarr` | `apiKey` | valeur envoyée en en-tête `DOLAPIKEY` | `cle-de-sonde-leadflow` |
+| `dolibarr` | `apiKey` | valeur envoyée en en-tête `DOLAPIKEY` | `cle-dolibarr-de-demo` |
 | `odoo` | `baseUrl` | racine du serveur, sans `/jsonrpc` | `http://localhost:8069` |
 | `odoo` | `database` | base Odoo visée | `leadflow` |
 | `odoo` | `username` | login du compte de service | `admin` |
@@ -154,7 +178,7 @@ communs à toutes les instances d'un même ERP.
 
 ```bash
 export LEADFLOW_DOLIBARR_URL=http://localhost:8081/api/index.php
-export LEADFLOW_DOLIBARR_API_KEY=cle-de-sonde-leadflow
+export LEADFLOW_DOLIBARR_API_KEY=cle-dolibarr-de-demo
 export LEADFLOW_ODOO_URL=http://localhost:8069
 export LEADFLOW_ODOO_DB=leadflow
 export LEADFLOW_ODOO_USER=admin

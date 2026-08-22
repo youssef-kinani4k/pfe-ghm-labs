@@ -20,8 +20,36 @@ class LeadReferenceTest {
     }
 
     @Test
-    void deriveLaReferenceDesPremiersCaracteresDeLIdentifiant() {
-        assertThat(LeadReference.pour(LEAD)).isEqualTo("LF-3F2A9C1B7D4E");
+    void deriveLaReferenceDUneEmpreinteDeLIdentifiant() {
+        assertThat(LeadReference.pour(LEAD)).isEqualTo("LF-682775F7969B");
+    }
+
+    /**
+     * Aucun caractere de l'identifiant ne se retrouve tel quel dans la reference : c'est ce
+     * qui affranchit la classe de la disposition interne de l'UUID, dont deux parties se
+     * sont deja revelees non aleatoires.
+     */
+    @Test
+    void neRecopieAucuneTrancheDeLIdentifiant() {
+        String hexadecimal = LEAD.toString().replace("-", "").toUpperCase();
+        String reference = LeadReference.pour(LEAD).substring(3);
+
+        assertThat(hexadecimal).doesNotContain(reference);
+    }
+
+    /**
+     * Le defaut trouve en verifiant F4 contre un vrai Dolibarr. Les 64 bits de poids fort
+     * de {@code Style.TIME} portent l'adresse IP et un identifiant de JVM, constants pour
+     * toute la duree d'un demarrage : une reference tiree de la tete de l'UUID etait la
+     * meme pour dix leads consecutifs, et l'ERP rendait l'opportunite deja creee au lieu
+     * d'en creer une. Les deux identifiants ci-dessous sont reels, tires de cette panne.
+     */
+    @Test
+    void distingueDeuxIdentifiantsQuiPartagentLeursBitsDePoidsFort() {
+        UUID premier = UUID.fromString("a9fed6e8-a02b-1cd1-81a0-2bb43afc0005");
+        UUID second = UUID.fromString("a9fed6e8-a02b-1cd1-81a0-2bc41d500014");
+
+        assertThat(LeadReference.pour(premier)).isNotEqualTo(LeadReference.pour(second));
     }
 
     @Test

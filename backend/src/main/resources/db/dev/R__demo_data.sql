@@ -10,6 +10,12 @@
 --
 -- Secret HMAC en clair, pour signer les requetes de test en F2 :
 --   c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19
+--
+-- Contenu en clair de crm_config, pour la verification manuelle du pipeline en F4 :
+--   {"baseUrl":"http://localhost:8081/api/index.php","apiKey":"cle-dolibarr-de-demo"}
+-- La cle d'API doit etre celle posee sur l'utilisateur admin de Dolibarr (voir la
+-- section 2.1 de docs/erp-integration-setup.md). Les deux valeurs se sont contredites
+-- jusqu'a F4, et l'ecart produisait un 401 illisible cote backend.
 
 INSERT INTO client (id, public_key, name, hmac_secret, crm_provider_id, crm_config,
                     assignment_strategy, scoring_config, active)
