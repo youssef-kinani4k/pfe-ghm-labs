@@ -13,6 +13,14 @@ import java.util.UUID;
  * <p>Douze caracteres hexadecimaux et non huit : huit font 32 bits, et par le paradoxe des
  * anniversaires une collision devient probable vers 65 000 leads, ce qui est atteignable
  * pour un middleware dont c'est le metier. Douze font 48 bits.
+ *
+ * <p><b>Les douze derniers caracteres, jamais les premiers.</b> Les identifiants sont
+ * ordonnes dans le temps : leur tete est un horodatage, identique pour tous les leads d'une
+ * meme periode. Une reference tiree de la tete valait donc la meme chose pour dix leads
+ * consecutifs, et Dolibarr, retrouvant une {@code ref} connue, rendait l'opportunite deja
+ * creee au lieu d'en creer une — quatre prospects sur cinq se retrouvaient rattaches a
+ * l'opportunite du premier. Le raisonnement sur les 48 bits ci-dessus ne tient que si ces
+ * bits sont aleatoires, ce qui n'est vrai que de la queue de l'identifiant.
  */
 public final class LeadReference {
 
@@ -28,6 +36,7 @@ public final class LeadReference {
             throw new IllegalArgumentException("Impossible de deriver une reference sans identifiant");
         }
         String hexadecimal = leadId.toString().replace("-", "");
-        return PREFIXE + hexadecimal.substring(0, LONGUEUR).toUpperCase(Locale.ROOT);
+        return PREFIXE + hexadecimal.substring(hexadecimal.length() - LONGUEUR)
+                .toUpperCase(Locale.ROOT);
     }
 }
