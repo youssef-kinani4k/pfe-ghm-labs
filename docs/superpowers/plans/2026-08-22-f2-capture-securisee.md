@@ -77,7 +77,7 @@ L'idempotence de la spec §3.4 est portée par la base, pas par le code : c'est 
 - Consumes : `RawLeadEvent`, `RawLeadEventStatus`, `RawLeadEventRepository` (F1).
 - Produces : `Optional<RawLeadEvent> findByClientIdAndSignature(UUID clientId, String signature)` et `List<RawLeadEvent> findByStatusInAndReceivedAtBefore(Collection<RawLeadEventStatus> statuts, Instant limite)`.
 
-- [ ] **Step 1: Écrire le test d'idempotence**
+- [x] **Step 1: Écrire le test d'idempotence**
 
 Créer `backend/src/test/java/com/leadflow/capture/RawLeadEventIdempotenceTest.java` :
 
@@ -191,7 +191,7 @@ class RawLeadEventIdempotenceTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=RawLeadEventIdempotenceTest
@@ -199,7 +199,7 @@ class RawLeadEventIdempotenceTest {
 
 Attendu : échec de compilation — `findByClientIdAndSignature` et `findByStatusInAndReceivedAtBefore` n'existent pas.
 
-- [ ] **Step 3: Écrire la migration**
+- [x] **Step 3: Écrire la migration**
 
 Créer `backend/src/main/resources/db/migration/V3__raw_lead_event_idempotence.sql` :
 
@@ -222,7 +222,7 @@ CREATE INDEX idx_raw_lead_event_status_received
     ON raw_lead_event (status, received_at);
 ```
 
-- [ ] **Step 4: Ajouter les deux dérivés au repository**
+- [x] **Step 4: Ajouter les deux dérivés au repository**
 
 Remplacer le contenu de `backend/src/main/java/com/leadflow/capture/RawLeadEventRepository.java` :
 
@@ -254,7 +254,7 @@ public interface RawLeadEventRepository extends JpaRepository<RawLeadEvent, UUID
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=RawLeadEventIdempotenceTest
@@ -262,7 +262,7 @@ public interface RawLeadEventRepository extends JpaRepository<RawLeadEvent, UUID
 
 Attendu : 4 tests verts. Si Flyway échoue sur un checksum, c'est que la base de développement contient un V3 différent : `docker compose down -v` en dev. Les tests, eux, partent d'un conteneur neuf.
 
-- [ ] **Step 6: Lancer la suite complète et commiter**
+- [x] **Step 6: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -294,7 +294,7 @@ Le cœur sécurité de la feature, et la seule classe entièrement testable sans
 - Consumes : `WebhookProperties`.
 - Produces : `HmacSignatureVerifier.verifie(String secret, String corpsBrut, String enTeteSignature, Instant maintenant)` — rend `void`, lève `WebhookAuthenticationException`. Et `WebhookAuthenticationException(String raisonInterne)`.
 
-- [ ] **Step 1: Écrire le test du vérificateur**
+- [x] **Step 1: Écrire le test du vérificateur**
 
 Créer `backend/src/test/java/com/leadflow/capture/HmacSignatureVerifierTest.java` :
 
@@ -408,7 +408,7 @@ class HmacSignatureVerifierTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=HmacSignatureVerifierTest
@@ -416,7 +416,7 @@ class HmacSignatureVerifierTest {
 
 Attendu : échec de compilation — `HmacSignatureVerifier` et `WebhookAuthenticationException` n'existent pas, et `WebhookProperties` n'a que deux composants.
 
-- [ ] **Step 3: Écrire l'exception d'authentification**
+- [x] **Step 3: Écrire l'exception d'authentification**
 
 Créer `backend/src/main/java/com/leadflow/common/WebhookAuthenticationException.java` :
 
@@ -439,7 +439,7 @@ public class WebhookAuthenticationException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 4: Élargir les propriétés**
+- [x] **Step 4: Élargir les propriétés**
 
 Remplacer le contenu de `backend/src/main/java/com/leadflow/config/WebhookProperties.java` :
 
@@ -485,7 +485,7 @@ Puis, dans `backend/src/main/resources/application.yml`, remplacer le bloc `webh
     relay-interval: 30s
 ```
 
-- [ ] **Step 5: Écrire le vérificateur**
+- [x] **Step 5: Écrire le vérificateur**
 
 Créer `backend/src/main/java/com/leadflow/capture/HmacSignatureVerifier.java` :
 
@@ -585,7 +585,7 @@ public class HmacSignatureVerifier {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=HmacSignatureVerifierTest
@@ -593,7 +593,7 @@ public class HmacSignatureVerifier {
 
 Attendu : 8 tests verts.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -628,7 +628,7 @@ Le chemin synchrone complet, sans publication : authentifier, parser, écrire, r
 - Consumes : `HmacSignatureVerifier.verifie(...)`, `WebhookAuthenticationException`, `ClientRepository.findByPublicKeyAndActiveTrue(String)`, `RawLeadEventRepository`.
 - Produces : `LeadCaptureService.capture(String clientKey, String corpsBrut, String enTeteSignature)` rendant `CaptureAccepted(UUID eventId)` ; `PayloadRejectedException(String message, HttpStatus statut)`.
 
-- [ ] **Step 1: Écrire le test d'intégration**
+- [x] **Step 1: Écrire le test d'intégration**
 
 Créer `backend/src/test/java/com/leadflow/capture/LeadCaptureIntegrationTest.java` :
 
@@ -844,7 +844,7 @@ class LeadCaptureIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest
@@ -852,7 +852,7 @@ class LeadCaptureIntegrationTest {
 
 Attendu : échec — l'endpoint n'existe pas, les requêtes répondent `404` ou `401` selon la chaîne de filtres.
 
-- [ ] **Step 3: Écrire les deux exceptions et le gestionnaire REST**
+- [x] **Step 3: Écrire les deux exceptions et le gestionnaire REST**
 
 Créer `backend/src/main/java/com/leadflow/common/PayloadRejectedException.java` :
 
@@ -921,7 +921,7 @@ public class ApiExceptionHandler {
 }
 ```
 
-- [ ] **Step 4: Écrire le corps de réponse et le service**
+- [x] **Step 4: Écrire le corps de réponse et le service**
 
 Créer `backend/src/main/java/com/leadflow/capture/CaptureAccepted.java` :
 
@@ -1035,7 +1035,7 @@ public class LeadCaptureService {
 }
 ```
 
-- [ ] **Step 5: Écrire le contrôleur**
+- [x] **Step 5: Écrire le contrôleur**
 
 Créer `backend/src/main/java/com/leadflow/capture/LeadWebhookController.java` :
 
@@ -1086,7 +1086,7 @@ public class LeadWebhookController {
 }
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest
@@ -1098,7 +1098,7 @@ Si `refuseUnCorpsTropGros` échoue en `400` au lieu de `413`, vérifier que le c
 
 Si `repondLaMemeChoseQuelleQueSoitLaCauseDuRefus` échoue, comparer les deux corps : le `ProblemDetail` ne doit contenir aucune information issue de la requête.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1128,7 +1128,7 @@ L'index de la tâche 1 refuse déjà le doublon en base ; il reste à en faire u
 - Consumes : `RawLeadEventRepository.findByClientIdAndSignature(UUID, String)` (tâche 1).
 - Produces : rien de nouveau — `capture(...)` rend le même `CaptureAccepted` pour un rejeu exact.
 
-- [ ] **Step 1: Ajouter les deux tests de rejeu**
+- [x] **Step 1: Ajouter les deux tests de rejeu**
 
 Ajouter dans `LeadCaptureIntegrationTest`, avant la dernière accolade :
 
@@ -1177,7 +1177,7 @@ Ajouter dans `LeadCaptureIntegrationTest`, avant la dernière accolade :
     }
 ```
 
-- [ ] **Step 2: Lancer les tests et vérifier qu'ils échouent**
+- [x] **Step 2: Lancer les tests et vérifier qu'ils échouent**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest#rejoueLaMemeRequeteSansCreerDeSecondEvenement
@@ -1185,7 +1185,7 @@ Ajouter dans `LeadCaptureIntegrationTest`, avant la dernière accolade :
 
 Attendu : échec — la seconde requête remonte une `DataIntegrityViolationException`, donc une `500`.
 
-- [ ] **Step 3: Rendre l'identifiant existant au lieu d'insérer**
+- [x] **Step 3: Rendre l'identifiant existant au lieu d'insérer**
 
 Dans `LeadCaptureService.capture`, insérer ce bloc **juste après** la vérification de signature et **avant** le contrôle de taille :
 
@@ -1202,7 +1202,7 @@ Dans `LeadCaptureService.capture`, insérer ce bloc **juste après** la vérific
 
 Ajouter l'import `java.util.Optional`.
 
-- [ ] **Step 4: Lancer les tests et vérifier qu'ils passent**
+- [x] **Step 4: Lancer les tests et vérifier qu'ils passent**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest
@@ -1210,7 +1210,7 @@ Ajouter l'import `java.util.Optional`.
 
 Attendu : 13 tests verts.
 
-- [ ] **Step 5: Lancer la suite complète et commiter**
+- [x] **Step 5: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1239,7 +1239,7 @@ La ligne existe ; il faut maintenant qu'elle parte sur la file, et jamais avant 
 - Consumes : `RabbitMQConfig.LEADS_EXCHANGE`, `RabbitMQConfig.LEADS_ROUTING_KEY`, `RabbitMQConfig.LEADS_QUEUE`, `RabbitTemplate`.
 - Produces : `CapturedLeadMessage(UUID eventId, UUID clientId, String source, Instant receivedAt)` — le contrat de file de F3 ; `LeadCapturedEvent(UUID eventId, UUID clientId, String source, Instant receivedAt)` — l'événement Spring interne ; `LeadEventPublisher.publie(LeadCapturedEvent)`.
 
-- [ ] **Step 1: Ajouter le test de publication**
+- [x] **Step 1: Ajouter le test de publication**
 
 Ajouter dans `LeadCaptureIntegrationTest` les champs et le test suivants :
 
@@ -1277,7 +1277,7 @@ Ajouter dans `LeadCaptureIntegrationTest` les champs et le test suivants :
     }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest#publieLeMessageSurLaFileEtMarqueLEvenementPublie
@@ -1285,7 +1285,7 @@ Ajouter dans `LeadCaptureIntegrationTest` les champs et le test suivants :
 
 Attendu : échec de compilation — `CapturedLeadMessage` n'existe pas.
 
-- [ ] **Step 3: Écrire les deux records**
+- [x] **Step 3: Écrire les deux records**
 
 Créer `backend/src/main/java/com/leadflow/capture/CapturedLeadMessage.java` :
 
@@ -1336,7 +1336,7 @@ public record LeadCapturedEvent(
 }
 ```
 
-- [ ] **Step 4: Écrire le publieur**
+- [x] **Step 4: Écrire le publieur**
 
 Créer `backend/src/main/java/com/leadflow/capture/LeadEventPublisher.java` :
 
@@ -1411,7 +1411,7 @@ public class LeadEventPublisher {
 }
 ```
 
-- [ ] **Step 5: Publier l'événement depuis le service**
+- [x] **Step 5: Publier l'événement depuis le service**
 
 Dans `LeadCaptureService`, ajouter le champ et l'appel.
 
@@ -1431,7 +1431,7 @@ Ajouter au constructeur le paramètre `ApplicationEventPublisher evenements` (im
         return new CaptureAccepted(enregistre.getId());
 ```
 
-- [ ] **Step 6: Lancer le test et vérifier qu'il passe**
+- [x] **Step 6: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=LeadCaptureIntegrationTest
@@ -1441,7 +1441,7 @@ Attendu : 14 tests verts.
 
 Si `recu` est une `Map` plutôt qu'un `CapturedLeadMessage`, c'est que l'en-tête de type n'a pas été posé : vérifier que le `RabbitTemplate` injecté est bien celui de `RabbitMQConfig`, avec son `JacksonJsonMessageConverter`.
 
-- [ ] **Step 7: Lancer la suite complète et commiter**
+- [x] **Step 7: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1471,7 +1471,7 @@ Sans lui, un broker indisponible perd le lead en silence — ce qui contredirait
 - Consumes : `LeadEventPublisher.publie(LeadCapturedEvent)`, `RawLeadEventRepository.findByStatusInAndReceivedAtBefore(...)`, `WebhookProperties.relayAfter()` et `relayInterval()`.
 - Produces : `PendingEventRelay.republieLesEnAttente()` — appelable directement par un test, sans attendre l'ordonnanceur.
 
-- [ ] **Step 1: Écrire le test du filet**
+- [x] **Step 1: Écrire le test du filet**
 
 Créer `backend/src/test/java/com/leadflow/capture/PendingEventRelayTest.java` :
 
@@ -1584,7 +1584,7 @@ class PendingEventRelayTest {
 }
 ```
 
-- [ ] **Step 2: Lancer le test et vérifier qu'il échoue**
+- [x] **Step 2: Lancer le test et vérifier qu'il échoue**
 
 ```bash
 ./mvnw test -Dtest=PendingEventRelayTest
@@ -1592,7 +1592,7 @@ class PendingEventRelayTest {
 
 Attendu : échec de compilation — `PendingEventRelay` n'existe pas.
 
-- [ ] **Step 3: Activer l'ordonnanceur**
+- [x] **Step 3: Activer l'ordonnanceur**
 
 Créer `backend/src/main/java/com/leadflow/config/SchedulingConfig.java` :
 
@@ -1613,7 +1613,7 @@ public class SchedulingConfig {
 }
 ```
 
-- [ ] **Step 4: Écrire le filet**
+- [x] **Step 4: Écrire le filet**
 
 Créer `backend/src/main/java/com/leadflow/capture/PendingEventRelay.java` :
 
@@ -1681,7 +1681,7 @@ public class PendingEventRelay {
 }
 ```
 
-- [ ] **Step 5: Lancer le test et vérifier qu'il passe**
+- [x] **Step 5: Lancer le test et vérifier qu'il passe**
 
 ```bash
 ./mvnw test -Dtest=PendingEventRelayTest
@@ -1691,7 +1691,7 @@ Attendu : 4 tests verts.
 
 Si `ignoreUnEvenementTropRecent` échoue, vérifier que `relay-after` vaut bien `2m` dans `application.yml` : un délai plus court rendrait le test juste mais le filet dangereux.
 
-- [ ] **Step 6: Lancer la suite complète et commiter**
+- [x] **Step 6: Lancer la suite complète et commiter**
 
 ```bash
 ./mvnw test
@@ -1718,7 +1718,7 @@ git commit -m "feat: filet de republication des evenements non publies"
 - Consumes : tout ce qui précède.
 - Produces : rien de logiciel.
 
-- [ ] **Step 1: Écrire la documentation d'intégration**
+- [x] **Step 1: Écrire la documentation d'intégration**
 
 Créer `docs/webhook-integration.md` :
 
@@ -1850,7 +1850,7 @@ lead : le service rend le `eventId` déjà attribué avec un `202`. Un client pe
 réessayer sans risque après un timeout réseau.
 ````
 
-- [ ] **Step 2: Mettre à jour `CLAUDE.md`**
+- [x] **Step 2: Mettre à jour `CLAUDE.md`**
 
 Dans la section « Backend — conventions », après le paragraphe sur les deux étages de test
 des adaptateurs ERP, ajouter :
@@ -1885,7 +1885,7 @@ sur `eventId`**. Le filet est mono-instance ; deux instances demanderaient un
 `SELECT ... FOR UPDATE SKIP LOCKED`.
 ```
 
-- [ ] **Step 3: Mettre à jour la section « Etat actuel » de `CLAUDE.md`**
+- [x] **Step 3: Mettre à jour la section « Etat actuel » de `CLAUDE.md`**
 
 Remplacer la section par :
 
@@ -1907,7 +1907,7 @@ n'appelle donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'ex
 d'un service ou d'un endpoint : verifier avant de referencer.
 ```
 
-- [ ] **Step 4: Recette complète**
+- [x] **Step 4: Recette complète**
 
 ```bash
 ./mvnw verify
@@ -1938,7 +1938,7 @@ docker exec leadflow-postgres psql -U leadflow -d leadflow \
 
 Attendu : `PUBLISHED` avec un `published_at` renseigné.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/webhook-integration.md CLAUDE.md
