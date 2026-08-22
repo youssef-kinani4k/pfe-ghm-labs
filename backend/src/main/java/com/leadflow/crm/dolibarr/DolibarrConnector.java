@@ -10,7 +10,6 @@ import com.leadflow.crm.model.CrmTarget;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
@@ -41,11 +40,12 @@ public class DolibarrConnector implements CrmConnector {
      * <b>Limitation connue.</b> Si {@code lieResponsable} echoue apres la creation de
      * l'opportunite, l'etat partiel porte deja la reference de celle-ci : au rejeu, tout le
      * bloc est saute et l'opportunite reste sans chef de projet, sans que rien ne le signale.
-     * {@link CrmSyncState} n'a pas de logement pour cette quatrieme etape — il modelise
-     * l'idempotence comme trois references connues, ce qui suffit tant qu'une
-     * synchronisation se decompose en trois creations. Le jour ou un ERP en apportera une
-     * quatrieme, la bonne reponse sera une carte de references par etape plutot qu'un champ
-     * de plus. Decision reportee a F3, quand le consommateur de file sera cable.
+     * {@link CrmSyncState} n'a pas de logement pour cette quatrieme etape. Le jour ou un ERP
+     * en apportera une cinquieme, la bonne reponse sera une carte de references par etape
+     * plutot qu'un champ de plus.
+     *
+     * <p>La limitation sur la {@code ref} d'opportunite, elle, est levee depuis F3 : elle est
+     * derivee du lead et donc stable, et la recherche prealable rend le rejeu inoffensif.
      */
     @Override
     public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {
@@ -58,6 +58,12 @@ public class DolibarrConnector implements CrmConnector {
             }
             if (contact == null) {
                 contact = client.creeContact(target, corpsContact(lead, compte));
+            }
+            if (opportunite == null) {
+                // On demande d'abord a l'ERP s'il connait deja cette ref : la reference etant
+                // stable, un rejeu apres une reponse perdue retrouve son opportunite au lieu
+                // d'en creer une seconde.
+                opportunite = client.chercheOpportuniteParRef(target, lead.reference());
             }
             if (opportunite == null) {
                 opportunite = client.creeOpportunite(target, corpsOpportunite(lead, compte));
@@ -118,25 +124,13 @@ public class DolibarrConnector implements CrmConnector {
 
     private Map<String, Object> corpsOpportunite(CrmLead lead, String compte) {
         Map<String, Object> corps = new LinkedHashMap<>();
-        corps.put("ref", reference());
+        corps.put("ref", lead.reference());
         corps.put("socid", compte);
         corps.put("title", lead.detectedIntent() == null ? "Lead LeadFlow" : lead.detectedIntent());
         corps.put("usage_opportunity", "1");
         corps.put("opp_status", "1");
         corps.put("note_private", note(lead));
         return corps;
-    }
-
-    /**
-     * Dolibarr exige une {@code ref} sur un projet, et la refuse en doublon (contrainte
-     * {@code uk_projet_ref}). Elle est tiree au hasard plutot que derivee du lead : le pivot
-     * ne porte pas d'identifiant, et la non-recreation au rejeu est deja garantie en amont
-     * par {@code CrmSyncState}. Une opportunite ne peut donc etre creee deux fois que si la
-     * reponse de Dolibarr s'est perdue apres coup — cas ou une ref stable aurait, elle, fait
-     * echouer le rejeu au lieu de le laisser passer.
-     */
-    private String reference() {
-        return "LF-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     /** Le score n'a pas d'equivalent chez Dolibarr : il finit en texte, pas en champ. */

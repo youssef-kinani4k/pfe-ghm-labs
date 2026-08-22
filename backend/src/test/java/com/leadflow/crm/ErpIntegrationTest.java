@@ -11,6 +11,7 @@ import com.leadflow.crm.model.CrmTarget;
 import com.leadflow.crm.odoo.OdooClient;
 import com.leadflow.crm.odoo.OdooConnector;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,8 @@ class ErpIntegrationTest {
 
     private static CrmLead leadUnique() {
         String marque = UUID.randomUUID().toString().substring(0, 8);
-        return new CrmLead("Acme " + marque, "Amina", "Bensalem",
+        return new CrmLead("LF-" + marque.toUpperCase(Locale.ROOT), "Acme " + marque,
+                "Amina", "Bensalem",
                 "amina+" + marque + "@exemple.test", "+212600000000",
                 "Je veux un devis pour 50 unites", "DEMANDE_DEVIS", 72, "MA", "industrie", null);
     }

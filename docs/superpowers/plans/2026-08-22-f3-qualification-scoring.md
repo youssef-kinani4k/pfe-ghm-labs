@@ -2891,7 +2891,7 @@ git commit -m "feat: publication du lead qualifie sur leadflow.leads.qualified"
 
 **Attention :** ajouter un composant à `CrmLead` casse la compilation de tous ses sites de construction. Les corriger fait partie de cette tâche : `CrmSyncService.versPivot`, `DolibarrConnectorTest`, `OdooConnectorTest`, `CrmSyncServiceTest`.
 
-- [ ] **Step 1: Écrire les tests dans `DolibarrConnectorTest`**
+- [x] **Step 1: Écrire les tests dans `DolibarrConnectorTest`**
 
 Ajouter à `backend/src/test/java/com/leadflow/crm/dolibarr/DolibarrConnectorTest.java` :
 
@@ -2942,12 +2942,12 @@ Ajouter la fabrique locale correspondante, alignée sur celle déjà présente d
     }
 ```
 
-- [ ] **Step 2: Lancer les tests et vérifier qu'ils échouent**
+- [x] **Step 2: Lancer les tests et vérifier qu'ils échouent**
 
 Run: `./mvnw test -Dtest=DolibarrConnectorTest`
 Expected: échec de compilation — `CrmLead` n'a pas encore de composant `reference`.
 
-- [ ] **Step 3: Élargir le modèle pivot**
+- [x] **Step 3: Élargir le modèle pivot**
 
 Dans `backend/src/main/java/com/leadflow/crm/model/CrmLead.java`, ajouter `reference` en premier composant et documenter :
 
@@ -2974,7 +2974,7 @@ public record CrmLead(
 }
 ```
 
-- [ ] **Step 4: Renseigner la référence depuis `CrmSyncService`**
+- [x] **Step 4: Renseigner la référence depuis `CrmSyncService`**
 
 Dans `CrmSyncService`, ajouter l'import :
 
@@ -3002,7 +3002,7 @@ Puis modifier `versPivot` :
     }
 ```
 
-- [ ] **Step 5: Ajouter la recherche d'opportunité au client Dolibarr**
+- [x] **Step 5: Ajouter la recherche d'opportunité au client Dolibarr**
 
 Dans `DolibarrClient`, ajouter après `creeOpportunite` :
 
@@ -3045,7 +3045,7 @@ Dans `DolibarrClient`, ajouter après `creeOpportunite` :
         } catch (RestClientException e) {
 ```
 
-- [ ] **Step 6: Utiliser la référence stable dans le connecteur**
+- [x] **Step 6: Utiliser la référence stable dans le connecteur**
 
 Dans `DolibarrConnector` :
 
@@ -3090,19 +3090,19 @@ Enfin, réduire le Javadoc de `sync` : la limitation sur la `ref` est levée, ce
      */
 ```
 
-- [ ] **Step 7: Corriger les autres sites de construction**
+- [x] **Step 7: Corriger les autres sites de construction**
 
 Run: `./mvnw test-compile`
 Expected: erreurs de compilation dans `OdooConnectorTest` et `CrmSyncServiceTest`.
 
 Dans chacun, ajouter la référence en premier argument des constructions de `CrmLead` — par exemple `"LF-000000000001"`. Aucune assertion de ces fichiers ne porte sur ce champ : Odoo ne l'utilise pas.
 
-- [ ] **Step 8: Lancer les tests et vérifier qu'ils passent**
+- [x] **Step 8: Lancer les tests et vérifier qu'ils passent**
 
 Run: `./mvnw test -Dtest='DolibarrConnectorTest,OdooConnectorTest,CrmSyncServiceTest,LeadReferenceTest'`
 Expected: 0 échec.
 
-- [ ] **Step 9: Lancer la suite complète et commiter**
+- [x] **Step 9: Lancer la suite complète et commiter**
 
 Run: `./mvnw test`
 Expected: toute la suite verte.

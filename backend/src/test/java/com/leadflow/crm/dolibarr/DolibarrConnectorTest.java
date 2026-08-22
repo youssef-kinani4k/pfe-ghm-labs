@@ -28,6 +28,8 @@ class DolibarrConnectorTest {
         private Map<String, Object> corpsContact;
         private Map<String, Object> corpsOpportunite;
         private String responsableLie;
+        private String refCherchee;
+        private String opportuniteExistante;
         private boolean echoueSurOpportunite;
 
         private TransportFactice() {
@@ -59,6 +61,13 @@ class DolibarrConnectorTest {
         }
 
         @Override
+        public String chercheOpportuniteParRef(CrmTarget target, String ref) {
+            appels.add("recherche");
+            refCherchee = ref;
+            return opportuniteExistante;
+        }
+
+        @Override
         public void lieResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
             appels.add("responsable");
             responsableLie = utilisateurRef;
@@ -72,8 +81,12 @@ class DolibarrConnectorTest {
     }
 
     private static CrmLead lead(String companyName) {
-        return new CrmLead(companyName, "Amina", "Bensalem", "amina@acme.test", "+212600000000",
-                "Je veux un devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "9");
+        return leadAvecReference("LF-3F2A9C1B7D4E", companyName);
+    }
+
+    private static CrmLead leadAvecReference(String reference, String companyName) {
+        return new CrmLead(reference, companyName, "Amina", "Bensalem", "amina@acme.test",
+                "+212600000000", "Je veux un devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "9");
     }
 
     private final TransportFactice transport = new TransportFactice();
@@ -89,7 +102,8 @@ class DolibarrConnectorTest {
     void creeLeTiersLeContactPuisLOpportunite() {
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
-        assertThat(transport.appels).containsExactly("tiers", "contact", "opportunite", "responsable");
+        assertThat(transport.appels)
+                .containsExactly("tiers", "contact", "recherche", "opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
         assertThat(resultat.opportunityRef()).isEqualTo("99");
@@ -108,17 +122,31 @@ class DolibarrConnectorTest {
         assertThat(transport.corpsOpportunite).containsEntry("socid", "42");
     }
 
+    /**
+     * Releve de la sonde : sans {@code ref}, Dolibarr repond 400 ; en doublon, 500. Elle est
+     * desormais celle du lead, donc identique d'une tentative a l'autre.
+     */
     @Test
-    void donneUneReferenceUniqueALOpportunite() {
-        // Releve de la sonde : sans `ref`, Dolibarr repond 400 ; en doublon, 500.
-        connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
-        Object premiere = transport.corpsOpportunite.get("ref");
+    void envoieLaReferenceDuLeadCommeRefDOpportunite() {
+        connecteur.sync(leadAvecReference("LF-3F2A9C1B7D4E", "Acme"), CIBLE, CrmSyncState.VIERGE);
 
-        TransportFactice second = new TransportFactice();
-        new DolibarrConnector(second).sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+        assertThat(transport.corpsOpportunite).containsEntry("ref", "LF-3F2A9C1B7D4E");
+        assertThat(transport.refCherchee).isEqualTo("LF-3F2A9C1B7D4E");
+    }
 
-        assertThat(premiere).asString().startsWith("LF-");
-        assertThat(second.corpsOpportunite.get("ref")).isNotEqualTo(premiere);
+    /**
+     * Le cas que la reference stable rend traitable : la reponse de Dolibarr s'est perdue
+     * apres la creation, l'etat anterieur ignore donc l'opportunite, et le rejeu la
+     * retrouve au lieu de se heurter a {@code uk_projet_ref}.
+     */
+    @Test
+    void adopteLOpportuniteExistanteAuLieuDenCreerUneSeconde() {
+        transport.opportuniteExistante = "42";
+
+        CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.appels).containsExactly("tiers", "contact", "recherche");
+        assertThat(resultat.opportunityRef()).isEqualTo("42");
     }
 
     @Test
@@ -140,7 +168,7 @@ class DolibarrConnectorTest {
         CrmSyncResult resultat =
                 connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", null));
 
-        assertThat(transport.appels).containsExactly("opportunite", "responsable");
+        assertThat(transport.appels).containsExactly("recherche", "opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
     }

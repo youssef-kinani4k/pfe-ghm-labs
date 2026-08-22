@@ -63,7 +63,8 @@ class OdooConnectorTest {
     }
 
     private static CrmLead lead(String companyName) {
-        return new CrmLead(companyName, "Amina", "Bensalem", "amina@acme.test", "+212600000000",
+        return new CrmLead("LF-000000000001", companyName, "Amina", "Bensalem",
+                "amina@acme.test", "+212600000000",
                 "Je veux un devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "9");
     }
 
