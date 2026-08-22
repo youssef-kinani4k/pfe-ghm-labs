@@ -97,6 +97,39 @@ docker compose --profile dolibarr --profile odoo up -d
 ./mvnw verify -Perp-it
 ```
 
+### Capture — le contrat d'entree
+
+Le webhook est `POST /api/webhooks/leads/{clePublique}`, authentifie par l'en-tete
+`X-Leadflow-Signature: t=<epoch>,v1=<hex>` ou l'hexadecimal est
+`HMAC-SHA256(client.hmac_secret, t + "." + corps brut)`. Le contrat complet, avec exemples
+PHP, JS et curl, vit dans `docs/webhook-integration.md`.
+
+**Le corps n'est jamais deserialise avant authentification.** Le controleur le recoit en
+`String` : il faut les octets exacts pour recalculer le HMAC, et faire tourner Jackson sur
+une entree non authentifiee reviendrait a traiter une donnee dont on n'a pas verifie
+l'origine. Un test le verrouille — corps JSON invalide plus signature invalide doit rendre
+`401`, jamais `400`.
+
+**Les cinq causes de refus rendent la meme reponse `401`** : cle publique inconnue, client
+desactive, en-tete absent, signature fausse, horodatage hors fenetre. Distinguer les codes
+donnerait un oracle sur les cles publiques existantes. Le detail n'existe que dans les logs.
+
+**L'idempotence est en base**, par l'index unique `(client_id, signature)` de `V3` : un
+rejeu exact rend le `eventId` deja attribue. Une verification applicative ne suffirait pas,
+deux requetes concurrentes la passeraient toutes les deux.
+
+**La publication est at-least-once.** Elle part apres le commit
+(`@TransactionalEventListener(AFTER_COMMIT)`), et `PendingEventRelay` reprend
+periodiquement ce qui est reste non publie. Si l'envoi reussit mais que le passage a
+`PUBLISHED` echoue, le message est renvoye : **le consommateur de F3 doit etre idempotent
+sur `eventId`**. Le filet est mono-instance ; deux instances demanderaient un
+`SELECT ... FOR UPDATE SKIP LOCKED`.
+
+**Le convertisseur de messages ne fait confiance qu'a une liste blanche de paquets**
+(`RabbitMQConfig.PAQUETS_DE_CONFIANCE`), la correspondance etant exacte : ni prefixe, ni
+joker. Une feature qui ajoute un contrat de file dans un autre paquet doit l'y declarer,
+sans quoi le consommateur refusera de deserialiser le message.
+
 ### Frontend
 
 ```bash
@@ -294,14 +327,16 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le modele de donnees est complet (F1) et **les deux adaptateurs ERP existent** (F5).
+Le modele de donnees est complet (F1), les deux adaptateurs ERP existent (F5), et
+**l'entree du pipeline est ouverte** (F2).
 
 Ce qui existe : la configuration, le chiffrement des secrets, les cinq entites et leurs
-repositories, les migrations `V1` et `V2`, le port `CrmConnector` et son registre, les
-adaptateurs Dolibarr et Odoo, et `CrmSyncService` qui les orchestre.
+repositories, les migrations `V1` a `V3`, le port `CrmConnector` et son registre, les
+adaptateurs Dolibarr et Odoo, `CrmSyncService`, et la couche `capture` complete — webhook
+signe, evenement brut persiste, publication sur RabbitMQ avec filet de republication.
 
-Ce qui n'existe pas : **l'entree et le milieu du pipeline**. Pas d'endpoint webhook (F2),
-pas de consommateur RabbitMQ ni de qualification (F3), pas de routage (F4), pas d'API de
-monitoring (F6) ; les quatre composants de `features/` sont des placeholders. Rien n'appelle
-donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'existence d'un service
-ou d'un endpoint : verifier avant de referencer.
+Ce qui n'existe pas : **le milieu du pipeline**. Personne ne consomme
+`leadflow.leads.captured` : pas de qualification (F3), pas de routage (F4), pas d'API de
+monitoring (F6) ; les quatre composants de `features/` sont des placeholders. Rien
+n'appelle donc encore `CrmSyncService` en dehors des tests. Ne pas supposer l'existence
+d'un service ou d'un endpoint : verifier avant de referencer.
