@@ -384,6 +384,27 @@ CORS n'autorise que `http://localhost:4200` : a elargir avant tout deploiement.
 
 ## Frontend — conventions
 
+### Le visuel passe par le plugin `ui-ux-pro-max`
+
+**Règle permanente** : toute décision visuelle — écran, composant, palette, typographie,
+graphique, identité — se prend à travers les skills du plugin `ui-ux-pro-max`, invoqués
+**avant** d'écrire le code, jamais en relecture après coup.
+
+| Skill                        | Quand                                                       |
+| ---------------------------- | ----------------------------------------------------------- |
+| `ui-ux-pro-max:ui-ux-pro-max`| point d'entrée : styles, palettes produit, polices, graphiques |
+| `ui-ux-pro-max:ui-styling`   | composants concrets et mise en page                          |
+| `ui-ux-pro-max:design-system`| jetons de design (primitive → sémantique → composant)        |
+| `ui-ux-pro-max:design`, `:brand` | identité visuelle, logo, charte                          |
+| `ui-ux-pro-max:slides`       | présentations HTML avec Chart.js (soutenance)                |
+
+Cela concerne au premier chef les quatre écrans du dashboard (F6) : les compteurs, les
+répartitions et toute représentation graphique doivent être conçus, pas improvisés. Le skill
+`dataviz` reste complémentaire pour la rigueur des graphiques (accessibilité des couleurs,
+cohérence clair/sombre), mais le plugin prime sur les décisions visuelles.
+
+### Angular
+
 Angular 20 en mode **standalone** (aucun `NgModule`), avec signals et la nouvelle syntaxe de
 template (`@if`, `@for`). Les fichiers suivent la convention de nommage Angular 20 sans
 suffixe de type : `dashboard.ts` exporte `Dashboard`, et non `dashboard.component.ts`.

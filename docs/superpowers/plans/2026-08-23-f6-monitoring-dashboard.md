@@ -25,6 +25,7 @@
 - Le daemon Docker doit tourner pour `./mvnw test`.
 - Commits en français, une tâche = un commit, message expliquant la décision et non le diff.
 - Frontend : `environment.apiBaseUrl` est vide, les services appellent des **chemins relatifs** (`/api/leads`).
+- **Toute la partie visuelle passe par le plugin `ui-ux-pro-max`** — invoquer le skill *avant* d'écrire du code d'interface, jamais après coup : `ui-ux-pro-max:ui-ux-pro-max` pour les styles, palettes, polices et types de graphiques ; `ui-ux-pro-max:design-system` pour les jetons ; `ui-ux-pro-max:ui-styling` pour les composants et la mise en page. Cela vaut pour T13 à T16, et en particulier pour les compteurs et répartitions du dashboard (T15), qui doivent être conçus et non improvisés.
 
 ---
 
