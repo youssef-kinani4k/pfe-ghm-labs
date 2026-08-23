@@ -27,6 +27,7 @@
   - `TestRestTemplate` a quitté `org.springframework.boot.test.web.client` (il vit dans l'artefact `spring-boot-resttestclient`). **Les tests HTTP du projet utilisent `MockMvc` + `@AutoConfigureMockMvc`**, comme `LeadCaptureIntegrationTest` : la chaîne de filtres Spring Security y est traversée en entier, ce qui suffit à éprouver l'authentification.
   - Jackson est en version 3 : les imports sont `tools.jackson.databind.*`, **jamais** `com.fasterxml.jackson.*`.
 - Un hash BCrypt écrit dans un plan n'est jamais fiable : le régénérer avec `BCryptPasswordEncoder` et vérifier `matches` avant de s'en servir dans un test.
+- **Deux pièges constatés en T5, valables pour toute requête suivante** — `lead.raw_event_id` porte une **clé étrangère** vers `raw_lead_event` : un test qui invente un UUID est rejeté, chaque lead doit créer son événement d'origine. Et un paramètre qui n'apparaît que dans `:param is null or ...` n'a **aucun type déductible pour Postgres**, qui refuse la requête entière (« could not determine data type of parameter ») : entourer chaque paramètre facultatif d'un `cast(:param as java.util.UUID)` / `cast(:param as java.time.Instant)`.
 - Commits en français, une tâche = un commit, message expliquant la décision et non le diff.
 - Frontend : `environment.apiBaseUrl` est vide, les services appellent des **chemins relatifs** (`/api/leads`).
 - **Toute la partie visuelle passe par le plugin `ui-ux-pro-max`** — invoquer le skill *avant* d'écrire du code d'interface, jamais après coup : `ui-ux-pro-max:ui-ux-pro-max` pour les styles, palettes, polices et types de graphiques ; `ui-ux-pro-max:design-system` pour les jetons ; `ui-ux-pro-max:ui-styling` pour les composants et la mise en page. Cela vaut pour T13 à T16, et en particulier pour les compteurs et répartitions du dashboard (T15), qui doivent être conçus et non improvisés.
@@ -1914,7 +1915,7 @@ chargement de lignes — c'est ce que servent les index `idx_lead_client_status`
 résultat doit sortir à `0`, sans quoi l'écran affiche des trous. **Aucune série temporelle** :
 sans bibliothèque de graphiques (3.13), elle n'aurait pas de consommateur.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring;
@@ -2062,12 +2063,12 @@ class StatsServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=StatsServiceTest`
 Expected: FAIL — `StatsService` n'existe pas, la compilation du test échoue.
 
-- [ ] **Step 3: Écrire la projection et le repository d'agrégats**
+- [x] **Step 3: Écrire la projection et le repository d'agrégats**
 
 `monitoring/Comptage.java` :
 
@@ -2174,7 +2175,7 @@ public interface StatsRepository extends Repository<Lead, UUID> {
 }
 ```
 
-- [ ] **Step 4: Écrire `StatsView`**
+- [x] **Step 4: Écrire `StatsView`**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -2200,7 +2201,7 @@ public record StatsView(
 }
 ```
 
-- [ ] **Step 5: Écrire `StatsService`**
+- [x] **Step 5: Écrire `StatsService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -2299,7 +2300,7 @@ public class StatsService {
 }
 ```
 
-- [ ] **Step 6: Écrire le contrôleur**
+- [x] **Step 6: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring;
@@ -2332,7 +2333,7 @@ public class StatsController {
 }
 ```
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=StatsServiceTest` puis `./mvnw test`
 Expected: PASS.
