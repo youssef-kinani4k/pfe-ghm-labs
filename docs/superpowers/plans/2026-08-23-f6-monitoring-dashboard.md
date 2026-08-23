@@ -1212,7 +1212,7 @@ pipeline ne gagnent aucune association pour le confort d'un ecran."
 - Consumes: `LeadQueryRepository` (T2), `CrmSyncAttemptRepository` (F5), `RawLeadEventRepository` (F2).
 - Produces: `LeadDetailService.detail(UUID) -> LeadDetail` ; `RessourceIntrouvableException` réutilisée par T9.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring;
@@ -1326,12 +1326,12 @@ class LeadDetailServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=LeadDetailServiceTest`
 Expected: FAIL — `LeadDetailService` n'existe pas.
 
-- [ ] **Step 3: Écrire les DTO**
+- [x] **Step 3: Écrire les DTO**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -1420,7 +1420,7 @@ public record LeadDetail(
 }
 ```
 
-- [ ] **Step 4: Compléter le repository et écrire l'exception**
+- [x] **Step 4: Compléter le repository et écrire l'exception**
 
 Ajouter à `LeadQueryRepository` :
 
@@ -1457,7 +1457,7 @@ Vérifier que `CrmSyncAttemptRepository` expose la lecture par lead ; sinon ajou
     java.util.List<CrmSyncAttempt> findByLeadIdOrderByAttemptedAtDesc(java.util.UUID leadId);
 ```
 
-- [ ] **Step 5: Écrire `LeadDetailService`**
+- [x] **Step 5: Écrire `LeadDetailService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -1545,7 +1545,7 @@ public class LeadDetailService {
 }
 ```
 
-- [ ] **Step 6: Brancher l'endpoint**
+- [x] **Step 6: Brancher l'endpoint**
 
 Ajouter à `LeadQueryController` le champ `LeadDetailService` dans le constructeur, puis :
 
@@ -1556,7 +1556,7 @@ Ajouter à `LeadQueryController` le champ `LeadDetailService` dans le constructe
     }
 ```
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=LeadDetailServiceTest` puis `./mvnw test`
 Expected: PASS.

@@ -116,6 +116,30 @@ class LeadQueryControllerTest {
     }
 
     @Test
+    void leDetailDUnLeadInconnuRend404EnProblemDetail() throws Exception {
+        mockMvc.perform(get("/api/leads/" + UUID.randomUUID())
+                        .header("Authorization", "Bearer " + jeton()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").exists());
+    }
+
+    @Test
+    void leDetailRendLaChargeUtileBrute() throws Exception {
+        String id = mockMvc.perform(get("/api/leads").param("clientId", clientId.toString())
+                        .header("Authorization", "Bearer " + jeton()))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String leadId = mapper.readTree(id).get("content").get(0).get("id").asText();
+
+        mockMvc.perform(get("/api/leads/" + leadId)
+                        .header("Authorization", "Bearer " + jeton()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rawEvent.payload.email").exists())
+                .andExpect(jsonPath("$.syncAttempts").isArray());
+    }
+
+    @Test
     void sansJetonLEndpointEstRefuse() throws Exception {
         mockMvc.perform(get("/api/leads"))
                 .andExpect(status().isUnauthorized());

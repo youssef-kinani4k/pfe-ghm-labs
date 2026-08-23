@@ -1,6 +1,7 @@
 package com.leadflow.monitoring;
 
 import com.leadflow.qualification.Lead;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.Repository;
@@ -18,4 +19,10 @@ import org.springframework.data.repository.Repository;
  */
 public interface LeadQueryRepository
         extends Repository<Lead, UUID>, JpaSpecificationExecutor<Lead> {
+
+    /**
+     * Declaree explicitement : {@code Repository} nu n'apporte aucune methode, ce qui est
+     * precisement l'interet — chaque lecture ouverte au monitoring est ecrite ici.
+     */
+    Optional<Lead> findById(UUID id);
 }

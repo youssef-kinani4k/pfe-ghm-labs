@@ -1,5 +1,6 @@
 package com.leadflow.monitoring;
 
+import com.leadflow.monitoring.dto.LeadDetail;
 import com.leadflow.monitoring.dto.LeadSummary;
 import com.leadflow.monitoring.dto.PageResponse;
 import com.leadflow.qualification.IntentSource;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,9 +28,11 @@ public class LeadQueryController {
     private static final int TAILLE_MAXIMALE = 100;
 
     private final LeadQueryService service;
+    private final LeadDetailService detailService;
 
-    public LeadQueryController(LeadQueryService service) {
+    public LeadQueryController(LeadQueryService service, LeadDetailService detailService) {
         this.service = service;
+        this.detailService = detailService;
     }
 
     @GetMapping
@@ -47,6 +51,15 @@ public class LeadQueryController {
         LeadFilter filtre = new LeadFilter(
                 clientId, status, intent, intentSource, salesRepId, minScore, from, to, q);
         return service.cherche(filtre, plafonne(pagination));
+    }
+
+    /**
+     * Une route et non une boite modale cote frontend : une URL partageable vaut mieux
+     * qu'une modale, en exploitation comme en demonstration.
+     */
+    @GetMapping("/{id}")
+    public LeadDetail detail(@PathVariable UUID id) {
+        return detailService.detail(id);
     }
 
     private Pageable plafonne(Pageable demande) {
