@@ -23,6 +23,10 @@
 - Les corps JSON sont en **camelCase anglais** (`eventId`, `clientKey`), les erreurs en `ProblemDetail` (RFC 7807).
 - Tous les tests de persistance utilisent `@SpringBootTest` + `TestcontainersConfiguration`, jamais `@DataJpaTest` : sa tranche n'inclut pas les `@Component` que sont les converters chiffrés.
 - Le daemon Docker doit tourner pour `./mvnw test`.
+- **Deux pièges de Boot 4.1 / Jackson 3, constatés en T1** — le code d'exemple des tâches suivantes peut encore porter les anciens noms, les corriger en écrivant :
+  - `TestRestTemplate` a quitté `org.springframework.boot.test.web.client` (il vit dans l'artefact `spring-boot-resttestclient`). **Les tests HTTP du projet utilisent `MockMvc` + `@AutoConfigureMockMvc`**, comme `LeadCaptureIntegrationTest` : la chaîne de filtres Spring Security y est traversée en entier, ce qui suffit à éprouver l'authentification.
+  - Jackson est en version 3 : les imports sont `tools.jackson.databind.*`, **jamais** `com.fasterxml.jackson.*`.
+- Un hash BCrypt écrit dans un plan n'est jamais fiable : le régénérer avec `BCryptPasswordEncoder` et vérifier `matches` avant de s'en servir dans un test.
 - Commits en français, une tâche = un commit, message expliquant la décision et non le diff.
 - Frontend : `environment.apiBaseUrl` est vide, les services appellent des **chemins relatifs** (`/api/leads`).
 - **Toute la partie visuelle passe par le plugin `ui-ux-pro-max`** — invoquer le skill *avant* d'écrire du code d'interface, jamais après coup : `ui-ux-pro-max:ui-ux-pro-max` pour les styles, palettes, polices et types de graphiques ; `ui-ux-pro-max:design-system` pour les jetons ; `ui-ux-pro-max:ui-styling` pour les composants et la mise en page. Cela vaut pour T13 à T16, et en particulier pour les compteurs et répartitions du dashboard (T15), qui doivent être conçus et non improvisés.
@@ -120,7 +124,7 @@ ensuite devrait être réécrit. T7 précède T8. T13 précède les autres tâch
   exige `Authorization: Bearer <token>`. Le nom de l'opérateur est lisible par
   `SecurityContextHolder.getContext().getAuthentication().getName()`.
 
-- [ ] **Step 1: Ajouter la dépendance resource server**
+- [x] **Step 1: Ajouter la dépendance resource server**
 
 Le nom des starters a changé sous Boot 4.1 (`spring-boot-starter-webmvc`, pas `-web`).
 Vérifier le nom réel avant d'écrire :
@@ -141,7 +145,7 @@ Ajouter dans `pom.xml`, à côté de `spring-boot-starter-security` :
 Si la résolution échoue, retomber sur `spring-boot-starter-oauth2-resource-server` — c'est le
 nom sous Boot 3. Vérifier par `./mvnw -q dependency:resolve` avant d'aller plus loin.
 
-- [ ] **Step 2: Écrire le test qui échoue**
+- [x] **Step 2: Écrire le test qui échoue**
 
 `backend/src/test/java/com/leadflow/common/auth/AuthenticationTest.java` :
 
@@ -175,7 +179,7 @@ import org.springframework.test.context.TestPropertySource;
         "leadflow.dashboard.jwt-secret=cle-de-signature-de-test-suffisamment-longue-32o",
         "leadflow.dashboard.users[0].username=operateur",
         "leadflow.dashboard.users[0].password-hash="
-                + "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"})
+                + "$2a$10$k1ZYaZoOllGK2VFIAEZt9uWK6qqFReloDQRq3MbCQFPFoBmxXpYKK"})
 class AuthenticationTest {
 
     @Autowired private TestRestTemplate rest;
@@ -240,12 +244,12 @@ class AuthenticationTest {
 }
 ```
 
-- [ ] **Step 3: Vérifier que le test échoue**
+- [x] **Step 3: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=AuthenticationTest`
 Expected: FAIL — `/api/auth/login` renvoie 404, et la connexion n'existe pas.
 
-- [ ] **Step 4: Écrire `DashboardProperties`**
+- [x] **Step 4: Écrire `DashboardProperties`**
 
 ```java
 package com.leadflow.config;
@@ -273,7 +277,7 @@ public record DashboardProperties(
 }
 ```
 
-- [ ] **Step 5: Écrire `DashboardUserDetailsService`, `JwtIssuer` et les contrats**
+- [x] **Step 5: Écrire `DashboardUserDetailsService`, `JwtIssuer` et les contrats**
 
 `LoginRequest.java` :
 
@@ -400,7 +404,7 @@ public class JwtIssuer {
 }
 ```
 
-- [ ] **Step 6: Écrire `AuthController`**
+- [x] **Step 6: Écrire `AuthController`**
 
 ```java
 package com.leadflow.common.auth;
@@ -460,7 +464,7 @@ public class DashboardAuthenticationException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 7: Réécrire `SecurityConfig`**
+- [x] **Step 7: Réécrire `SecurityConfig`**
 
 ```java
 package com.leadflow.config;
@@ -571,7 +575,7 @@ public class SecurityConfig {
 }
 ```
 
-- [ ] **Step 8: Traduire l'échec de connexion en 401**
+- [x] **Step 8: Traduire l'échec de connexion en 401**
 
 Ajouter dans `common/ApiExceptionHandler.java` :
 
@@ -584,7 +588,7 @@ Ajouter dans `common/ApiExceptionHandler.java` :
     }
 ```
 
-- [ ] **Step 9: Compléter la configuration**
+- [x] **Step 9: Compléter la configuration**
 
 Dans `application.yml`, sous `leadflow:` :
 
@@ -607,17 +611,17 @@ Dans `src/test/resources/application.properties` :
 leadflow.dashboard.jwt-secret=cle-de-signature-de-test-suffisamment-longue-32o
 ```
 
-- [ ] **Step 10: Vérifier que le test passe**
+- [x] **Step 10: Vérifier que le test passe**
 
 Run: `cd backend && ./mvnw test -Dtest=AuthenticationTest`
 Expected: PASS, les cinq méthodes.
 
-- [ ] **Step 11: Vérifier que rien d'existant n'a cassé**
+- [x] **Step 11: Vérifier que rien d'existant n'a cassé**
 
 Run: `cd backend && ./mvnw test`
 Expected: PASS. Les tests de capture appellent `/api/webhooks/**`, resté en `permitAll`.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add backend/pom.xml backend/src/main/java/com/leadflow/common/auth \
@@ -1625,7 +1629,7 @@ import org.springframework.test.context.TestPropertySource;
         "leadflow.dashboard.jwt-secret=cle-de-signature-de-test-suffisamment-longue-32o",
         "leadflow.dashboard.users[0].username=operateur",
         "leadflow.dashboard.users[0].password-hash="
-                + "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"})
+                + "$2a$10$k1ZYaZoOllGK2VFIAEZt9uWK6qqFReloDQRq3MbCQFPFoBmxXpYKK"})
 class ClientDirectoryTest {
 
     private static final String SECRET_EN_CLAIR = "secret-hmac-tres-reconnaissable";
@@ -3479,8 +3483,8 @@ public class DeadLetterJournal {
 ```java
 package com.leadflow.monitoring.deadletter;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.leadflow.config.RabbitMQConfig;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;

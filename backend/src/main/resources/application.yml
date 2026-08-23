@@ -52,6 +52,17 @@ leadflow:
     # Cle AES-256 en base64 sur 32 octets. Aucune valeur de repli : l'application
     # doit refuser de demarrer plutot que de chiffrer avec une cle devinable.
     master-key: ${LEADFLOW_MASTER_KEY:}
+  dashboard:
+    # Cle de signature du jeton de session. Aucune valeur de repli, comme la cle maitre :
+    # l'application doit refuser de demarrer plutot que de signer avec un secret devinable.
+    jwt-secret: ${LEADFLOW_JWT_SECRET:}
+    # Huit heures, sans rafraichissement : a l'expiration, retour a l'ecran de connexion.
+    token-ttl: 8h
+    users:
+      - username: ${LEADFLOW_ADMIN_USER:admin}
+        # Hash BCrypt, jamais le mot de passe, meme ici. Genere par exemple avec
+        # htpasswd -bnBC 10 "" 'mot-de-passe' | tr -d ':\n'
+        password-hash: ${LEADFLOW_ADMIN_PASSWORD_HASH:}
   webhook:
     signature-header: X-Leadflow-Signature
     # Fenetre de tolerance anti-rejeu sur l'horodatage de la requete, dans les deux sens.

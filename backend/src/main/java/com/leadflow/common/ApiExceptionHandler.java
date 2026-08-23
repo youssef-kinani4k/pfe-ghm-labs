@@ -1,5 +1,6 @@
 package com.leadflow.common;
 
+import com.leadflow.common.auth.DashboardAuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -31,5 +32,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(PayloadRejectedException.class)
     ProblemDetail corpsRefuse(PayloadRejectedException echec) {
         return ProblemDetail.forStatusAndDetail(echec.statut(), echec.getMessage());
+    }
+
+    /** Meme reponse pour un identifiant inconnu et un mot de passe faux (cf. AuthController). */
+    @ExceptionHandler(DashboardAuthenticationException.class)
+    ProblemDetail refusDeConnexion(DashboardAuthenticationException echec) {
+        log.warn("Connexion au dashboard refusee");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
     }
 }
