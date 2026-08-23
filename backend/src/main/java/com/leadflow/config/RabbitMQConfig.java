@@ -7,6 +7,7 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
@@ -173,5 +174,16 @@ public class RabbitMQConfig {
         fabrique.setConcurrentConsumers(1);
         fabrique.setMaxConcurrentConsumers(1);
         return fabrique;
+    }
+
+    /**
+     * Expose l'administration du broker sous son type concret. Spring Boot en declare bien
+     * une, mais sous le type {@code AmqpAdmin}, qui ne porte pas {@code getQueueInfo} : le
+     * monitoring lit la profondeur et le nombre de consommateurs par un {@code
+     * queue.declare} passif, et a donc besoin du type concret.
+     */
+    @Bean
+    RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
     }
 }
