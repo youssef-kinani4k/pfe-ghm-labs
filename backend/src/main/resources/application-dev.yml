@@ -21,3 +21,15 @@ leadflow:
     # profil dev contre une base partagee ne chiffre pas avec une cle publiee dans le
     # depot. Ne jamais utiliser cette valeur de repli hors du poste de developpement.
     master-key: ${LEADFLOW_MASTER_KEY:gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=}
+  dashboard:
+    # Meme regle que la cle maitre ci-dessus : repli de developpement seulement, pour que
+    # `spring-boot:run -Pdev` demarre sans preparer d'environnement. Les variables restent
+    # prioritaires, donc lancer le profil dev contre un serveur partage ne signe pas avec
+    # une cle publiee dans le depot.
+    jwt-secret: ${LEADFLOW_JWT_SECRET:bNL8GrGqAKnqX2aNop0oLuz7CnOLMpk3tAAw07GHyUEqSyFTTJf4lNIUwcnW7v0A}
+    users:
+      # Compte de demonstration : admin / leadflow-demo-2026. Le mot de passe n'est ecrit
+      # nulle part dans le depot, seul son hash BCrypt l'est — et il ne vaut que pour ce
+      # compte de poste de developpement.
+      - username: ${LEADFLOW_ADMIN_USER:admin}
+        password-hash: ${LEADFLOW_ADMIN_PASSWORD_HASH:$2a$10$a8QuzGNnbod0fmiNRKENIeDMqOuB8miScppYxShvKV43Drygr1R0q}
