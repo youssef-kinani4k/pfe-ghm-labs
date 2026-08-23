@@ -1595,7 +1595,7 @@ lecture** : sérialiser l'entité publierait le secret HMAC sur HTTP. L'assertio
 sur le **corps JSON**, pas sur le DTO — c'est la sérialisation qu'on verrouille, et un DTO
 correct ne prouve rien si un jour quelqu'un renvoie l'entité.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 `backend/src/test/java/com/leadflow/monitoring/ClientDirectoryTest.java` :
 
@@ -1713,12 +1713,12 @@ class ClientDirectoryTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=ClientDirectoryTest`
 Expected: FAIL — `/api/clients` rend 404, l'endpoint n'existe pas.
 
-- [ ] **Step 3: Écrire les DTO**
+- [x] **Step 3: Écrire les DTO**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -1757,7 +1757,7 @@ public record SalesRepSummary(
 }
 ```
 
-- [ ] **Step 4: Écrire `ClientDirectoryService`**
+- [x] **Step 4: Écrire `ClientDirectoryService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -1839,7 +1839,7 @@ de rôle déséquilibré. Ajouter :
     List<SalesRep> findByClientId(UUID clientId);
 ```
 
-- [ ] **Step 5: Écrire le contrôleur**
+- [x] **Step 5: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring;
@@ -1875,7 +1875,7 @@ public class ClientDirectoryController {
 }
 ```
 
-- [ ] **Step 6: Vérifier et committer**
+- [x] **Step 6: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=ClientDirectoryTest` puis `./mvnw test`
 Expected: PASS.
