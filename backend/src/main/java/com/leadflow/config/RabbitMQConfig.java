@@ -5,8 +5,11 @@ import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.retry.MessageRecoverer;
+import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -129,5 +132,46 @@ public class RabbitMQConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(converter);
         return template;
+    }
+
+    /**
+     * Remplace le rejet par defaut a l'epuisement des trois tentatives : Spring AMQP
+     * republie lui-meme le message vers la DLX en ajoutant {@code x-exception-message},
+     * {@code x-exception-stacktrace}, {@code x-original-exchange} et
+     * {@code x-original-routingKey}.
+     *
+     * <p>Deux gains, tous deux indispensables a l'ecran : la <b>cause</b> de l'echec, que
+     * l'en-tete {@code x-death} pose par le broker ne contient pas — il ne dit que
+     * « rejected » — et la <b>cle de routage d'origine explicite</b>, celle dont le rejeu a
+     * besoin, au lieu d'etre deduite de {@code x-death}.
+     *
+     * <p>S'applique identiquement aux trois etapes du pipeline, sans changer une ligne de
+     * leur code.
+     */
+    @Bean
+    MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate) {
+        return new RepublishMessageRecoverer(rabbitTemplate, DLX_EXCHANGE, DLQ_ROUTING_KEY);
+    }
+
+    /**
+     * Fabrique dediee au consommateur de la DLQ. Elle differe de la fabrique par defaut sur
+     * un point : {@code defaultRequeueRejected = true}.
+     *
+     * <p>La DLQ n'a elle-meme aucune DLX. Acquitter un message qu'on n'a pas su journaliser
+     * — Postgres indisponible — le perdrait definitivement ; le remettre en file le fera
+     * reprendre quand la base reviendra. Le risque de boucle chaude est assume : si Postgres
+     * est a terre, l'application entiere l'est.
+     */
+    @Bean
+    SimpleRabbitListenerContainerFactory deadLetterListenerContainerFactory(
+            ConnectionFactory connectionFactory) {
+        SimpleRabbitListenerContainerFactory fabrique = new SimpleRabbitListenerContainerFactory();
+        fabrique.setConnectionFactory(connectionFactory);
+        fabrique.setDefaultRequeueRejected(true);
+        // Un seul consommateur : le journal n'est pas un goulot, et la sequence des morts
+        // reste lisible.
+        fabrique.setConcurrentConsumers(1);
+        fabrique.setMaxConcurrentConsumers(1);
+        return fabrique;
     }
 }

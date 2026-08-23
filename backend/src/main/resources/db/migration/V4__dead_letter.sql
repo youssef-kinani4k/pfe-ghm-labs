@@ -13,9 +13,11 @@ CREATE TABLE dead_letter (
     -- En-tete __TypeId__ du message. Sans lui, le convertisseur ne saurait pas dans quelle
     -- classe deserialiser au rejeu.
     type_id         VARCHAR(255),
-    client_id       UUID REFERENCES client (id),
-    -- Volontairement sans cle etrangere : le message peut etre corrompu, et une contrainte
-    -- ferait echouer l'ecriture du journal exactement quand on en a le plus besoin.
+    -- Ni client_id ni lead_id ne portent de cle etrangere : le message peut etre corrompu
+    -- ou designer un client disparu, et une contrainte ferait echouer l'ecriture du journal
+    -- exactement quand on en a le plus besoin. Le prix assume est une reference qui peut ne
+    -- designer personne — l'ecran l'affiche telle quelle.
+    client_id       UUID,
     lead_id         UUID,
     failure_reason  TEXT,
     dead_at         TIMESTAMPTZ NOT NULL DEFAULT now(),

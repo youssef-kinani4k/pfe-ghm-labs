@@ -91,6 +91,21 @@ leadflow:
       # Presence du consommateur de leadflow.leads.qualified. Toujours vrai en production ;
       # la suite de tests le retire pour lire elle-meme ce que la qualification a publie.
       enabled: true
+  monitoring:
+    deadletter:
+      listener:
+        # Presence du consommateur de la DLQ. Toujours vrai en production ; la suite de
+        # tests le retire, sauf la ou elle l'eprouve.
+        enabled: true
+    stream:
+      listener:
+        enabled: true
+      emitter-timeout: 30m
+      heartbeat-interval: 20s
+    relay:
+      qualified-after: 2m
+      routed-after: 2m
+      interval: 30s
   intent:
     gemini:
       enabled: true
