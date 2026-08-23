@@ -36,15 +36,21 @@ public class CrmSyncListener {
 
     private final CrmSyncService service;
     private final SyncedLeadWriter writer;
+    private final SyncedLeadPublisher publieur;
 
-    public CrmSyncListener(CrmSyncService service, SyncedLeadWriter writer) {
+    public CrmSyncListener(
+            CrmSyncService service, SyncedLeadWriter writer, SyncedLeadPublisher publieur) {
         this.service = service;
         this.writer = writer;
+        this.publieur = publieur;
     }
 
     @RabbitListener(queues = RabbitMQConfig.ROUTED_QUEUE)
     public void recoit(RoutedLeadMessage message) {
         service.synchronise(message.leadId());
         writer.marqueSynchronise(message.leadId());
+        // Rien n'existait apres cette etape : sans lead.synced, le flux du dashboard
+        // figerait le lead en ROUTED et raterait la fin de son parcours.
+        publieur.publie(message.leadId(), message.clientId(), null);
     }
 }

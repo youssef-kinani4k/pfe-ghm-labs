@@ -2,6 +2,7 @@ package com.leadflow.config;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
@@ -16,6 +17,7 @@ import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import java.util.stream.Stream;
 
 /**
  * Topologie du broker. Le webhook publie dans {@link #LEADS_QUEUE} et rend la main
@@ -36,6 +38,17 @@ public class RabbitMQConfig {
     /** Sortie du routage, consommee par la synchronisation ERP. */
     public static final String ROUTED_QUEUE = "leadflow.leads.routed";
     public static final String ROUTED_ROUTING_KEY = "lead.routed";
+
+    /** Sortie de la synchronisation ERP. Aucun consommateur metier : le monitoring seul. */
+    public static final String SYNCED_ROUTING_KEY = "lead.synced";
+
+    /**
+     * File d'observation du monitoring. Distincte des files metier : un DirectExchange
+     * livre a TOUTES les files liees a une cle, et la concurrence entre consommateurs ne
+     * joue qu'au sein d'une meme file. Le monitoring observe donc sans qu'aucune ligne du
+     * routage ou de la qualification ne bouge.
+     */
+    public static final String MONITORING_QUEUE = "leadflow.monitoring.events";
 
     public static final String DLX_EXCHANGE = "leadflow.leads.dlx";
     public static final String DLQ_QUEUE = "leadflow.leads.dlq";
@@ -112,7 +125,8 @@ public class RabbitMQConfig {
      * contrat de file dans un autre paquet doit l'ajouter ici.
      */
     private static final String[] PAQUETS_DE_CONFIANCE =
-            {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing"};
+            {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing",
+                    "com.leadflow.crm"};
 
     /**
      * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par
@@ -185,5 +199,31 @@ public class RabbitMQConfig {
     @Bean
     RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
         return new RabbitAdmin(connectionFactory);
+    }
+
+    /**
+     * <b>Pas de DLX.</b> Un echec d'affichage n'est pas un echec de lead et n'a rien a faire
+     * dans le journal des morts.
+     */
+    @Bean
+    Queue monitoringEventsQueue() {
+        return QueueBuilder.durable(MONITORING_QUEUE).build();
+    }
+
+    /**
+     * Un {@code Declarables} et non une {@code List<Binding>} : RabbitAdmin ne parcourt que
+     * le premier type a la declaration, une liste nue serait ignoree en silence — et la
+     * file d'observation resterait vide sans qu'aucune erreur ne le dise.
+     */
+    @Bean
+    Declarables monitoringEventsBindings(
+            Queue monitoringEventsQueue, DirectExchange leadsExchange) {
+        return new Declarables(Stream.of(
+                        LEADS_ROUTING_KEY,
+                        QUALIFIED_ROUTING_KEY,
+                        ROUTED_ROUTING_KEY,
+                        SYNCED_ROUTING_KEY)
+                .map(cle -> BindingBuilder.bind(monitoringEventsQueue).to(leadsExchange).with(cle))
+                .toList());
     }
 }

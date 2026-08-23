@@ -1,6 +1,8 @@
 package com.leadflow.monitoring.deadletter;
 
 import com.leadflow.config.RabbitMQConfig;
+import com.leadflow.monitoring.dto.DeadLetterView;
+import com.leadflow.monitoring.stream.LeadStreamBroadcaster;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -34,10 +36,13 @@ public class DeadLetterListener {
 
     private final DeadLetterJournal journal;
     private final ObjectMapper mapper;
+    private final LeadStreamBroadcaster diffuseur;
 
-    public DeadLetterListener(DeadLetterJournal journal, ObjectMapper mapper) {
+    public DeadLetterListener(
+            DeadLetterJournal journal, ObjectMapper mapper, LeadStreamBroadcaster diffuseur) {
         this.journal = journal;
         this.mapper = mapper;
+        this.diffuseur = diffuseur;
     }
 
     @RabbitListener(
@@ -61,8 +66,28 @@ public class DeadLetterListener {
         motif.append(lisIdentifiants(corps, mort));
 
         mort.setFailureReason(motif.isEmpty() ? "Cause inconnue" : motif.toString());
-        journal.enregistre(mort);
+        DeadLetter ecrite = journal.enregistre(mort);
+        // Le flux ne repasse pas par le broker : c'est le meme processus.
+        diffuseur.diffuseMort(vue(ecrite));
         log.info("Mort journalisee : file {}, cle {}", mort.getOriginQueue(), mort.getRoutingKey());
+    }
+
+    /** Vue maigre : {@code clientName} reste nul, l'ecran rechargeant la liste au clic. */
+    private DeadLetterView vue(DeadLetter mort) {
+        return new DeadLetterView(
+                mort.getId(),
+                mort.getOriginQueue(),
+                mort.getRoutingKey(),
+                mort.getClientId(),
+                null,
+                mort.getLeadId(),
+                mort.getFailureReason(),
+                mort.getDeadAt(),
+                mort.getStatus(),
+                mort.getReplayedAt(),
+                mort.getReplayedBy(),
+                mort.getPayload(),
+                null);
     }
 
     /**
