@@ -68,13 +68,18 @@ docker compose down -v                    # remet la base a zero (rejoue les mig
 ### Backend
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # :8080, logs SQL + DEBUG
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # :8090, logs SQL + DEBUG
 ./mvnw test                                             # toute la suite
 ./mvnw test -Dtest=HmacSignatureVerifierTest            # une classe
 ./mvnw test -Dtest=HmacSignatureVerifierTest#rejectsExpiredTimestamp   # une methode
 ./mvnw verify                                           # tests + package
 ./mvnw spring-boot:test-run                             # lance l'app avec Testcontainers
 ```
+
+**Le backend ecoute sur `:8090`, pas sur `:8080`.** Le port par defaut de Tomcat est occupe
+en permanence sur le poste de developpement du projet ; le choisir explicitement evite un
+demarrage qui echoue une fois sur deux. Il se surcharge par `SERVER_PORT`, et
+`frontend/proxy.conf.json` vise ce meme port — les deux se changent ensemble.
 
 **Le daemon Docker doit tourner pour `./mvnw test`** : `BackendApplicationTests` importe
 `TestcontainersConfiguration`, qui demarre Postgres et RabbitMQ en conteneurs. Sans Docker,
@@ -213,7 +218,7 @@ reparer : activer un commercial, puis rejouer.
 ### Frontend
 
 ```bash
-npm start                                     # ng serve sur :4200, proxy /api -> :8080
+npm start                                     # ng serve sur :4200, proxy /api -> :8090
 npm run build                                 # build production dans dist/
 npm test                                      # Karma + Jasmine, mode watch
 npm test -- --watch=false --browsers=ChromeHeadless   # une passe, pour CI ou verification
@@ -423,7 +428,7 @@ separes, verifiable dans la sortie de `npm run build`. Ajouter une feature = un 
 ### Appels API
 
 `environment.apiBaseUrl` est **volontairement vide dans les deux environnements** : en dev
-`proxy.conf.json` renvoie `/api` et `/actuator` vers `localhost:8080`, en production le
+`proxy.conf.json` renvoie `/api` et `/actuator` vers `localhost:8090`, en production le
 dashboard est servi derriere le meme domaine que l'API. Les services doivent donc appeler des
 chemins relatifs (`/api/leads`), jamais une URL absolue. Le remplacement de fichier
 d'environnement est cable dans `angular.json`, configuration `development`.

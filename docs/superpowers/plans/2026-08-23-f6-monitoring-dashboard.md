@@ -5584,7 +5584,7 @@ export interface LeadQuery {
 
 /**
  * Chemins relatifs, jamais d'URL absolue : environment.apiBaseUrl est vide dans les deux
- * environnements — en dev le proxy renvoie /api vers :8080, en production le dashboard est
+ * environnements — en dev le proxy renvoie /api vers :8090, en production le dashboard est
  * servi derriere le meme domaine que l'API.
  */
 @Injectable({ providedIn: 'root' })
@@ -6169,11 +6169,11 @@ les paramètres, un exemple `curl` complet avec le `Bearer`, et un exemple de r�
 L'obtention du jeton en premier, parce que rien d'autre ne marche sans lui :
 
 ```bash
-JETON=$(curl -s -X POST http://localhost:8080/api/auth/login \
+JETON=$(curl -s -X POST http://localhost:8090/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"operateur","password":"..."}' | jq -r .token)
 
-curl -s http://localhost:8080/api/leads?status=SYNCED -H "Authorization: Bearer $JETON" | jq
+curl -s http://localhost:8090/api/leads?status=SYNCED -H "Authorization: Bearer $JETON" | jq
 ```
 
 Une section sur les variables d'environnement, et **comment produire un hash BCrypt** — le

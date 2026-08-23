@@ -34,5 +34,5 @@ cp .env.example .env          # renseigner LEADFLOW_MASTER_KEY (openssl rand -ba
 docker compose up -d          # Postgres + RabbitMQ
 # ERP de test au besoin : docker compose --profile dolibarr up -d  (ou --profile odoo)
 cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-cd frontend && npm start      # http://localhost:4200, proxy /api -> :8080
+cd frontend && npm start      # http://localhost:4200, proxy /api -> :8090
 ```

@@ -1,3 +1,9 @@
+server:
+  # 8090 et non 8080 : le port par defaut de Tomcat est occupe en permanence sur le poste
+  # de developpement du projet, et un port choisi vaut mieux qu'un demarrage qui echoue une
+  # fois sur deux. Surchargeable par SERVER_PORT pour tout autre environnement.
+  port: ${SERVER_PORT:8090}
+
 spring:
   application:
     name: leadflow-backend

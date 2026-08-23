@@ -89,7 +89,7 @@ Le secret ne doit jamais partir dans un navigateur : la signature se calcule cô
 
 ### Vérifier en local avec curl
 
-Backend démarré sur `:8080` et données de démonstration chargées (profil `dev`). Les
+Backend démarré sur `:8090` et données de démonstration chargées (profil `dev`). Les
 valeurs ci-dessous sont celles du client de démonstration de
 `backend/src/main/resources/db/dev/R__demo_data.sql`, dont le secret HMAC est donné en clair
 en commentaire de ce fichier :
@@ -101,7 +101,7 @@ CORPS='{"source":"formulaire-devis","email":"karim@acme.test"}'
 T=$(date +%s)
 SIG=$(printf '%s' "$T.$CORPS" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
 
-curl -i -X POST "http://localhost:8080/api/webhooks/leads/$CLE" \
+curl -i -X POST "http://localhost:8090/api/webhooks/leads/$CLE" \
   -H "Content-Type: application/json" \
   -H "X-Leadflow-Signature: t=$T,v1=$SIG" \
   -d "$CORPS"
