@@ -658,7 +658,7 @@ Spring Security — aucun filtre maison, donc aucun bug de parsing."
   `LeadSummary`, et `LeadQueryService.cherche(LeadFilter, Pageable) -> PageResponse<LeadSummary>`.
   Task 3 réutilise `LeadQueryRepository` ; T13+ consomment `PageResponse` en TypeScript.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring;
@@ -806,12 +806,12 @@ class LeadQueryServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=LeadQueryServiceTest`
 Expected: FAIL — compilation impossible, `LeadQueryService` et `LeadFilter` n'existent pas.
 
-- [ ] **Step 3: Écrire `PageResponse` et `LeadSummary`**
+- [x] **Step 3: Écrire `PageResponse` et `LeadSummary`**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -864,7 +864,7 @@ public record LeadSummary(
 }
 ```
 
-- [ ] **Step 4: Écrire `LeadFilter`, `LeadQueryRepository` et `LeadSpecifications`**
+- [x] **Step 4: Écrire `LeadFilter`, `LeadQueryRepository` et `LeadSpecifications`**
 
 `monitoring/LeadFilter.java` :
 
@@ -1006,7 +1006,7 @@ final class LeadSpecifications {
 }
 ```
 
-- [ ] **Step 5: Écrire `LeadQueryService`**
+- [x] **Step 5: Écrire `LeadQueryService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -1110,12 +1110,12 @@ public class LeadQueryService {
 }
 ```
 
-- [ ] **Step 6: Vérifier que le test passe**
+- [x] **Step 6: Vérifier que le test passe**
 
 Run: `cd backend && ./mvnw test -Dtest=LeadQueryServiceTest`
 Expected: PASS, les cinq méthodes.
 
-- [ ] **Step 7: Écrire le contrôleur**
+- [x] **Step 7: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring;
@@ -1177,7 +1177,7 @@ public class LeadQueryController {
 }
 ```
 
-- [ ] **Step 8: Lancer la suite complète et committer**
+- [x] **Step 8: Lancer la suite complète et committer**
 
 Run: `cd backend && ./mvnw test`
 Expected: PASS.
