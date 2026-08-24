@@ -3,7 +3,9 @@ package com.leadflow.tenant;
 import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmConnectorRegistry;
 import com.leadflow.crm.model.CrmSettingSpec;
+import com.leadflow.tenant.dto.ClientCreated;
 import com.leadflow.tenant.dto.ClientDetailAdmin;
+import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
 import com.leadflow.tenant.dto.SalesRepAdminView;
 import java.util.LinkedHashMap;
@@ -31,14 +33,17 @@ public class ClientAdminService {
     private final ClientRepository clients;
     private final SalesRepRepository commerciaux;
     private final CrmConnectorRegistry connecteurs;
+    private final CleGenerator generateur;
 
     public ClientAdminService(
             ClientRepository clients,
             SalesRepRepository commerciaux,
-            CrmConnectorRegistry connecteurs) {
+            CrmConnectorRegistry connecteurs,
+            CleGenerator generateur) {
         this.clients = clients;
         this.commerciaux = commerciaux;
         this.connecteurs = connecteurs;
+        this.generateur = generateur;
     }
 
     @Transactional(readOnly = true)
@@ -71,6 +76,70 @@ public class ClientAdminService {
                 commerciaux.findByClientIdOrderByFullName(client.getId()).stream()
                         .map(this::vue)
                         .toList());
+    }
+
+    /**
+     * Cree la boutique et son premier commercial <b>dans une seule transaction</b>.
+     *
+     * <p>Deux appels separes laisseraient, si le second echoue, une boutique active sans
+     * commercial : le routage leverait AssignmentException et ses leads partiraient en DLQ
+     * des le premier formulaire soumis. C'est exactement l'etat que cet ecran doit rendre
+     * impossible a fabriquer.
+     */
+    @Transactional
+    public ClientCreated cree(ClientForm formulaire) {
+        if (formulaire.firstSalesRep() == null) {
+            throw new ReglageManquantException(
+                    "Une boutique doit etre creee avec au moins un commercial");
+        }
+        valideLesReglages(formulaire.crmProviderId(), formulaire.crmSettings());
+
+        Client client = new Client();
+        client.setName(formulaire.name());
+        client.setPublicKey(generateur.clePublique());
+        String secret = generateur.secretHmac();
+        client.setHmacSecret(secret);
+        client.setCrmProviderId(formulaire.crmProviderId());
+        client.setCrmConfig(new LinkedHashMap<>(formulaire.crmSettings()));
+        client.setAssignmentStrategy(formulaire.assignmentStrategy());
+        client.setActive(true);
+        Client enregistre = clients.save(client);
+
+        SalesRep rep = new SalesRep();
+        rep.setClient(enregistre);
+        rep.setFullName(formulaire.firstSalesRep().fullName());
+        rep.setEmail(formulaire.firstSalesRep().email());
+        rep.setSector(formulaire.firstSalesRep().sector());
+        rep.setZone(formulaire.firstSalesRep().zone());
+        rep.setCrmRef(formulaire.firstSalesRep().crmRef());
+        rep.setActive(true);
+        commerciaux.save(rep);
+
+        return new ClientCreated(
+                enregistre.getId(),
+                enregistre.getPublicKey(),
+                secret,
+                "/api/webhooks/leads/" + enregistre.getPublicKey());
+    }
+
+    /**
+     * Valide contre ce que le connecteur declare, jamais contre une liste ecrite ici :
+     * ajouter un ERP ne doit rien demander a ce package.
+     */
+    private void valideLesReglages(String providerId, Map<String, String> reglages) {
+        List<CrmSettingSpec> attendus;
+        try {
+            attendus = connecteurs.forProvider(providerId).reglagesAttendus();
+        } catch (IllegalArgumentException inconnu) {
+            throw new ReglageManquantException(inconnu.getMessage());
+        }
+        for (CrmSettingSpec attendu : attendus) {
+            String valeur = reglages == null ? null : reglages.get(attendu.cle());
+            if (valeur == null || valeur.isBlank()) {
+                throw new ReglageManquantException(
+                        "Le reglage '" + attendu.cle() + "' est requis pour " + providerId);
+            }
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.leadflow.common;
 import com.leadflow.common.auth.DashboardAuthenticationException;
 import com.leadflow.monitoring.deadletter.DejaTraiteException;
 import com.leadflow.monitoring.deadletter.RejeuIndisponibleException;
+import com.leadflow.tenant.ReglageManquantException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -58,5 +59,10 @@ public class ApiExceptionHandler {
         log.warn("Rejeu impossible : broker injoignable", echec);
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.SERVICE_UNAVAILABLE, echec.getMessage());
+    }
+
+    @ExceptionHandler(ReglageManquantException.class)
+    ProblemDetail reglageManquant(ReglageManquantException echec) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, echec.getMessage());
     }
 }

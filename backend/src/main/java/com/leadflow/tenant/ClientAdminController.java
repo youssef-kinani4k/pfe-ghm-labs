@@ -1,12 +1,19 @@
 package com.leadflow.tenant;
 
+import com.leadflow.tenant.dto.ClientCreated;
 import com.leadflow.tenant.dto.ClientDetailAdmin;
+import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,5 +39,11 @@ public class ClientAdminController {
     @GetMapping("/{id}")
     public ClientDetailAdmin fiche(@PathVariable UUID id) {
         return service.fiche(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ClientCreated cree(@Valid @RequestBody ClientForm formulaire) {
+        return service.cree(formulaire);
     }
 }
