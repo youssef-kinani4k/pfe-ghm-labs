@@ -2377,7 +2377,7 @@ L'écran doit distinguer trois situations, ce qu'exige le critère de recette 6 
 **désactivé** par configuration, fournisseur **actif sans aucune trace**, fournisseur actif
 dont la **dernière synchronisation a échoué**.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring;
@@ -2489,12 +2489,12 @@ class ConnectorHealthServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=ConnectorHealthServiceTest`
 Expected: FAIL — `ConnectorHealthService` n'existe pas.
 
-- [ ] **Step 3: Écrire les DTO**
+- [x] **Step 3: Écrire les DTO**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -2540,7 +2540,7 @@ public record ConnectorClientActivity(
 }
 ```
 
-- [ ] **Step 4: Écrire le repository d'activité**
+- [x] **Step 4: Écrire le repository d'activité**
 
 `crm_sync_attempt` ne porte pas de `client_id` : la trace est rattachée au lead. La
 ventilation par client passe donc par une jointure sur `Lead`, écrite ici plutôt que dans
@@ -2625,7 +2625,7 @@ public interface SyncActivityRepository extends Repository<CrmSyncAttempt, UUID>
 }
 ```
 
-- [ ] **Step 5: Écrire `ConnectorHealthService`**
+- [x] **Step 5: Écrire `ConnectorHealthService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -2750,7 +2750,7 @@ public class ConnectorHealthService {
 }
 ```
 
-- [ ] **Step 6: Écrire le contrôleur**
+- [x] **Step 6: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring;
@@ -2778,7 +2778,7 @@ public class ConnectorHealthController {
 }
 ```
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=ConnectorHealthServiceTest` puis `./mvnw test`
 Expected: PASS.
@@ -2816,7 +2816,7 @@ semble en réclamer une a dévié du plan. Elle rompt la promesse « le schéma 
 tenue depuis `V3`, ce que la spec assume en 12.6 : une file de messages ne sait pas être une
 liste paginée et filtrable, et le critère de recette en exige une.
 
-- [ ] **Step 1: Écrire la migration**
+- [x] **Step 1: Écrire la migration**
 
 `backend/src/main/resources/db/migration/V4__dead_letter.sql` :
 
@@ -2860,7 +2860,7 @@ CREATE INDEX idx_dead_letter_lead ON dead_letter (lead_id) WHERE lead_id IS NOT 
 le consommateur meurt entre le commit et l'acquittement : c'est un doublon visible dans un
 journal, écartable d'un clic, et le prix à payer pour ne rien perdre.
 
-- [ ] **Step 2: Écrire le test qui échoue**
+- [x] **Step 2: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -2944,12 +2944,12 @@ class DeadLetterPersistenceTest {
 }
 ```
 
-- [ ] **Step 3: Vérifier que le test échoue**
+- [x] **Step 3: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterPersistenceTest`
 Expected: FAIL — l'entité n'existe pas.
 
-- [ ] **Step 4: Écrire l'énumération, l'entité et le repository**
+- [x] **Step 4: Écrire l'énumération, l'entité et le repository**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3095,7 +3095,7 @@ public interface DeadLetterRepository
 package com.leadflow.monitoring.deadletter;
 ```
 
-- [ ] **Step 5: Vérifier et committer**
+- [x] **Step 5: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterPersistenceTest` puis `./mvnw test`
 Expected: PASS. Si Flyway refuse de démarrer sur un checksum, c'est qu'une migration
@@ -3139,7 +3139,7 @@ qui liste des morts sans dire pourquoi n'oriente personne. Le listener **ne perd
 distingue deux échecs : une charge utile inexploitable donne une ligne quand même, une base
 indisponible remet le message en file.
 
-- [ ] **Step 1: Écrire les propriétés de monitoring**
+- [x] **Step 1: Écrire les propriétés de monitoring**
 
 ```java
 package com.leadflow.config;
@@ -3211,7 +3211,7 @@ leadflow.monitoring.deadletter.listener.enabled=false
 leadflow.monitoring.stream.listener.enabled=false
 ```
 
-- [ ] **Step 2: Écrire le test qui échoue**
+- [x] **Step 2: Écrire le test qui échoue**
 
 `DeadLetterListenerTest` — le listener rallumé, on publie directement sur la DLX :
 
@@ -3386,12 +3386,12 @@ class CheminDEchecCompletTest {
 }
 ```
 
-- [ ] **Step 3: Vérifier que les tests échouent**
+- [x] **Step 3: Vérifier que les tests échouent**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterListenerTest+CheminDEchecCompletTest`
 Expected: FAIL — aucun consommateur de DLQ, et aucune cause capturée.
 
-- [ ] **Step 4: Modifier `RabbitMQConfig`**
+- [x] **Step 4: Modifier `RabbitMQConfig`**
 
 Trois ajouts. Le `RepublishMessageRecoverer` :
 
@@ -3446,7 +3446,7 @@ Si Boot 4.1 configure déjà un `MessageRecoverer` par défaut au lieu du rejet,
 `./mvnw spring-boot:test-run` qu'un message en échec arrive bien dans la DLQ avec
 `x-exception-message` avant d'aller plus loin.
 
-- [ ] **Step 5: Écrire `DeadLetterJournal`**
+- [x] **Step 5: Écrire `DeadLetterJournal`**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3479,7 +3479,7 @@ public class DeadLetterJournal {
 }
 ```
 
-- [ ] **Step 6: Écrire `DeadLetterListener`**
+- [x] **Step 6: Écrire `DeadLetterListener`**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3588,7 +3588,7 @@ public class DeadLetterListener {
 du recoverer. Si le test montre qu'il est absent, se rabattre sur `x-original-exchange` plus
 la routing key, et le noter dans le Javadoc.
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterListenerTest+CheminDEchecCompletTest`
 puis `./mvnw test`
@@ -3636,7 +3636,7 @@ n'est honoré que si le paquet figure dans `RabbitMQConfig.PAQUETS_DE_CONFIANCE`
 Pas de bouton « tout rejouer » : un rejeu de masse sur un incident non compris multiplie
 l'incident. L'API rejoue **une** ligne ; l'écran boucle sur une sélection explicite (T16).
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3740,12 +3740,12 @@ class DeadLetterReplayServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterReplayServiceTest`
 Expected: FAIL — `DeadLetterReplayService` n'existe pas.
 
-- [ ] **Step 3: Écrire les exceptions et leur traduction HTTP**
+- [x] **Step 3: Écrire les exceptions et leur traduction HTTP**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3791,7 +3791,7 @@ Dans `common/ApiExceptionHandler.java` :
     }
 ```
 
-- [ ] **Step 4: Écrire `DeadLetterReplayService`**
+- [x] **Step 4: Écrire `DeadLetterReplayService`**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -3901,7 +3901,7 @@ public class DeadLetterReplayService {
 }
 ```
 
-- [ ] **Step 5: Écrire la vue et le service de lecture**
+- [x] **Step 5: Écrire la vue et le service de lecture**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -4048,7 +4048,7 @@ public class DeadLetterQueryService {
 }
 ```
 
-- [ ] **Step 6: Écrire le contrôleur**
+- [x] **Step 6: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring.deadletter;
@@ -4106,7 +4106,7 @@ public class DeadLetterController {
 }
 ```
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=DeadLetterReplayServiceTest` puis `./mvnw test`
 Expected: PASS.
@@ -4149,7 +4149,7 @@ sur `leadflow.leads.qualified` explique en une seconde pourquoi plus rien n'avan
 profondeur de `leadflow.leads.dlq` doit rester nulle ; une valeur qui persiste signale que le
 journal ne suit pas.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring;
@@ -4220,12 +4220,12 @@ class QueueServiceTest {
 }
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=QueueServiceTest`
 Expected: FAIL — `QueueService` n'existe pas.
 
-- [ ] **Step 3: Écrire les DTO**
+- [x] **Step 3: Écrire les DTO**
 
 ```java
 package com.leadflow.monitoring.dto;
@@ -4255,7 +4255,7 @@ public record QueuesView(List<QueueView> queues, long pendingDeadLetters) {
 }
 ```
 
-- [ ] **Step 4: Écrire `QueueService`**
+- [x] **Step 4: Écrire `QueueService`**
 
 ```java
 package com.leadflow.monitoring;
@@ -4330,7 +4330,7 @@ Si aucun bean `RabbitAdmin` n'est exposé, l'ajouter dans `RabbitMQConfig` :
 Spring Boot en déclare un dès que `spring-boot-starter-amqp` est présent ; vérifier avant
 d'en créer un second.
 
-- [ ] **Step 5: Écrire le contrôleur**
+- [x] **Step 5: Écrire le contrôleur**
 
 ```java
 package com.leadflow.monitoring;
@@ -4357,7 +4357,7 @@ public class QueueController {
 }
 ```
 
-- [ ] **Step 6: Vérifier et committer**
+- [x] **Step 6: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=QueueServiceTest` puis `./mvnw test`
 Expected: PASS.
@@ -4403,7 +4403,7 @@ ERP, donc sans `lead.synced` le flux raterait la fin de l'histoire qu'il raconte
 La file du monitoring n'a **pas de DLX** : un échec d'affichage n'est pas un échec de lead et
 n'a rien à faire dans le journal des morts.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```java
 package com.leadflow.monitoring.stream;
@@ -4475,12 +4475,12 @@ class PipelineEventListenerTest {
 s'observe pas autrement sans monter un client HTTP complet. Les deux sont documentées comme
 telles dans le diffuseur.
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd backend && ./mvnw test -Dtest=PipelineEventListenerTest`
 Expected: FAIL — ni la file d'observation, ni le diffuseur n'existent.
 
-- [ ] **Step 3: Compléter `RabbitMQConfig`**
+- [x] **Step 3: Compléter `RabbitMQConfig`**
 
 ```java
     /** Sortie de la synchronisation ERP. Aucun consommateur metier : le monitoring seul. */
@@ -4522,7 +4522,7 @@ fait pas, écrire quatre beans `Binding` nommés plutôt qu'une boucle.
 Ajouter `"com.leadflow.crm"` à `PAQUETS_DE_CONFIANCE` — `SyncedLeadMessage` y vit, et la
 correspondance est exacte, ni préfixe ni joker.
 
-- [ ] **Step 4: Publier `lead.synced`**
+- [x] **Step 4: Publier `lead.synced`**
 
 `crm/SyncedLeadMessage.java` :
 
@@ -4601,7 +4601,7 @@ Le `providerId` reste `null` tant que `CrmSyncService.synchronise` ne le rend pa
 retour le porte déjà, le passer plutôt que `null` — le flux n'en dépend pas, l'écran de
 détail donnant l'information complète.
 
-- [ ] **Step 5: Écrire `StreamEvent` et le diffuseur**
+- [x] **Step 5: Écrire `StreamEvent` et le diffuseur**
 
 ```java
 package com.leadflow.monitoring.stream;
@@ -4713,7 +4713,7 @@ public class LeadStreamBroadcaster {
 }
 ```
 
-- [ ] **Step 6: Écrire le consommateur d'observation et le contrôleur**
+- [x] **Step 6: Écrire le consommateur d'observation et le contrôleur**
 
 ```java
 package com.leadflow.monitoring.stream;
@@ -4804,7 +4804,7 @@ public class LeadStreamController {
 }
 ```
 
-- [ ] **Step 7: Brancher le journal sur le flux**
+- [x] **Step 7: Brancher le journal sur le flux**
 
 Dans `DeadLetterListener`, après `journal.enregistre(mort)`, diffuser la ligne écrite. Le
 diffuseur est injecté en plus ; il ne repasse pas par le broker, c'est le même processus.
@@ -4817,7 +4817,7 @@ diffuseur est injecté en plus ; il ne repasse pas par le broker, c'est le même
 Construire la `DeadLetterView` avec `clientName` à `null` : le flux est maigre par principe,
 et l'écran recharge la liste au clic.
 
-- [ ] **Step 8: Vérifier et committer**
+- [x] **Step 8: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=PipelineEventListenerTest` puis `./mvnw test`
 Expected: PASS.
@@ -4868,7 +4868,7 @@ rejoué ou écarté. C'est la même distinction que F2 a faite entre `FAILED` et
 
 C'est aussi le critère de recette 7.
 
-- [ ] **Step 1: Écrire les tests qui échouent**
+- [x] **Step 1: Écrire les tests qui échouent**
 
 ```java
 package com.leadflow.qualification;
@@ -4984,12 +4984,12 @@ class QualifiedLeadRelayTest {
 `RoutedLeadRelayTest` est le symétrique exact : statut `ROUTED`, file
 `RabbitMQConfig.ROUTED_QUEUE`, méthode `republieLesNonSynchronises()`.
 
-- [ ] **Step 2: Vérifier que les tests échouent**
+- [x] **Step 2: Vérifier que les tests échouent**
 
 Run: `cd backend && ./mvnw test -Dtest=QualifiedLeadRelayTest+RoutedLeadRelayTest`
 Expected: FAIL — les deux filets n'existent pas.
 
-- [ ] **Step 3: Compléter `LeadRepository`**
+- [x] **Step 3: Compléter `LeadRepository`**
 
 ```java
     /**
@@ -5000,7 +5000,7 @@ Expected: FAIL — les deux filets n'existent pas.
     List<Lead> findByStatusAndCreatedAtBefore(LeadStatus status, Instant limite);
 ```
 
-- [ ] **Step 4: Écrire `QualifiedLeadRelay`**
+- [x] **Step 4: Écrire `QualifiedLeadRelay`**
 
 ```java
 package com.leadflow.qualification;
@@ -5080,20 +5080,20 @@ public class QualifiedLeadRelay {
 }
 ```
 
-- [ ] **Step 5: Écrire `RoutedLeadRelay`**
+- [x] **Step 5: Écrire `RoutedLeadRelay`**
 
 Symétrique : `LeadStatus.ROUTED`, `properties.relay().routedAfter()`,
 `RoutedLeadPublisher`, méthode `republieLesNonSynchronises()`. Même garde-fou, même Javadoc
 sur le couplage assumé.
 
-- [ ] **Step 6: Corriger les Javadoc des deux publieurs**
+- [x] **Step 6: Corriger les Javadoc des deux publieurs**
 
 `QualifiedLeadPublisher` et `RoutedLeadPublisher` annoncent tous deux « dette assumée : aucun
 filet de republication » et la reportent à F6. Remplacer ces paragraphes par un renvoi vers
 le filet qui existe désormais — une dette soldée qui reste écrite dans le code est un
 mensonge que la prochaine session croira.
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd backend && ./mvnw test -Dtest=QualifiedLeadRelayTest+RoutedLeadRelayTest`
 puis `./mvnw test`

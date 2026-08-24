@@ -14,6 +14,13 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     /** Verifie qu'un evenement brut rejoue n'a pas deja produit son lead. */
     Optional<Lead> findByRawEventId(UUID rawEventId);
 
+    /**
+     * Leads restes dans un etat depuis plus longtemps que le seuil. Balayage borne depuis
+     * F4 : un lead quitte reellement QUALIFIED puis ROUTED, ce qui n'etait pas le cas avant
+     * et rendait ce filet impossible a ecrire sans republier la table entiere en boucle.
+     */
+    List<Lead> findByStatusAndCreatedAtBefore(LeadStatus status, Instant limite);
+
     /** Deduplication de F3 : meme client, meme email, dans une fenetre temporelle. */
     boolean existsByClientIdAndEmailAndCreatedAtAfter(UUID clientId, String email, Instant depuis);
 
