@@ -21,6 +21,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/leads/leads').then((m) => m.Leads),
   },
   {
+    path: 'leads/:id',
+    title: 'Detail du lead',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/leads/lead-detail/lead-detail').then((m) => m.LeadDetail),
+  },
+  {
     path: 'queue',
     title: "File d'attente",
     canActivate: [authGuard],

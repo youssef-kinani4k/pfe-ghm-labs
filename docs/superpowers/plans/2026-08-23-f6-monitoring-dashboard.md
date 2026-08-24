@@ -5534,7 +5534,7 @@ nouvelle requête. Il faut l'écrire explicitement parce que la plupart des exem
 un `MatTableDataSource` sur un tableau complet — appliqué à une page déjà paginée par le
 serveur, cela paginerait en mémoire une page et afficherait des totaux faux.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```ts
 import { TestBed } from '@angular/core/testing';
@@ -5587,12 +5587,12 @@ describe('LeadApi', () => {
 });
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 Expected: FAIL — `LeadApi` n'existe pas.
 
-- [ ] **Step 3: Écrire `LeadApi` et `ClientApi`**
+- [x] **Step 3: Écrire `LeadApi` et `ClientApi`**
 
 ```ts
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -5654,13 +5654,13 @@ export class LeadApi {
 
 `ClientApi` : `clients()` et `commerciaux(clientId)`, deux `GET` sans paramètre.
 
-- [ ] **Step 4: Écrire le badge de statut partagé**
+- [x] **Step 4: Écrire le badge de statut partagé**
 
 Un composant `shared/status-badge/` qui prend un `status` en entrée et rend une pastille
 colorée. Les cinq statuts de lead et les trois du journal passent par lui : la couleur d'un
 statut est une décision d'interface, et la répéter dans quatre écrans la ferait diverger.
 
-- [ ] **Step 5: Écrire l'écran de liste**
+- [x] **Step 5: Écrire l'écran de liste**
 
 ```ts
 import { Component, inject, signal } from '@angular/core';
@@ -5736,7 +5736,7 @@ La barre de filtres : client (liste déroulante alimentée par `ClientApi`), sta
 (multi-sélection), score minimal, recherche libre, plage de dates. Chaque changement appelle
 `appliqueFiltres`.
 
-- [ ] **Step 6: Écrire l'écran de détail**
+- [x] **Step 6: Écrire l'écran de détail**
 
 `/leads/:id` plutôt qu'un `mat-dialog` : une URL partageable vaut mieux qu'une modale, en
 exploitation comme en démonstration. Trois blocs, dans l'ordre où on les lit quand on
@@ -5744,7 +5744,7 @@ diagnostique : le lead et son commercial, l'historique `crm_sync_attempt` du plu
 plus ancien, et l'événement brut avec **sa charge utile JSON**. C'est ce dernier bloc qui
 répond à « pourquoi ce lead n'a pas de téléphone » sans ouvrir `psql`.
 
-- [ ] **Step 7: Vérifier et committer**
+- [x] **Step 7: Vérifier et committer**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 puis `npm run build`
@@ -5762,6 +5762,19 @@ vaut mieux en exploitation comme en demonstration."
 ```
 
 ---
+
+### Ecarts constates a l'execution de T14
+
+- La route `/leads/:id`, reportee de T13, est posee ici, avec le composant qu'elle charge.
+- **`clientName` et `salesRepName` ne sont pas triables** : le service les resout apres coup
+  par une seconde lecture, ils n'existent pas comme proprietes de l'entite `Lead`, et un
+  `sort=clientName` ferait rendre 500 par Spring Data. Leurs en-tetes ne portent donc pas
+  `mat-sort-header`.
+- `LeadApi.liste` traite aussi le **tableau vide** comme une absence : « aucun statut coche »
+  veut dire « tous », et envoyer `status` vide laisserait construire un `status in ()`.
+  Un test le verrouille, en plus des trois du plan.
+- Les erreurs de chargement s'affichent : une table vide apres une panne ressemble a
+  « aucun lead », ce qui est un diagnostic faux sur un ecran de supervision.
 
 ## Task 15: Dashboard et flux temps réel
 
