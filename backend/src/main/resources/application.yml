@@ -1,3 +1,9 @@
+server:
+  # 8090 et non 8080 : le port par defaut de Tomcat est occupe en permanence sur le poste
+  # de developpement du projet, et un port choisi vaut mieux qu'un demarrage qui echoue une
+  # fois sur deux. Surchargeable par SERVER_PORT pour tout autre environnement.
+  port: ${SERVER_PORT:8090}
+
 spring:
   application:
     name: leadflow-backend
@@ -52,6 +58,17 @@ leadflow:
     # Cle AES-256 en base64 sur 32 octets. Aucune valeur de repli : l'application
     # doit refuser de demarrer plutot que de chiffrer avec une cle devinable.
     master-key: ${LEADFLOW_MASTER_KEY:}
+  dashboard:
+    # Cle de signature du jeton de session. Aucune valeur de repli, comme la cle maitre :
+    # l'application doit refuser de demarrer plutot que de signer avec un secret devinable.
+    jwt-secret: ${LEADFLOW_JWT_SECRET:}
+    # Huit heures, sans rafraichissement : a l'expiration, retour a l'ecran de connexion.
+    token-ttl: 8h
+    users:
+      - username: ${LEADFLOW_ADMIN_USER:admin}
+        # Hash BCrypt, jamais le mot de passe, meme ici. Genere par exemple avec
+        # htpasswd -bnBC 10 "" 'mot-de-passe' | tr -d ':\n'
+        password-hash: ${LEADFLOW_ADMIN_PASSWORD_HASH:}
   webhook:
     signature-header: X-Leadflow-Signature
     # Fenetre de tolerance anti-rejeu sur l'horodatage de la requete, dans les deux sens.
@@ -74,6 +91,21 @@ leadflow:
       # Presence du consommateur de leadflow.leads.qualified. Toujours vrai en production ;
       # la suite de tests le retire pour lire elle-meme ce que la qualification a publie.
       enabled: true
+  monitoring:
+    deadletter:
+      listener:
+        # Presence du consommateur de la DLQ. Toujours vrai en production ; la suite de
+        # tests le retire, sauf la ou elle l'eprouve.
+        enabled: true
+    stream:
+      listener:
+        enabled: true
+      emitter-timeout: 30m
+      heartbeat-interval: 20s
+    relay:
+      qualified-after: 2m
+      routed-after: 2m
+      interval: 30s
   intent:
     gemini:
       enabled: true

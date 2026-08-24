@@ -174,6 +174,12 @@ communs à toutes les instances d'un même ERP.
 
 ---
 
+> **Ces variables ne concernent que les tests d'intégration ERP.** Celles du dashboard —
+> `LEADFLOW_JWT_SECRET`, `LEADFLOW_ADMIN_USER`, `LEADFLOW_ADMIN_PASSWORD_HASH` — et la
+> production d'un hash BCrypt sont documentées dans `docs/monitoring-api.md`. Les paramètres
+> de connexion aux ERP en exploitation, eux, ne sont dans aucun fichier : ils vivent chiffrés
+> dans `client.crm_config`, ligne par ligne.
+
 ## 5. Variables d'environnement des tests
 
 ```bash

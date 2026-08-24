@@ -1,0 +1,147 @@
+<a matButton routerLink="/leads" class="detail__retour">
+  <mat-icon>arrow_back</mat-icon>
+  Retour aux leads
+</a>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement du lead" />
+}
+
+@if (erreur(); as message) {
+  <p class="detail__erreur" role="alert">{{ message }}</p>
+}
+
+@if (lead(); as lead) {
+  <article class="detail">
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="detail__titre">
+          {{ lead.companyName || lead.email }}
+          <app-status-badge [status]="lead.status" />
+        </mat-card-title>
+        <mat-card-subtitle>
+          {{ lead.clientName }} · recu le {{ lead.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <dl class="champs">
+          <div class="champs__paire">
+            <dt>Contact</dt>
+            <dd>{{ lead.firstName }} {{ lead.lastName }}</dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Email</dt>
+            <dd>{{ lead.email }}</dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Telephone</dt>
+            <dd>{{ lead.phone || '—' }}</dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Intention</dt>
+            <dd>
+              {{ lead.detectedIntent || '—' }}
+              @if (lead.intentSource) {
+                <span class="detail__source">{{ lead.intentSource }}</span>
+              }
+            </dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Score</dt>
+            <dd class="lf-mono">{{ lead.score }}</dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Pays / secteur</dt>
+            <dd>{{ lead.countryCode || '—' }} · {{ lead.sector || '—' }}</dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Commercial</dt>
+            <dd>
+              @if (lead.salesRep; as commercial) {
+                {{ commercial.fullName }} — {{ commercial.email }}
+              } @else {
+                Non attribue
+              }
+            </dd>
+          </div>
+        </dl>
+
+        @if (lead.message) {
+          <mat-divider />
+          <p class="detail__message">{{ lead.message }}</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="detail__sous-titre">Synchronisations ERP</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (tentatives().length === 0) {
+          <p class="detail__vide">Aucune tentative de synchronisation.</p>
+        } @else {
+          <ol class="tentatives">
+            @for (tentative of tentatives(); track tentative.id) {
+              <li class="tentatives__ligne">
+                <div class="tentatives__entete">
+                  <app-status-badge [status]="tentative.status" />
+                  <span class="tentatives__fournisseur">{{ tentative.providerId }}</span>
+                  <span class="tentatives__date">
+                    {{ tentative.attemptedAt | date: 'dd/MM/yyyy HH:mm:ss' }}
+                  </span>
+                </div>
+                <p class="tentatives__refs lf-mono">
+                  tiers {{ tentative.accountRef || '—' }} · contact
+                  {{ tentative.contactRef || '—' }} · opportunite
+                  {{ tentative.opportunityRef || '—' }} · tache {{ tentative.taskRef || '—' }}
+                </p>
+                @if (tentative.errorMessage) {
+                  <p class="tentatives__erreur">{{ tentative.errorMessage }}</p>
+                }
+              </li>
+            }
+          </ol>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="detail__sous-titre">Evenement d'origine</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (lead.rawEvent; as evenement) {
+          <dl class="champs">
+            <div class="champs__paire">
+              <dt>Statut</dt>
+              <dd><app-status-badge [status]="evenement.status" /></dd>
+            </div>
+            <div class="champs__paire">
+              <dt>Source</dt>
+              <dd>{{ evenement.source || '—' }}</dd>
+            </div>
+            <div class="champs__paire">
+              <dt>Recu le</dt>
+              <dd>{{ evenement.receivedAt | date: 'dd/MM/yyyy HH:mm:ss' }}</dd>
+            </div>
+            @if (evenement.failureReason) {
+              <div class="champs__paire">
+                <dt>Cause d'echec</dt>
+                <dd class="detail__cause">{{ evenement.failureReason }}</dd>
+              </div>
+            }
+          </dl>
+
+          @if (payload(); as charge) {
+            <!-- La charge brute repond a « pourquoi ce champ est vide » sans ouvrir psql. -->
+            <pre class="detail__payload">{{ charge }}</pre>
+          }
+        } @else {
+          <p class="detail__vide">Evenement d'origine introuvable.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  </article>
+}

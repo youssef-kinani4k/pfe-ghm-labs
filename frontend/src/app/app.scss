@@ -1,40 +1,55 @@
 :host {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  padding: 0 1.5rem;
-  height: 3.5rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+.app-barre {
+  position: relative;
+  z-index: 2;
+  gap: var(--lf-space-1);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+  background: var(--mat-sys-surface);
 
-  &__brand {
+  &__marque {
+    font-family: 'Fira Sans', Roboto, sans-serif;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
   }
 
-  &__nav {
-    display: flex;
-    gap: 1.25rem;
+  &__espace {
+    flex: 1;
+  }
 
-    a {
-      color: var(--text-muted);
-      text-decoration: none;
-
-      &.is-active {
-        color: var(--text);
-        font-weight: 500;
-      }
-    }
+  &__operateur {
+    font-size: 0.875rem;
+    color: var(--mat-sys-on-surface-variant);
   }
 }
 
-.app-main {
+.app-corps {
   flex: 1;
-  padding: 1.5rem;
+  min-height: 0;
+  background: var(--mat-sys-surface-container);
+}
+
+.app-menu {
+  width: 15rem;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+.app-contenu {
+  padding: var(--lf-space-4);
+}
+
+// Sous 900px le menu prendrait la moitie de la largeur utile : il passe en superposition,
+// ferme par defaut, et le bouton de la barre reste le seul moyen de l'ouvrir.
+@media (max-width: 900px) {
+  .app-menu {
+    width: 13rem;
+  }
+
+  .app-contenu {
+    padding: var(--lf-space-3);
+  }
 }

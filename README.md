@@ -12,10 +12,11 @@ implementer une interface, sans toucher au reste du pipeline.
 
 1. **Capture** — webhook signe HMAC-SHA256, payload persiste puis publie sur RabbitMQ.
 2. **Qualification** — nettoyage email/telephone, deduplication, analyse d'intention (NLP), scoring.
-3. **Routage & synchronisation** — creation du tiers, du contact et de l'opportunite dans
-   l'ERP via le connecteur configure, attribution du commercial (geo, secteur ou
-   round-robin), tache d'agenda et alerte lead chaud.
-4. **Monitoring** — dashboard Angular : flux temps reel, conversion, etat de la file et de la DLQ.
+3. **Routage & synchronisation** — attribution du commercial (geo, secteur ou round-robin),
+   puis creation du tiers, du contact et de l'opportunite dans l'ERP via le connecteur
+   configure. La tache d'agenda et l'alerte lead chaud restent a ecrire.
+4. **Monitoring** — API REST authentifiee par jeton et dashboard Angular : flux temps reel,
+   conversion, etat des files, journal des messages morts rejouable, sante des connecteurs.
 
 ## Stack
 
@@ -34,5 +35,18 @@ cp .env.example .env          # renseigner LEADFLOW_MASTER_KEY (openssl rand -ba
 docker compose up -d          # Postgres + RabbitMQ
 # ERP de test au besoin : docker compose --profile dolibarr up -d  (ou --profile odoo)
 cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-cd frontend && npm start      # http://localhost:4200, proxy /api -> :8080
+cd frontend && npm start      # http://localhost:4200, proxy /api -> :8090
 ```
+
+Le profil `dev` porte un compte de demonstration : **`admin` / `leadflow-demo-2026`**. Hors
+`dev`, le compte et la cle de signature des jetons viennent de l'environnement — voir
+`docs/monitoring-api.md`.
+
+## Documentation
+
+| Document                       | Contenu                                              |
+| ------------------------------ | ---------------------------------------------------- |
+| `docs/webhook-integration.md`  | Contrat du webhook de capture, signature HMAC        |
+| `docs/monitoring-api.md`       | API du dashboard : jeton, lecture, rejeu, flux SSE   |
+| `docs/erp-integration-setup.md`| Mise en route de Dolibarr et Odoo pour les tests     |
+| `CLAUDE.md`                    | Architecture et invariants a ne pas casser           |

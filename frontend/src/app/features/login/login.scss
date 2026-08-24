@@ -1,0 +1,39 @@
+.login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--lf-space-4);
+  background: var(--mat-sys-surface-container);
+
+  &__carte {
+    width: 100%;
+    max-width: 24rem;
+    overflow: hidden;
+  }
+
+  &__entete {
+    padding-top: var(--lf-space-4);
+  }
+
+  &__titre {
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  &__formulaire {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lf-space-1);
+    padding-top: var(--lf-space-3);
+  }
+
+  // La zone d'erreur garde sa hauteur meme vide : l'apparition du message ne doit pas
+  // deplacer le bouton sous le curseur au moment ou l'on s'appretait a cliquer.
+  &__erreur {
+    min-height: 1.25rem;
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+    font-size: 0.875rem;
+  }
+}

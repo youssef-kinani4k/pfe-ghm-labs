@@ -1,0 +1,29 @@
+.badge {
+  display: inline-block;
+  padding: 0.125rem var(--lf-space-1);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+
+  &--succes {
+    color: var(--lf-succes);
+    background: var(--lf-succes-fond);
+  }
+
+  &--attente {
+    color: var(--lf-attente);
+    background: var(--lf-attente-fond);
+  }
+
+  &--echec {
+    color: var(--lf-echec);
+    background: var(--lf-echec-fond);
+  }
+
+  &--neutre {
+    color: var(--lf-neutre);
+    background: var(--lf-neutre-fond);
+  }
+}

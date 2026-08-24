@@ -2,16 +2,22 @@ package com.leadflow.config;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.retry.MessageRecoverer;
+import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import java.util.stream.Stream;
 
 /**
  * Topologie du broker. Le webhook publie dans {@link #LEADS_QUEUE} et rend la main
@@ -32,6 +38,17 @@ public class RabbitMQConfig {
     /** Sortie du routage, consommee par la synchronisation ERP. */
     public static final String ROUTED_QUEUE = "leadflow.leads.routed";
     public static final String ROUTED_ROUTING_KEY = "lead.routed";
+
+    /** Sortie de la synchronisation ERP. Aucun consommateur metier : le monitoring seul. */
+    public static final String SYNCED_ROUTING_KEY = "lead.synced";
+
+    /**
+     * File d'observation du monitoring. Distincte des files metier : un DirectExchange
+     * livre a TOUTES les files liees a une cle, et la concurrence entre consommateurs ne
+     * joue qu'au sein d'une meme file. Le monitoring observe donc sans qu'aucune ligne du
+     * routage ou de la qualification ne bouge.
+     */
+    public static final String MONITORING_QUEUE = "leadflow.monitoring.events";
 
     public static final String DLX_EXCHANGE = "leadflow.leads.dlx";
     public static final String DLQ_QUEUE = "leadflow.leads.dlq";
@@ -108,7 +125,8 @@ public class RabbitMQConfig {
      * contrat de file dans un autre paquet doit l'ajouter ici.
      */
     private static final String[] PAQUETS_DE_CONFIANCE =
-            {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing"};
+            {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing",
+                    "com.leadflow.crm"};
 
     /**
      * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par
@@ -129,5 +147,83 @@ public class RabbitMQConfig {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(converter);
         return template;
+    }
+
+    /**
+     * Remplace le rejet par defaut a l'epuisement des trois tentatives : Spring AMQP
+     * republie lui-meme le message vers la DLX en ajoutant {@code x-exception-message},
+     * {@code x-exception-stacktrace}, {@code x-original-exchange} et
+     * {@code x-original-routingKey}.
+     *
+     * <p>Deux gains, tous deux indispensables a l'ecran : la <b>cause</b> de l'echec, que
+     * l'en-tete {@code x-death} pose par le broker ne contient pas — il ne dit que
+     * « rejected » — et la <b>cle de routage d'origine explicite</b>, celle dont le rejeu a
+     * besoin, au lieu d'etre deduite de {@code x-death}.
+     *
+     * <p>S'applique identiquement aux trois etapes du pipeline, sans changer une ligne de
+     * leur code.
+     */
+    @Bean
+    MessageRecoverer messageRecoverer(RabbitTemplate rabbitTemplate) {
+        return new RepublishMessageRecoverer(rabbitTemplate, DLX_EXCHANGE, DLQ_ROUTING_KEY);
+    }
+
+    /**
+     * Fabrique dediee au consommateur de la DLQ. Elle differe de la fabrique par defaut sur
+     * un point : {@code defaultRequeueRejected = true}.
+     *
+     * <p>La DLQ n'a elle-meme aucune DLX. Acquitter un message qu'on n'a pas su journaliser
+     * — Postgres indisponible — le perdrait definitivement ; le remettre en file le fera
+     * reprendre quand la base reviendra. Le risque de boucle chaude est assume : si Postgres
+     * est a terre, l'application entiere l'est.
+     */
+    @Bean
+    SimpleRabbitListenerContainerFactory deadLetterListenerContainerFactory(
+            ConnectionFactory connectionFactory) {
+        SimpleRabbitListenerContainerFactory fabrique = new SimpleRabbitListenerContainerFactory();
+        fabrique.setConnectionFactory(connectionFactory);
+        fabrique.setDefaultRequeueRejected(true);
+        // Un seul consommateur : le journal n'est pas un goulot, et la sequence des morts
+        // reste lisible.
+        fabrique.setConcurrentConsumers(1);
+        fabrique.setMaxConcurrentConsumers(1);
+        return fabrique;
+    }
+
+    /**
+     * Expose l'administration du broker sous son type concret. Spring Boot en declare bien
+     * une, mais sous le type {@code AmqpAdmin}, qui ne porte pas {@code getQueueInfo} : le
+     * monitoring lit la profondeur et le nombre de consommateurs par un {@code
+     * queue.declare} passif, et a donc besoin du type concret.
+     */
+    @Bean
+    RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
+        return new RabbitAdmin(connectionFactory);
+    }
+
+    /**
+     * <b>Pas de DLX.</b> Un echec d'affichage n'est pas un echec de lead et n'a rien a faire
+     * dans le journal des morts.
+     */
+    @Bean
+    Queue monitoringEventsQueue() {
+        return QueueBuilder.durable(MONITORING_QUEUE).build();
+    }
+
+    /**
+     * Un {@code Declarables} et non une {@code List<Binding>} : RabbitAdmin ne parcourt que
+     * le premier type a la declaration, une liste nue serait ignoree en silence — et la
+     * file d'observation resterait vide sans qu'aucune erreur ne le dise.
+     */
+    @Bean
+    Declarables monitoringEventsBindings(
+            Queue monitoringEventsQueue, DirectExchange leadsExchange) {
+        return new Declarables(Stream.of(
+                        LEADS_ROUTING_KEY,
+                        QUALIFIED_ROUTING_KEY,
+                        ROUTED_ROUTING_KEY,
+                        SYNCED_ROUTING_KEY)
+                .map(cle -> BindingBuilder.bind(monitoringEventsQueue).to(leadsExchange).with(cle))
+                .toList());
     }
 }

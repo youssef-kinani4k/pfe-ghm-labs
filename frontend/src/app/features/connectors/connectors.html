@@ -1,2 +1,129 @@
-<h1>Connecteurs ERP</h1>
-<p>Fournisseurs actifs (Dolibarr, Odoo, ...), etat de connexion et derniere synchronisation.</p>
+<header class="connecteurs__entete">
+  <h1 class="connecteurs__titre">Connecteurs ERP</h1>
+  <button matButton type="button" (click)="charge()">
+    <mat-icon>refresh</mat-icon>
+    Rafraichir
+  </button>
+</header>
+
+<p class="connecteurs__note">
+  Cet etat se lit dans les traces de synchronisation : aucun ERP n'est contacte pour
+  l'afficher.
+</p>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement des connecteurs" />
+}
+
+@if (erreur(); as message) {
+  <p class="connecteurs__erreur" role="alert">{{ message }}</p>
+}
+
+<section class="connecteurs">
+  @for (connecteur of connecteurs(); track connecteur.providerId) {
+    @let etatCourant = etat(connecteur);
+
+    <mat-card appearance="outlined" class="carte" [class]="'carte--' + etatCourant">
+      <mat-card-header class="carte__entete">
+        <mat-card-title class="carte__titre lf-mono">{{ connecteur.providerId }}</mat-card-title>
+        <!-- Icone et libelle accompagnent la couleur : le rouge seul ne se distingue pas
+             pour tous les lecteurs, et l'ecran s'imprime aussi en noir et blanc. -->
+        <p class="carte__etat">
+          <mat-icon>{{ icone(etatCourant) }}</mat-icon>
+          {{ libelle(etatCourant) }}
+        </p>
+      </mat-card-header>
+
+      <mat-card-content>
+        @if (etatCourant === 'anomalie') {
+          <p class="carte__anomalie">
+            Ce fournisseur est active en configuration, mais aucun adaptateur ne porte cet
+            identifiant : toute synchronisation qui le vise echouera.
+          </p>
+        }
+
+        <dl class="mesures">
+          <div class="mesures__paire">
+            <dt>Succes</dt>
+            <dd class="lf-mono">{{ connecteur.successCount }}</dd>
+          </div>
+          <div class="mesures__paire">
+            <dt>Echecs</dt>
+            <dd class="lf-mono">{{ connecteur.failureCount }}</dd>
+          </div>
+          <div class="mesures__paire">
+            <dt>Dernier succes</dt>
+            <dd>
+              {{
+                connecteur.lastSuccessAt
+                  ? (connecteur.lastSuccessAt | date: 'dd/MM/yyyy HH:mm')
+                  : '—'
+              }}
+            </dd>
+          </div>
+          <div class="mesures__paire">
+            <dt>Dernier echec</dt>
+            <dd>
+              {{
+                connecteur.lastFailureAt
+                  ? (connecteur.lastFailureAt | date: 'dd/MM/yyyy HH:mm')
+                  : '—'
+              }}
+            </dd>
+          </div>
+        </dl>
+
+        @if (etatCourant === 'echec' && connecteur.lastFailureMessage) {
+          <p class="carte__motif">{{ connecteur.lastFailureMessage }}</p>
+        }
+
+        @if (connecteur.parClient.length > 0) {
+          <mat-accordion>
+            <mat-expansion-panel class="detail-client">
+              <mat-expansion-panel-header>
+                <mat-panel-title>Detail par client</mat-panel-title>
+                <mat-panel-description>
+                  {{ connecteur.parClient.length }} client(s)
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <!-- C'est ici qu'on voit qu'un seul client casse pendant que les autres
+                   passent : le probleme est alors dans son crm_config, pas dans
+                   l'adaptateur. -->
+              <ul class="clients">
+                @for (activite of connecteur.parClient; track activite.clientId) {
+                  <li class="clients__ligne">
+                    <span class="clients__nom">{{ activite.clientName }}</span>
+                    <span class="clients__succes lf-mono">{{ activite.successCount }} ok</span>
+                    <span
+                      class="clients__echecs lf-mono"
+                      [class.clients__echecs--vifs]="activite.failureCount > 0"
+                    >
+                      {{ activite.failureCount }} ko
+                    </span>
+                    <span class="clients__date">
+                      {{
+                        activite.lastAttemptAt
+                          ? (activite.lastAttemptAt | date: 'dd/MM/yyyy HH:mm')
+                          : '—'
+                      }}
+                    </span>
+                  </li>
+                }
+              </ul>
+            </mat-expansion-panel>
+          </mat-accordion>
+        } @else {
+          <p class="vide">Aucun client n'a encore utilise ce connecteur.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  } @empty {
+    @if (!enCours() && !erreur()) {
+      <p class="vide">
+        Aucun connecteur n'est declare. Ajouter un fournisseur sous
+        <span class="lf-mono">leadflow.crm.providers</span> le fera apparaitre ici.
+      </p>
+    }
+  }
+</section>

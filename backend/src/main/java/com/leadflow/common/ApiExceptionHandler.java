@@ -1,5 +1,9 @@
 package com.leadflow.common;
 
+import com.leadflow.common.auth.DashboardAuthenticationException;
+import com.leadflow.monitoring.RessourceIntrouvableException;
+import com.leadflow.monitoring.deadletter.DejaTraiteException;
+import com.leadflow.monitoring.deadletter.RejeuIndisponibleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -31,5 +35,29 @@ public class ApiExceptionHandler {
     @ExceptionHandler(PayloadRejectedException.class)
     ProblemDetail corpsRefuse(PayloadRejectedException echec) {
         return ProblemDetail.forStatusAndDetail(echec.statut(), echec.getMessage());
+    }
+
+    @ExceptionHandler(RessourceIntrouvableException.class)
+    ProblemDetail ressourceIntrouvable(RessourceIntrouvableException echec) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, echec.getMessage());
+    }
+
+    /** Meme reponse pour un identifiant inconnu et un mot de passe faux (cf. AuthController). */
+    @ExceptionHandler(DashboardAuthenticationException.class)
+    ProblemDetail refusDeConnexion(DashboardAuthenticationException echec) {
+        log.warn("Connexion au dashboard refusee");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
+    }
+
+    @ExceptionHandler(DejaTraiteException.class)
+    ProblemDetail dejaTraite(DejaTraiteException echec) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, echec.getMessage());
+    }
+
+    @ExceptionHandler(RejeuIndisponibleException.class)
+    ProblemDetail rejeuIndisponible(RejeuIndisponibleException echec) {
+        log.warn("Rejeu impossible : broker injoignable", echec);
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, echec.getMessage());
     }
 }

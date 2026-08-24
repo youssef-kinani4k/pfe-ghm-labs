@@ -1,2 +1,206 @@
-<h1>Flux des leads</h1>
-<p>Volume entrant, taux de conversion et alertes leads chauds.</p>
+<header class="tableau__entete">
+  <h1 class="tableau__titre">Flux des leads</h1>
+
+  <mat-form-field appearance="outline" class="tableau__client">
+    <mat-label>Client</mat-label>
+    <mat-select [(ngModel)]="clientId" name="clientId" (selectionChange)="changeClient()">
+      <mat-option [value]="undefined">Tous</mat-option>
+      @for (client of clients(); track client.id) {
+        <mat-option [value]="client.id">{{ client.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <!-- Un seul message d'etat pour tout l'ecran : une region vivante par compteur se
+       disputerait la parole du lecteur d'ecran. -->
+  <p class="tableau__etat" role="status" aria-atomic="true">
+    @if (flux.connecte()) {
+      <span class="tableau__pastille tableau__pastille--vif"></span>
+      Flux connecte
+    } @else {
+      <span class="tableau__pastille"></span>
+      Flux interrompu, reconnexion en cours
+    }
+    @if (calculeesA(); as instant) {
+      · chiffres arretes a {{ instant | date: 'HH:mm:ss' }}
+    }
+  </p>
+
+  <button matButton type="button" (click)="charge()">
+    <mat-icon>refresh</mat-icon>
+    Rafraichir
+  </button>
+</header>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement des statistiques" />
+}
+
+@if (erreur(); as message) {
+  <p class="tableau__erreur" role="alert">{{ message }}</p>
+}
+
+<section class="compteurs" aria-label="Compteurs du pipeline">
+  <mat-card appearance="outlined" class="compteurs__carte compteurs__carte--vedette">
+    <p class="compteurs__libelle">Leads traites</p>
+    <p class="compteurs__valeur">{{ stats()?.total ?? 0 }}</p>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="compteurs__carte compteurs__carte--vedette">
+    <p class="compteurs__libelle">Taux de conversion</p>
+    <!-- Le backend rend un ratio dans [0,1], pas un pourcentage : la conversion en
+         centiemes se fait ici, au seul endroit qui ajoute le signe %. -->
+    <p class="compteurs__valeur">
+      {{ ((stats()?.tauxDeConversion ?? 0) * 100 | number: '1.0-1') }}%
+    </p>
+    <p class="compteurs__note">Part des leads synchronises dans l'ERP</p>
+  </mat-card>
+
+  @for (statut of statuts; track statut) {
+    <mat-card appearance="outlined" class="compteurs__carte">
+      <app-status-badge [status]="statut" />
+      <p class="compteurs__valeur compteurs__valeur--petite">{{ compte(statut) }}</p>
+    </mat-card>
+  }
+</section>
+
+<div class="grille">
+  <section class="grille__colonne">
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="grille__titre">Intentions detectees</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @for (part of intentions(); track part.cle) {
+          <div class="part">
+            <div class="part__ligne">
+              <span>{{ part.libelle }}</span>
+              <span class="lf-mono">{{ part.valeur }}</span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="part.pourcentage" />
+          </div>
+        } @empty {
+          <p class="vide">Aucune intention detectee pour l'instant.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="grille__titre">Origine de l'analyse</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @for (part of sources(); track part.cle) {
+          <div class="part">
+            <div class="part__ligne">
+              <span>{{ part.libelle === 'GEMINI' ? 'Modele Gemini' : 'Lexique de repli' }}</span>
+              <span class="lf-mono">{{ part.valeur }}</span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="part.pourcentage" />
+          </div>
+        } @empty {
+          <p class="vide">Aucun lead analyse pour l'instant.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="grille__titre">Charge par commercial</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @for (part of commerciaux(); track part.cle) {
+          <div class="part">
+            <div class="part__ligne">
+              <span>{{ part.libelle }}</span>
+              <span class="lf-mono">{{ part.valeur }}</span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="part.pourcentage" />
+          </div>
+        } @empty {
+          <p class="vide">Aucun lead attribue pour l'instant.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="grille__titre">Evenements de capture</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @for (part of evenements(); track part.cle) {
+          <div class="part">
+            <div class="part__ligne">
+              <app-status-badge [status]="part.cle" />
+              <span class="lf-mono">{{ part.valeur }}</span>
+            </div>
+            <mat-progress-bar mode="determinate" [value]="part.pourcentage" />
+          </div>
+        } @empty {
+          <p class="vide">Aucun evenement recu pour l'instant.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  <section class="grille__colonne grille__colonne--flux">
+    <mat-card appearance="outlined">
+      <mat-card-header class="flux__entete">
+        <mat-card-title class="grille__titre">Ce qui bouge</mat-card-title>
+        <button matButton type="button" (click)="basculeLaPause()">
+          <mat-icon>{{ enPause() ? 'play_arrow' : 'pause' }}</mat-icon>
+          {{ enPause() ? 'Reprendre' : 'Suspendre' }}
+        </button>
+      </mat-card-header>
+      <mat-card-content>
+        @if (enPause()) {
+          <p class="vide">
+            Rafraichissement des chiffres suspendu. Le flux continue d'alimenter la liste.
+          </p>
+        }
+        @for (evenement of flux.derniersLeads(); track $index) {
+          <!-- La capture n'a pas encore d'identifiant de lead : la ligne s'affiche, mais
+               elle ne mene nulle part tant que la qualification n'a pas eu lieu. -->
+          @if (evenement.leadId; as identifiant) {
+            <a class="evenement" [routerLink]="['/leads', identifiant]">
+              <app-status-badge [status]="evenement.status" />
+              <span class="evenement__id lf-mono">{{ identifiant.slice(0, 8) }}</span>
+              @if (evenement.score !== null) {
+                <span class="evenement__score lf-mono">{{ evenement.score }}</span>
+              }
+              <span class="evenement__heure">{{ evenement.occurredAt | date: 'HH:mm:ss' }}</span>
+            </a>
+          } @else {
+            <div class="evenement">
+              <app-status-badge [status]="evenement.status" />
+              <span class="evenement__id">evenement brut</span>
+              <span class="evenement__heure">{{ evenement.occurredAt | date: 'HH:mm:ss' }}</span>
+            </div>
+          }
+        } @empty {
+          <p class="vide">
+            Rien n'est encore passe depuis l'ouverture de cet ecran. Les leads apparaissent
+            ici des qu'un formulaire est soumis.
+          </p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title class="grille__titre">Morts recentes</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @for (mort of flux.dernieresMorts(); track mort.id) {
+          <div class="evenement">
+            <app-status-badge [status]="mort.status" />
+            <span class="evenement__id lf-mono">{{ mort.originQueue }}</span>
+            <span class="evenement__heure">{{ mort.deadAt | date: 'HH:mm:ss' }}</span>
+          </div>
+        } @empty {
+          <p class="vide">Aucun message mort depuis l'ouverture de cet ecran.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+</div>

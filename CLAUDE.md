@@ -68,13 +68,18 @@ docker compose down -v                    # remet la base a zero (rejoue les mig
 ### Backend
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # :8080, logs SQL + DEBUG
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev   # :8090, logs SQL + DEBUG
 ./mvnw test                                             # toute la suite
 ./mvnw test -Dtest=HmacSignatureVerifierTest            # une classe
 ./mvnw test -Dtest=HmacSignatureVerifierTest#rejectsExpiredTimestamp   # une methode
 ./mvnw verify                                           # tests + package
 ./mvnw spring-boot:test-run                             # lance l'app avec Testcontainers
 ```
+
+**Le backend ecoute sur `:8090`, pas sur `:8080`.** Le port par defaut de Tomcat est occupe
+en permanence sur le poste de developpement du projet ; le choisir explicitement evite un
+demarrage qui echoue une fois sur deux. Il se surcharge par `SERVER_PORT`, et
+`frontend/proxy.conf.json` vise ce meme port — les deux se changent ensemble.
 
 **Le daemon Docker doit tourner pour `./mvnw test`** : `BackendApplicationTests` importe
 `TestcontainersConfiguration`, qui demarre Postgres et RabbitMQ en conteneurs. Sans Docker,
@@ -210,10 +215,48 @@ du client se voie.
 puis DLQ. C'est le seul echec du routage qui merite la DLQ, parce qu'un humain peut le
 reparer : activer un commercial, puis rejouer.
 
+### Monitoring — l'observateur
+
+Le contrat complet de l'API, avec exemples `curl` et reponses, vit dans
+`docs/monitoring-api.md`.
+
+**Le monitoring est un observateur.** Il lit les tables des autres etapes par ses propres
+repositories en lecture seule, n'ecrit que `dead_letter`, et ne publie qu'un rejeu de message
+mort. `LeadQueryRepository` etend `Repository` nu et non `JpaRepository` : aucune methode
+d'ecriture n'est meme exposee. Une modification qui ferait ecrire `monitoring/` dans `lead`,
+`raw_lead_event` ou `crm_sync_attempt` casse cette separation.
+
+**Aucune entite JPA ne franchit la frontiere HTTP.** `Client` porte `hmacSecret` et
+`crmConfig` **dechiffres a la lecture** par les `AttributeConverter` : serialiser l'entite
+publierait le secret en clair. Toute reponse passe par un `record` de `monitoring/dto/`, et
+un test l'asserte sur le corps JSON — pas sur le DTO, qui ne prouverait rien.
+
+**La file d'observation ne vole aucun message.** `leadflow.monitoring.events` est liee aux
+memes routing keys que les files metier ; un `DirectExchange` livre a **toutes** les files
+liees a une cle, donc le pipeline continue de recevoir ce qu'il recevait. Elle n'a pas de DLX :
+un echec d'affichage n'est pas un echec de lead.
+
+**Les filets de republication vivent dans `qualification/` et `routing/`**, pas dans
+`monitoring/` : ils publient sur le pipeline, ils ne l'observent pas. `QualifiedLeadRelay` et
+`RoutedLeadRelay` ignorent les leads portant une mort `PENDING`, sans quoi un echec permanent
+deviendrait une inondation — le filet republierait a chaque tour ce que la DLQ vient de tuer.
+
+**Le dashboard est une console d'agence.** Un seul modele d'utilisateur, aucun role, et le
+tenant est un **filtre de requete** (`?clientId=`), jamais une donnee portee par le jeton.
+Ouvrir le dashboard aux clients finaux demanderait d'abord de porter le tenant dans le jeton
+et de filtrer cote serveur — ce n'est pas une extension de l'existant.
+
+**Le flux temps reel ne passe pas par `EventSource`** : il ne sait pas poser d'en-tete
+`Authorization`, et mettre le jeton en parametre d'URL le ferait apparaitre dans tous les
+journaux d'acces. Le frontend lit `/api/stream/leads` par `fetch` + `ReadableStream`.
+
+**Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
+service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
+
 ### Frontend
 
 ```bash
-npm start                                     # ng serve sur :4200, proxy /api -> :8080
+npm start                                     # ng serve sur :4200, proxy /api -> :8090
 npm run build                                 # build production dans dist/
 npm test                                      # Karma + Jasmine, mode watch
 npm test -- --watch=false --browsers=ChromeHeadless   # une passe, pour CI ou verification
@@ -247,6 +290,31 @@ prefixe `leadflow.*` et se lisent via un `record`
 `@ConfigurationProperties` place dans `config/` — `@ConfigurationPropertiesScan` est actif
 sur `BackendApplication`, aucun enregistrement manuel n'est necessaire.
 
+Cinq variables gouvernent l'instance :
+
+| Variable                       | Role                                                    |
+| ------------------------------ | ------------------------------------------------------- |
+| `LEADFLOW_MASTER_KEY`          | Cle AES-256 (base64, 32 octets) des secrets au repos     |
+| `LEADFLOW_JWT_SECRET`          | Cle de signature HS256 des jetons du dashboard           |
+| `LEADFLOW_ADMIN_USER`          | Identifiant de l'operateur (defaut `admin`)              |
+| `LEADFLOW_ADMIN_PASSWORD_HASH` | **Hash BCrypt** du mot de passe, jamais le mot de passe  |
+| `GEMINI_API_KEY`               | Cle de l'analyse d'intention, globale a l'instance       |
+
+**`LEADFLOW_JWT_SECRET` n'a aucune valeur de repli en production, comme `LEADFLOW_MASTER_KEY`** :
+l'application refuse de demarrer plutot que de signer avec un secret devinable. Le controle
+ne porte que sur l'absence — un secret de moins de 32 octets demarre mais fait echouer la
+premiere connexion, HS256 exigeant 256 bits.
+
+**Le profil `dev` porte un repli** pour ces trois-la, secret de signature et compte
+operateur compris (`admin` / `leadflow-demo-2026`), afin que `spring-boot:run` demarre sans
+preparer d'environnement. Les variables restent prioritaires : lancer le profil `dev` contre
+un serveur partage ne signe donc pas avec une cle publiee dans le depot. `GEMINI_API_KEY` est
+la seule des cinq qui puisse manquer sans consequence en production : l'analyse d'intention
+retombe alors sur le lexique.
+
+La production d'un hash BCrypt est documentee dans `docs/monitoring-api.md` — c'est le
+premier obstacle concret au deploiement.
+
 ### Base de donnees
 
 `ddl-auto: validate` : **Hibernate ne cree jamais de table**. Toute evolution de schema passe
@@ -254,12 +322,15 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Trois migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Quatre migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
-`crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`) et
-`V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`). Le schema est
-desormais complet : F3 n'a rien eu a y ajouter, et les features suivantes ne devraient pas
-non plus.
+`crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
+`V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`) et
+`V4__dead_letter.sql` (journal des messages morts).
+
+`V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
+messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le
+schema metier, lui, n'a pas bouge depuis `V2` — F3, F4 et F5 n'ont rien eu a y ajouter.
 
 Sous le profil `dev`, `spring.flyway.locations` inclut en plus `classpath:db/dev`, qui
 contient `R__demo_data.sql` — un client de demonstration et ses commerciaux. La production
@@ -296,8 +367,18 @@ vivent dans cette classe — ne pas ecrire ces noms en dur ailleurs.
 
 Le comportement d'echec est delibere : `default-requeue-rejected: false` plus 3 tentatives
 avec backoff exponentiel, puis passage en DLQ. Un message ne reboucle donc jamais
-indefiniment ; la DLQ est la source de verite des leads en echec, et l'ecran « File
-d'attente » du dashboard doit s'appuyer dessus.
+indefiniment.
+
+**La DLQ est le tuyau, pas le registre.** Depuis F6, la source de verite des leads en echec
+est la table `dead_letter` : une file de messages ne sait ni paginer, ni filtrer, ni retenir
+ce qu'on a deja traite. Le consommateur de la DLQ ecrit une ligne par mort puis acquitte,
+donc **la profondeur de `leadflow.leads.dlq` doit rester nulle** — une profondeur qui monte
+veut dire que ce consommateur ne tourne pas.
+
+Le motif de l'echec vient du `RepublishMessageRecoverer` : il republie le message vers la DLX
+en ajoutant dans ses en-tetes la cause et la trace de l'exception d'origine. Sans lui, un
+message mort arriverait sans rien dire de ce qui l'a tue, et le journal n'aurait qu'une date
+a montrer.
 
 ### Connecteurs ERP/CRM — la regle a ne pas casser
 
@@ -384,6 +465,27 @@ CORS n'autorise que `http://localhost:4200` : a elargir avant tout deploiement.
 
 ## Frontend — conventions
 
+### Le visuel passe par le plugin `ui-ux-pro-max`
+
+**Règle permanente** : toute décision visuelle — écran, composant, palette, typographie,
+graphique, identité — se prend à travers les skills du plugin `ui-ux-pro-max`, invoqués
+**avant** d'écrire le code, jamais en relecture après coup.
+
+| Skill                        | Quand                                                       |
+| ---------------------------- | ----------------------------------------------------------- |
+| `ui-ux-pro-max:ui-ux-pro-max`| point d'entrée : styles, palettes produit, polices, graphiques |
+| `ui-ux-pro-max:ui-styling`   | composants concrets et mise en page                          |
+| `ui-ux-pro-max:design-system`| jetons de design (primitive → sémantique → composant)        |
+| `ui-ux-pro-max:design`, `:brand` | identité visuelle, logo, charte                          |
+| `ui-ux-pro-max:slides`       | présentations HTML avec Chart.js (soutenance)                |
+
+Cela concerne au premier chef les quatre écrans du dashboard (F6) : les compteurs, les
+répartitions et toute représentation graphique doivent être conçus, pas improvisés. Le skill
+`dataviz` reste complémentaire pour la rigueur des graphiques (accessibilité des couleurs,
+cohérence clair/sombre), mais le plugin prime sur les décisions visuelles.
+
+### Angular
+
 Angular 20 en mode **standalone** (aucun `NgModule`), avec signals et la nouvelle syntaxe de
 template (`@if`, `@for`). Les fichiers suivent la convention de nommage Angular 20 sans
 suffixe de type : `dashboard.ts` exporte `Dashboard`, et non `dashboard.component.ts`.
@@ -402,26 +504,41 @@ separes, verifiable dans la sortie de `npm run build`. Ajouter une feature = un 
 ### Appels API
 
 `environment.apiBaseUrl` est **volontairement vide dans les deux environnements** : en dev
-`proxy.conf.json` renvoie `/api` et `/actuator` vers `localhost:8080`, en production le
+`proxy.conf.json` renvoie `/api` et `/actuator` vers `localhost:8090`, en production le
 dashboard est servi derriere le meme domaine que l'API. Les services doivent donc appeler des
 chemins relatifs (`/api/leads`), jamais une URL absolue. Le remplacement de fichier
 d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le pipeline est **complet de bout en bout** : capture (F2), qualification (F3), routage et
-synchronisation ERP (F4), sur le socle multi-tenant de F1 et les adaptateurs de F5.
+Le pipeline est **complet de bout en bout et observable** : capture (F2), qualification (F3),
+routage et synchronisation ERP (F4), sur le socle multi-tenant de F1, les adaptateurs de F5
+et le monitoring de F6.
 
-Ce qui existe : la configuration, le chiffrement des secrets, les cinq entites et leurs
-repositories, les migrations `V1` a `V3`, le port `CrmConnector` et son registre, les
-adaptateurs Dolibarr et Odoo, `CrmSyncService`, la couche `capture`, la couche
-`qualification`, et la couche `routing` — trois strategies d'attribution, publication sur
-`leadflow.leads.routed`, et la synchronisation ERP enfin declenchee par la file. Un lead
-traverse desormais `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention.
+Ce qui existe : la configuration, le chiffrement des secrets, les six entites et leurs
+repositories, les migrations `V1` a `V4`, le port `CrmConnector` et son registre, les
+adaptateurs Dolibarr et Odoo, `CrmSyncService`, les couches `capture`, `qualification` et
+`routing` — trois strategies d'attribution, et la synchronisation ERP declenchee par la file.
+Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention.
 
-Ce qui n'existe pas : **l'observabilite**. Pas d'API de monitoring ni de dashboard (F6) : les
-quatre composants de `features/` sont des placeholders, la DLQ ne se rejoue qu'a la main
-depuis la console RabbitMQ, et les filets de republication de `lead.qualified` et
-`lead.routed` restent a ecrire. Aucune notification n'est envoyee au commercial : ni tache
-d'agenda dans l'ERP, ni alerte pour les leads chauds. Ne pas supposer l'existence d'un
-service ou d'un endpoint : verifier avant de referencer.
+Et desormais la couche `monitoring` : authentification JWT, API de lecture du pipeline
+(`/api/leads`, `/api/stats`, `/api/clients`, `/api/connectors`, `/api/queues`), journal des
+messages morts rejouable un par un, flux SSE, filets de republication de `lead.qualified` et
+`lead.routed` — plus les cinq ecrans Angular : connexion, dashboard, leads et detail, file
+d'attente, connecteurs.
+
+Ce qui n'existe pas :
+
+- **Aucune notification n'est envoyee au commercial** : ni tache d'agenda dans l'ERP, ni
+  alerte pour les leads chauds. `ScoringConfig.seuilChaud` est lu et porte depuis F3 pour
+  figer la forme du document, mais **rien ne s'en sert encore**.
+- **Aucune reattribution manuelle** : un lead attribue au mauvais commercial ne se corrige
+  que par un rejeu depuis le journal des morts, ou en base.
+- **Aucun CRUD des clients ni des commerciaux** : ajouter un client reste une insertion SQL.
+  Le dashboard ne fait que lire l'annuaire.
+- **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
+  Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
+- **Aucun deploiement** (F7) : pas d'integration continue, pas d'image de production, et CORS
+  n'autorise toujours que `http://localhost:4200`.
+
+Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.

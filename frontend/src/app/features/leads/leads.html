@@ -1,2 +1,127 @@
-<h1>Leads</h1>
-<p>Historique des leads qualifies, score, commercial assigne et etat de la synchronisation Dolibarr.</p>
+<header class="leads__entete">
+  <h1 class="leads__titre">Leads</h1>
+  <p class="leads__compte" role="status" aria-live="polite">
+    {{ total() }} lead{{ total() > 1 ? 's' : '' }}
+  </p>
+</header>
+
+<form class="filtres" (ngSubmit)="appliqueFiltres()">
+  <mat-form-field appearance="outline" class="filtres__champ">
+    <mat-label>Client</mat-label>
+    <mat-select [(ngModel)]="clientId" name="clientId" (selectionChange)="appliqueFiltres()">
+      <mat-option [value]="undefined">Tous</mat-option>
+      @for (client of clients(); track client.id) {
+        <mat-option [value]="client.id">{{ client.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="filtres__champ">
+    <mat-label>Statuts</mat-label>
+    <mat-select
+      [(ngModel)]="statutsChoisis"
+      name="statuts"
+      multiple
+      (selectionChange)="appliqueFiltres()"
+    >
+      @for (statut of statuts; track statut) {
+        <mat-option [value]="statut">{{ statut }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="filtres__champ filtres__champ--court">
+    <mat-label>Score minimal</mat-label>
+    <input matInput type="number" min="0" max="100" [(ngModel)]="minScore" name="minScore" />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="filtres__champ filtres__champ--large">
+    <mat-label>Recherche</mat-label>
+    <input matInput [(ngModel)]="recherche" name="recherche" placeholder="Email, societe" />
+    <mat-icon matSuffix>search</mat-icon>
+  </mat-form-field>
+
+  <div class="filtres__actions">
+    <button matButton="filled" type="submit">Filtrer</button>
+    <button matButton type="button" (click)="reinitialise()">Reinitialiser</button>
+  </div>
+</form>
+
+<section class="leads__table">
+  @if (enCours()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Chargement des leads" />
+  }
+
+  @if (erreur(); as message) {
+    <p class="leads__erreur" role="alert">{{ message }}</p>
+  }
+
+  <table mat-table [dataSource]="lignes()" matSort (matSortChange)="changeTri($event)">
+    <ng-container matColumnDef="createdAt">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Recu le</th>
+      <td mat-cell *matCellDef="let lead">{{ lead.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="clientName">
+      <th mat-header-cell *matHeaderCellDef>Client</th>
+      <td mat-cell *matCellDef="let lead">{{ lead.clientName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="companyName">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Societe</th>
+      <td mat-cell *matCellDef="let lead">{{ lead.companyName || '—' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="email">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Email</th>
+      <td mat-cell *matCellDef="let lead">{{ lead.email }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="detectedIntent">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Intention</th>
+      <td mat-cell *matCellDef="let lead">
+        {{ lead.detectedIntent || '—' }}
+        @if (lead.intentSource) {
+          <span class="leads__source">{{ lead.intentSource }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="score">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Score</th>
+      <td mat-cell *matCellDef="let lead" class="leads__score">{{ lead.score }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
+      <td mat-cell *matCellDef="let lead"><app-status-badge [status]="lead.status" /></td>
+    </ng-container>
+
+    <ng-container matColumnDef="salesRepName">
+      <th mat-header-cell *matHeaderCellDef>Commercial</th>
+      <td mat-cell *matCellDef="let lead">{{ lead.salesRepName || 'Non attribue' }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+    <tr
+      mat-row
+      *matRowDef="let lead; columns: colonnes"
+      class="leads__ligne"
+      [routerLink]="['/leads', lead.id]"
+      tabindex="0"
+    ></tr>
+  </table>
+
+  @if (!enCours() && lignes().length === 0 && !erreur()) {
+    <p class="leads__vide">Aucun lead ne correspond a ces filtres.</p>
+  }
+
+  <mat-paginator
+    [length]="total()"
+    [pageIndex]="requete.page"
+    [pageSize]="requete.size"
+    [pageSizeOptions]="[25, 50, 100]"
+    (page)="changePage($event)"
+    aria-label="Pagination des leads"
+  />
+</section>

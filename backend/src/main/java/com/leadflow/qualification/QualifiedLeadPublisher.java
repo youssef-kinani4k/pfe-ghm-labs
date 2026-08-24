@@ -17,14 +17,11 @@ import org.springframework.stereotype.Component;
  * {@code @TransactionalEventListener} publie hors de toute transaction serait
  * <b>silencieusement ignore</b> : le message ne partirait jamais, sans la moindre erreur.
  *
- * <p><b>Dette assumee : aucun filet de republication.</b> Si l'envoi echoue, le lead reste
- * en base avec {@code status = QUALIFIED} — rien n'est perdu, mais rien ne le republie. Le
- * filet symetrique de {@code PendingEventRelay} consisterait a rebalayer les leads
- * {@code QUALIFIED} plus vieux que N minutes. Il etait impossible avant F4, puisque aucun
- * lead ne quittait cet etat et que le balayage aurait republie la table entiere en boucle.
- * F4 fait passer le lead a {@code ROUTED} : le filet est desormais bornable
- * ({@code findByStatusAndCreatedAtBefore(QUALIFIED, seuil)}), et il est reporte a F6 avec
- * son jumeau sur {@code lead.routed}.
+ * <p><b>Dette soldee par F6 : le filet existe.</b> Si l'envoi echoue, le lead reste en base
+ * avec {@code status = QUALIFIED} — rien n'est perdu, et {@link QualifiedLeadRelay} le
+ * republie au prochain balayage. Le filet n'etait pas ecrivable avant F4, puisque aucun lead
+ * ne quittait cet etat et que le balayage aurait republie la table entiere en boucle ; F4
+ * fait passer le lead a {@code ROUTED}, ce qui le rend bornable.
  */
 @Component
 public class QualifiedLeadPublisher {

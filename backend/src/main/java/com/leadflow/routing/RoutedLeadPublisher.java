@@ -17,11 +17,10 @@ import org.springframework.stereotype.Component;
  * l'orchestrateur n'etant pas transactionnel, un tel listener serait <b>silencieusement
  * ignore</b> et le message ne partirait jamais.
  *
- * <p><b>Dette assumee : aucun filet de republication.</b> Si l'envoi echoue, le lead reste
- * {@code ROUTED} — rien n'est perdu, mais rien ne le republie. Le balayage symetrique
- * ({@code findByStatusAndCreatedAtBefore(ROUTED, seuil)}) est desormais bornable puisque le
- * lead quitte cet etat pour {@code SYNCED} ; il est reporte a F6, ou il rejoint le rejeu
- * manuel depuis la DLQ.
+ * <p><b>Dette soldee par F6 : le filet existe.</b> Si l'envoi echoue, le lead reste
+ * {@code ROUTED} — rien n'est perdu, et {@link RoutedLeadRelay} le republie au prochain
+ * balayage, aux cotes du rejeu manuel depuis la DLQ. Le balayage est bornable parce que le
+ * lead quitte cet etat pour {@code SYNCED}.
  */
 @Component
 public class RoutedLeadPublisher {
