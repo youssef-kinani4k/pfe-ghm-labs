@@ -1,7 +1,6 @@
 package com.leadflow.common;
 
 import com.leadflow.common.auth.DashboardAuthenticationException;
-import com.leadflow.monitoring.RessourceIntrouvableException;
 import com.leadflow.monitoring.deadletter.DejaTraiteException;
 import com.leadflow.monitoring.deadletter.RejeuIndisponibleException;
 import org.slf4j.Logger;

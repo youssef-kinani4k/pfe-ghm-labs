@@ -15,4 +15,7 @@ public interface SalesRepRepository extends JpaRepository<SalesRep, UUID> {
      * desequilibre.
      */
     List<SalesRep> findByClientIdOrderByFullName(UUID clientId);
+
+    /** Nombre de commerciaux actifs, pour la colonne de la liste des boutiques. */
+    long countByClientIdAndActiveTrue(UUID clientId);
 }

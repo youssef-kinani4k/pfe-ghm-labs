@@ -2,6 +2,7 @@ package com.leadflow.monitoring;
 
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
+import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.monitoring.dto.LeadDetail;

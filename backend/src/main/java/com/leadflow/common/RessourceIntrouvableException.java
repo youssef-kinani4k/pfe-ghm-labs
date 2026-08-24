@@ -1,4 +1,4 @@
-package com.leadflow.monitoring;
+package com.leadflow.common;
 
 /**
  * Ressource inconnue du dashboard. Traduite en 404 par {@code ApiExceptionHandler}.

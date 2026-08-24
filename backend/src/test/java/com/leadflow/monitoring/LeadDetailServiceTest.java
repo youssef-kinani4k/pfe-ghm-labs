@@ -7,6 +7,7 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
