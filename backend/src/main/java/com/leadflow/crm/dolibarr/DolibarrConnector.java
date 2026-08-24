@@ -2,13 +2,16 @@ package com.leadflow.crm.dolibarr;
 
 import com.leadflow.crm.CrmConnector;
 import com.leadflow.crm.model.CrmAssignee;
+import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmLead;
+import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -80,6 +83,18 @@ public class DolibarrConnector implements CrmConnector {
     @Override
     public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
         return client.chercheUtilisateurParEmail(target, assignee.email());
+    }
+
+    @Override
+    public List<CrmSettingSpec> reglagesAttendus() {
+        return List.of(
+                new CrmSettingSpec("baseUrl", "Adresse de l'API, /api/index.php compris", false),
+                new CrmSettingSpec("apiKey", "Cle d'API de l'utilisateur de service", true));
+    }
+
+    @Override
+    public CrmCheck verifieAcces(CrmTarget cible) {
+        return client.verifieAcces(cible);
     }
 
     private Map<String, Object> corpsTiers(CrmLead lead) {

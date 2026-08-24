@@ -7,7 +7,9 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.crm.model.CrmAssignee;
+import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmLead;
+import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
@@ -78,6 +80,16 @@ class CrmSyncServiceTest {
                 throw new CrmSyncException("espion", "instance injoignable", null);
             }
             return "U-9";
+        }
+
+        @Override
+        public List<CrmSettingSpec> reglagesAttendus() {
+            return List.of();
+        }
+
+        @Override
+        public CrmCheck verifieAcces(CrmTarget cible) {
+            return CrmCheck.joignable(null);
         }
     }
 

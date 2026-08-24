@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.leadflow.config.CrmProperties;
 import com.leadflow.crm.model.CrmAssignee;
+import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmLead;
+import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
@@ -46,6 +48,16 @@ class CrmConnectorRegistryTest {
         @Override
         public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
             return "u-" + assignee.email();
+        }
+
+        @Override
+        public List<CrmSettingSpec> reglagesAttendus() {
+            return List.of();
+        }
+
+        @Override
+        public CrmCheck verifieAcces(CrmTarget cible) {
+            return CrmCheck.joignable(null);
         }
     }
 

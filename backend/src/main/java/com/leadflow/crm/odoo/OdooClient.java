@@ -1,6 +1,8 @@
 package com.leadflow.crm.odoo;
 
 import com.leadflow.crm.CrmHttpConfig;
+import com.leadflow.crm.model.CrmCheck;
+import com.leadflow.crm.model.CrmCheckCause;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmTarget;
 import java.util.ArrayList;
@@ -10,6 +12,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -82,6 +85,41 @@ public class OdooClient {
             return null;
         }
         return String.valueOf(liste.getFirst());
+    }
+
+    /**
+     * Sonde d'acces : l'authentification JSON-RPC valide d'un seul appel l'adresse, la base,
+     * l'utilisateur et la cle. Rien n'est cree.
+     *
+     * <p>Odoo repond 200 meme en cas de refus — l'echec vit dans le corps — donc la
+     * distinction se fait sur le contenu et non sur le code HTTP.
+     */
+    public CrmCheck verifieAcces(CrmTarget target) {
+        for (String cle : List.of("baseUrl", "database", "username", "apiKey")) {
+            String valeur = target.settings() == null ? null : target.settings().get(cle);
+            if (valeur == null || valeur.isBlank()) {
+                return CrmCheck.echec(
+                        CrmCheckCause.REPONSE_INATTENDUE, "Reglage '" + cle + "' absent");
+            }
+        }
+        try {
+            int uid = authentifie(target);
+            return uid > 0
+                    ? CrmCheck.joignable(null)
+                    : CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, null);
+        } catch (CrmSyncException echec) {
+            // `appelle` enveloppe toute RestClientException, injoignabilite comprise : la
+            // distinction se lit dans la cause et non dans un catch separe. Verifie sur le
+            // code d'OdooClient, pas suppose.
+            if (echec.getCause() instanceof ResourceAccessException reseau) {
+                return CrmCheck.echec(CrmCheckCause.INJOIGNABLE, reseau.getMessage());
+            }
+            String message = echec.getMessage() == null ? "" : echec.getMessage().toLowerCase();
+            if (message.contains("database")) {
+                return CrmCheck.echec(CrmCheckCause.CIBLE_INCONNUE, echec.getMessage());
+            }
+            return CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, echec.getMessage());
+        }
     }
 
     private Map<String, Object> executeKw(
