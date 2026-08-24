@@ -123,6 +123,76 @@ public class ClientAdminService {
     }
 
     /**
+     * Met a jour l'identite, le fournisseur et les reglages ERP.
+     *
+     * <p>Ni les cles ni l'etat actif ne passent par la : ce sont des actions aux consequences
+     * distinctes, exposees en sous-ressources pour qu'une simple correction de nom ne puisse
+     * pas casser la signature d'une boutique par inadvertance.
+     */
+    @Transactional
+    public ClientDetailAdmin metAJour(UUID id, ClientForm formulaire) {
+        Client client = trouve(id);
+        // Fusionner d'abord, valider ensuite : un champ secret laisse vide n'est pas un
+        // reglage manquant, c'est un reglage inchange.
+        Map<String, String> reglages = fusionne(client, formulaire);
+        valideLesReglages(formulaire.crmProviderId(), reglages);
+        client.setName(formulaire.name());
+        client.setCrmProviderId(formulaire.crmProviderId());
+        client.setCrmConfig(new LinkedHashMap<>(reglages));
+        client.setAssignmentStrategy(formulaire.assignmentStrategy());
+        return fiche(client.getId());
+    }
+
+    /**
+     * Active ou desactive une boutique.
+     *
+     * <p>La desactivation remplace la suppression, que le schema interdit : {@code lead} et
+     * {@code raw_lead_event} referencent {@code client} sans cascade, donc Postgres refuserait
+     * d'effacer la premiere boutique ayant recu un lead.
+     */
+    @Transactional
+    public ClientDetailAdmin change(UUID id, boolean actif) {
+        Client client = trouve(id);
+        // Les commerciaux ne sont pas touches : la reactivation doit restituer la
+        // configuration telle quelle, et coupler les deux ferait perdre qui etait actif.
+        client.setActive(actif);
+        return fiche(client.getId());
+    }
+
+    private Client trouve(UUID id) {
+        return clients.findById(id)
+                .orElseThrow(() -> new RessourceIntrouvableException(
+                        "Aucune boutique avec cet identifiant"));
+    }
+
+    /**
+     * Un champ secret laisse vide conserve la valeur enregistree : la fiche ne le rend pas.
+     *
+     * <p>Un fournisseur inconnu ressort tel quel plutot que de lever ici : la fusion n'a rien
+     * a dire de ce cas, et {@code valideLesReglages}, appelee juste apres, en fait le meme
+     * ReglageManquantException que la creation — donc un 400, pas un 500.
+     */
+    private Map<String, String> fusionne(Client client, ClientForm formulaire) {
+        Map<String, String> fusion = new LinkedHashMap<>(formulaire.crmSettings());
+        List<CrmSettingSpec> attendus;
+        try {
+            attendus = connecteurs.forProvider(formulaire.crmProviderId()).reglagesAttendus();
+        } catch (IllegalArgumentException fournisseurInconnu) {
+            return fusion;
+        }
+        attendus.stream()
+                .filter(CrmSettingSpec::secret)
+                .forEach(spec -> {
+                    String fourni = fusion.get(spec.cle());
+                    if ((fourni == null || fourni.isBlank())
+                            && client.getCrmConfig().containsKey(spec.cle())) {
+                        fusion.put(spec.cle(), client.getCrmConfig().get(spec.cle()));
+                    }
+                });
+        return fusion;
+    }
+
+    /**
      * Valide contre ce que le connecteur declare, jamais contre une liste ecrite ici :
      * ajouter un ERP ne doit rien demander a ce package.
      */

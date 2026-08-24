@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -45,5 +46,24 @@ public class ClientAdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public ClientCreated cree(@Valid @RequestBody ClientForm formulaire) {
         return service.cree(formulaire);
+    }
+
+    @PutMapping("/{id}")
+    public ClientDetailAdmin metAJour(@PathVariable UUID id, @Valid @RequestBody ClientForm f) {
+        return service.metAJour(id, f);
+    }
+
+    /**
+     * L'activation et la desactivation sont des sous-ressources et non un champ du formulaire :
+     * couper la capture d'une boutique ne doit pas pouvoir arriver par une correction de nom.
+     */
+    @PostMapping("/{id}/activate")
+    public ClientDetailAdmin active(@PathVariable UUID id) {
+        return service.change(id, true);
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public ClientDetailAdmin desactive(@PathVariable UUID id) {
+        return service.change(id, false);
     }
 }
