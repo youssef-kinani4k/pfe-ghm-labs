@@ -5161,7 +5161,7 @@ heures rend nécessaire. Le choix l'expose à une XSS ; la contrepartie est qu'i
 cookie ni CSRF à gérer sur une API `STATELESS`. L'intercepteur pose le `Bearer`, et sur `401`
 il vide le jeton et renvoie à `/login`.
 
-- [ ] **Step 1: Ajouter Angular Material**
+- [x] **Step 1: Ajouter Angular Material**
 
 ```bash
 cd frontend && npm install @angular/material@^20.3.0 @angular/cdk@^20.3.0
@@ -5188,7 +5188,7 @@ body {
 }
 ```
 
-- [ ] **Step 2: Écrire le test qui échoue**
+- [x] **Step 2: Écrire le test qui échoue**
 
 `frontend/src/app/core/auth/auth.spec.ts` :
 
@@ -5269,12 +5269,12 @@ describe('Auth', () => {
 });
 ```
 
-- [ ] **Step 3: Vérifier que le test échoue**
+- [x] **Step 3: Vérifier que le test échoue**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 Expected: FAIL — `Auth` et `authInterceptor` n'existent pas.
 
-- [ ] **Step 4: Écrire les modèles**
+- [x] **Step 4: Écrire les modèles**
 
 `core/models/page-response.ts` :
 
@@ -5300,7 +5300,7 @@ export type LeadStatus = 'QUALIFIED' | 'ROUTED' | 'SYNCED' | 'REJECTED' | 'FAILE
 export type DeadLetterStatus = 'PENDING' | 'REPLAYED' | 'DISCARDED';
 ```
 
-- [ ] **Step 5: Écrire `Auth`**
+- [x] **Step 5: Écrire `Auth`**
 
 ```ts
 import { HttpClient } from '@angular/common/http';
@@ -5350,7 +5350,7 @@ export class Auth {
 }
 ```
 
-- [ ] **Step 6: Écrire l'intercepteur et le garde**
+- [x] **Step 6: Écrire l'intercepteur et le garde**
 
 ```ts
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
@@ -5400,7 +5400,7 @@ export const authGuard: CanActivateFn = () => {
 };
 ```
 
-- [ ] **Step 7: Écrire l'écran de connexion**
+- [x] **Step 7: Écrire l'écran de connexion**
 
 `features/login/login.ts` — formulaire réactif, deux champs, message d'erreur unique :
 
@@ -5451,7 +5451,7 @@ export class Login {
 }
 ```
 
-- [ ] **Step 8: Câbler routes, providers et coquille**
+- [x] **Step 8: Câbler routes, providers et coquille**
 
 `app.config.ts` gagne l'intercepteur et les animations :
 
@@ -5481,7 +5481,7 @@ export class Login {
 l'opérateur ; la barre et le menu ne s'affichent que si `auth.estConnecte()`, sinon l'écran
 de connexion apparaîtrait dans le cadre de l'application.
 
-- [ ] **Step 9: Vérifier et committer**
+- [x] **Step 9: Vérifier et committer**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 puis `npm run build`
@@ -5500,6 +5500,19 @@ peerDependency de bibliotheque de graphiques a faire correspondre."
 ```
 
 ---
+
+### Ecarts constates a l'execution de T13
+
+- `@angular/material@^20.3.0` n'existe pas : la ligne 20 de Material s'arrete a **20.2.14**,
+  compatible avec `@angular/core` ^20.3.0. C'est cette contrainte qui a ete posee.
+- Material tire `@angular/animations`, absent du projet : il a fallu l'ajouter (^20.3.0),
+  faute de quoi le bundle ne resout pas `@angular/platform-browser/animations`.
+- La route `/leads/:id` est **reportee a T14** : `features/leads/lead-detail/lead-detail`
+  n'existe pas encore, et un `loadComponent` vers un fichier absent casse le build.
+- Le budget `initial` d'`angular.json` passe de 500 kB / 1 MB a **800 kB / 1.5 MB** : le
+  socle Material depasse l'ancien seuil de 304 octets, et T14 a T16 vont l'alourdir.
+- `app.spec.ts` a ete reecrit : l'ancien test attendait `.app-header__brand`, que la
+  coquille conditionnelle ne rend plus tant qu'aucun jeton n'est en main.
 
 ## Task 14: Écran Leads et détail
 

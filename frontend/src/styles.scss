@@ -1,10 +1,50 @@
+@use '@angular/material' as mat;
+
+// Theme Material 3 defini une fois pour toute l'application. Le clair est impose plutot que
+// suivi du systeme : le dashboard s'exploite a cote de la console RabbitMQ et des ERP, tous
+// clairs, et une bascule automatique rendrait l'ensemble incoherent d'un ecran a l'autre.
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+      ),
+      // Fira Sans porte les titres, Roboto le texte courant : la direction Swiss veut une
+      // graisse geometrique sur la hierarchie, sans changer la lisibilite des tableaux.
+      typography: (
+          plain-family: Roboto,
+          brand-family: 'Fira Sans',
+        ),
+      density: 0,
+    )
+  );
+}
+
 :root {
-  --bg: #f7f8fa;
-  --surface: #ffffff;
-  --border: #e3e6ea;
-  --text: #14181f;
-  --text-muted: #616b7a;
-  --accent: #2f6feb;
+  // Echelle d'espacement dense (8 -> 32). Un ecran d'exploitation se lit d'un coup d'oeil :
+  // l'air respire moins que sur une page vitrine, au profit du nombre de lignes visibles.
+  --lf-space-1: 0.5rem;
+  --lf-space-2: 0.75rem;
+  --lf-space-3: 1rem;
+  --lf-space-4: 1.5rem;
+  --lf-space-5: 2rem;
+
+  // Couleurs de statut, hors palette Material : elles portent un sens metier et ne doivent
+  // pas bouger avec le theme. Chacune est doublee d'un libelle dans l'interface — la couleur
+  // ne porte jamais seule l'information.
+  --lf-succes: #15803d;
+  --lf-succes-fond: #dcfce7;
+  --lf-attente: #a16207;
+  --lf-attente-fond: #fef9c3;
+  --lf-echec: #b91c1c;
+  --lf-echec-fond: #fee2e2;
+  --lf-neutre: #334155;
+  --lf-neutre-fond: #e2e8f0;
+
+  // Les identifiants (UUID, references ERP, cles de routage) se lisent en chasse fixe :
+  // comparer deux UUID a l'oeil est impossible en proportionnelle.
+  --lf-police-mono: 'Fira Code', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 
 * {
@@ -15,8 +55,28 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 15px;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+code,
+.lf-mono {
+  font-family: var(--lf-police-mono);
+  font-size: 0.85em;
+}
+
+// Le focus visible n'est jamais retire : c'est le seul reperage au clavier, et l'ecran se
+// parcourt beaucoup au clavier une fois les filtres poses.
+:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

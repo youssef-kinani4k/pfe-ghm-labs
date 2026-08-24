@@ -1,0 +1,48 @@
+<main class="login">
+  <mat-card class="login__carte" appearance="outlined">
+    @if (enCours()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Connexion en cours" />
+    }
+
+    <mat-card-header class="login__entete">
+      <mat-card-title class="login__titre">LeadFlow</mat-card-title>
+      <mat-card-subtitle>Console de supervision du pipeline</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form class="login__formulaire" [formGroup]="formulaire" (ngSubmit)="soumet()">
+        <mat-form-field appearance="outline">
+          <mat-label>Identifiant</mat-label>
+          <input matInput formControlName="username" autocomplete="username" autofocus />
+          @if (formulaire.controls.username.touched && formulaire.controls.username.invalid) {
+            <mat-error>Identifiant requis</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Mot de passe</mat-label>
+          <input
+            matInput
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+          />
+          @if (formulaire.controls.password.touched && formulaire.controls.password.invalid) {
+            <mat-error>Mot de passe requis</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Zone d'erreur annoncee : l'echec de connexion n'a aucun champ ou se poser. -->
+        <p class="login__erreur" role="alert" aria-live="assertive">
+          @if (erreur(); as message) {
+            {{ message }}
+          }
+        </p>
+
+        <button matButton="filled" type="submit" [disabled]="enCours()">
+          {{ enCours() ? 'Connexion...' : 'Se connecter' }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</main>

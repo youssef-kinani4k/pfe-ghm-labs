@@ -1,13 +1,50 @@
-<header class="app-header">
-  <span class="app-header__brand">LeadFlow</span>
-  <nav class="app-header__nav">
-    <a routerLink="/dashboard" routerLinkActive="is-active">Dashboard</a>
-    <a routerLink="/leads" routerLinkActive="is-active">Leads</a>
-    <a routerLink="/queue" routerLinkActive="is-active">File d'attente</a>
-    <a routerLink="/connectors" routerLinkActive="is-active">Connecteurs</a>
-  </nav>
-</header>
+@if (auth.estConnecte()) {
+  <mat-toolbar class="app-barre">
+    <button
+      matIconButton
+      type="button"
+      (click)="basculeMenu()"
+      [attr.aria-expanded]="menuOuvert()"
+      aria-label="Afficher ou masquer le menu"
+    >
+      <mat-icon>menu</mat-icon>
+    </button>
 
-<main class="app-main">
+    <span class="app-barre__marque">LeadFlow</span>
+    <span class="app-barre__espace"></span>
+
+    @if (auth.utilisateur(); as operateur) {
+      <span class="app-barre__operateur">{{ operateur }}</span>
+    }
+    <button matButton type="button" (click)="deconnecte()">
+      <mat-icon>logout</mat-icon>
+      Deconnexion
+    </button>
+  </mat-toolbar>
+
+  <mat-sidenav-container class="app-corps">
+    <mat-sidenav mode="side" [opened]="menuOuvert()" class="app-menu">
+      <mat-nav-list>
+        @for (entree of entrees; track entree.chemin) {
+          <a
+            mat-list-item
+            [routerLink]="entree.chemin"
+            routerLinkActive
+            #actif="routerLinkActive"
+            [activated]="actif.isActive"
+            [attr.aria-current]="actif.isActive ? 'page' : null"
+          >
+            <mat-icon matListItemIcon>{{ entree.icone }}</mat-icon>
+            <span matListItemTitle>{{ entree.libelle }}</span>
+          </a>
+        }
+      </mat-nav-list>
+    </mat-sidenav>
+
+    <mat-sidenav-content class="app-contenu">
+      <router-outlet />
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+} @else {
   <router-outlet />
-</main>
+}
