@@ -10,6 +10,26 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-23-f6-monitoring-dashboard-design.md`
 
+## Reprise — etat au 24 aout 2026
+
+**Tout le backend de F6 est ecrit et verifie : T1 a T12 sont faites**, une par commit sur
+`feature/f6-monitoring-dashboard` (branche locale, non poussee). Le dernier commit est
+`af6a580 feat: filets de republication de lead.qualified et lead.routed`, qui solde les
+dettes laissees par F3 et F4.
+
+**La prochaine tache est T13**, le socle frontend — et avec elle commence toute la partie
+Angular, encore intacte : les quatre dossiers de `frontend/src/app/features/` sont des
+coquilles vides. Les decisions visuelles de T13 a T16 passent par les skills du plugin
+`ui-ux-pro-max`, invoquees avant d'ecrire le code, comme l'exige `CLAUDE.md`.
+
+**Sur la verification.** La suite complete (294 tests) demande environ quinze minutes et
+plusieurs conteneurs Testcontainers ; sur cette machine elle ne tient pas dans une seule
+invocation. Elle a ete passee en quatre lots — `capture`+`common`+`crm`, `monitoring`,
+`qualification`, `routing`+`tenant`+`BackendApplicationTests` — tous verts. Un run
+interrompu laisse derriere lui un JVM Maven, son fork surefire et ses conteneurs : les
+nettoyer avant de relancer, sans quoi RabbitMQ n'atteint plus « Server startup complete »
+dans le delai et les tests d'integration echouent pour une raison d'environnement.
+
 ## Global Constraints
 
 - Les commandes backend s'exécutent depuis `backend/`, les commandes frontend depuis `frontend/`.
