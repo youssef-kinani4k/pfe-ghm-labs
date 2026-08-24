@@ -1,0 +1,190 @@
+:host {
+  display: block;
+}
+
+.connecteurs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: var(--lf-space-3);
+  align-items: start;
+
+  &__entete {
+    display: flex;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-1);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+  }
+
+  &__note {
+    margin: 0 0 var(--lf-space-3);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8125rem;
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+  }
+}
+
+.carte {
+  // Le bord porte l'etat autant que la couleur du texte : il subsiste en impression noir et
+  // blanc, ou aucune teinte ne se distingue.
+  border-left-width: 3px;
+
+  &--echec,
+  &--anomalie {
+    border-left-color: var(--lf-echec);
+  }
+
+  &--sain {
+    border-left-color: var(--lf-succes);
+  }
+
+  &--inactif {
+    border-left-color: var(--lf-attente);
+  }
+
+  &--desactive {
+    border-left-color: var(--mat-sys-outline);
+    // Desactive n'est pas une panne : la carte s'efface au lieu d'alerter.
+    opacity: 0.7;
+  }
+
+  &__entete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: var(--lf-space-1);
+  }
+
+  &__titre {
+    font-family: var(--lf-police-mono);
+    font-size: 1rem;
+  }
+
+  &__etat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    font-size: 0.8125rem;
+
+    mat-icon {
+      font-size: 1.125rem;
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+  }
+
+  &--echec &__etat,
+  &--anomalie &__etat {
+    color: var(--lf-echec);
+    font-weight: 500;
+  }
+
+  &--sain &__etat {
+    color: var(--lf-succes);
+  }
+
+  &--inactif &__etat {
+    color: var(--lf-attente);
+  }
+
+  &--desactive &__etat {
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__anomalie,
+  &__motif {
+    margin: 0 0 var(--lf-space-2);
+    padding: var(--lf-space-2);
+    border-radius: 0.25rem;
+    background: var(--lf-echec-fond);
+    color: var(--lf-echec);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.mesures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--lf-space-2);
+  margin: 0 0 var(--lf-space-2);
+
+  &__paire {
+    dt {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.6875rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      margin: 0.125rem 0 0;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+}
+
+.detail-client {
+  box-shadow: none !important;
+}
+
+.clients {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &__ligne {
+    display: flex;
+    align-items: center;
+    gap: var(--lf-space-2);
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    font-size: 0.8125rem;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__nom {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__succes {
+    color: var(--lf-succes);
+  }
+
+  &__echecs {
+    color: var(--mat-sys-on-surface-variant);
+
+    &--vifs {
+      color: var(--lf-echec);
+      font-weight: 500;
+    }
+  }
+
+  &__date {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.vide {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+}

@@ -6047,7 +6047,7 @@ calculé par `DeadLetterQueryService` (T9), l'écran ne le devine pas. Rejouer u
 `lead.qualified` refait passer le lead par l'attribution ; il peut changer de commercial et la
 rotation se décale.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```ts
 import { TestBed } from '@angular/core/testing';
@@ -6097,12 +6097,12 @@ describe('DeadLetterApi', () => {
 });
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 Expected: FAIL — `DeadLetterApi` n'existe pas.
 
-- [ ] **Step 3: Écrire les trois services d'API**
+- [x] **Step 3: Écrire les trois services d'API**
 
 `QueueApi.files()`, `ConnectorApi.connecteurs()`, et :
 
@@ -6142,7 +6142,7 @@ export class DeadLetterApi {
 }
 ```
 
-- [ ] **Step 4: Écrire l'écran File d'attente**
+- [x] **Step 4: Écrire l'écran File d'attente**
 
 Deux parties. En haut, une carte par file : nom, profondeur, nombre de consommateurs. **Un
 zéro consommateur se signale visuellement** — c'est la mesure la plus lisible d'un listener
@@ -6175,7 +6175,7 @@ Une sélection multiple est possible, mais elle boucle sur l'appel unitaire, ave
 confirmation qui annonce le nombre de lignes. Il n'y a pas d'endpoint de masse, et ce n'est
 pas un oubli.
 
-- [ ] **Step 5: Écrire l'écran Connecteurs**
+- [x] **Step 5: Écrire l'écran Connecteurs**
 
 Une carte par fournisseur. Trois états visuellement distincts, ce qu'exige le critère de
 recette 6 :
@@ -6192,7 +6192,7 @@ Le détail par client se déplie sous la carte : succès, échecs, dernière ten
 qu'on voit qu'un seul client casse pendant que les autres passent — donc que le problème est
 dans son `crm_config`, pas dans l'adaptateur.
 
-- [ ] **Step 6: Vérifier et committer**
+- [x] **Step 6: Vérifier et committer**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 puis `npm run build`
@@ -6211,6 +6211,20 @@ que le critere de recette exige de ne pas confondre avec « desactive »."
 ```
 
 ---
+
+### Ecarts constates a l'execution de T16
+
+- **« Dernier appel en echec » se lit en comparant `lastFailureAt` a `lastSuccessAt`**, pas
+  au compteur d'echecs : un connecteur qui a echoue hier et reussi depuis va bien, et le
+  peindre en rouge ferait chercher une panne inexistante.
+- Un cinquieme etat est ajoute aux trois du plan : **`anomalie`**, pour un fournisseur
+  active en configuration sans adaptateur portant son identifiant. Le plan demandait de
+  l'afficher explicitement ; il merite son etat propre, car aucun compteur ne le revele.
+- L'echec de lecture des files **ne vide pas le journal** : l'etat des files est lu en AMQP
+  et le broker peut etre injoignable alors que le journal, lu en base, reste consultable.
+- `DeadLetterApi` gagne un test sur les filtres absents, comme `LeadApi`.
+- Les etats sont portes par un **bord et une icone**, pas par la seule couleur : la carte
+  reste lisible en impression noir et blanc.
 
 ## Task 17: Documentation et corrections d'invariants
 

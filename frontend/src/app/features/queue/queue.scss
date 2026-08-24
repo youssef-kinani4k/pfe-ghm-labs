@@ -1,0 +1,145 @@
+:host {
+  display: block;
+}
+
+.attente {
+  &__entete {
+    display: flex;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-3);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+  }
+
+  &__alerte {
+    margin: 0 0 var(--lf-space-3);
+    padding: var(--lf-space-2);
+    border-left: 3px solid var(--lf-echec);
+    border-radius: 0.25rem;
+    background: var(--lf-echec-fond);
+    color: var(--lf-echec);
+    font-size: 0.875rem;
+  }
+}
+
+.files {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--lf-space-2);
+  margin-bottom: var(--lf-space-3);
+
+  &__carte {
+    padding: var(--lf-space-2) var(--lf-space-3);
+
+    // L'anomalie se voit au cadre, pas seulement a la couleur du texte : le bord subsiste
+    // en impression noir et blanc et pour un lecteur qui distingue mal le rouge.
+    &--alerte {
+      border-color: var(--lf-echec);
+      border-left-width: 3px;
+    }
+  }
+
+  &__nom {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__profondeur {
+    margin: 0.25rem 0 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  &__detail {
+    margin: 0.25rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+  }
+
+  &__critique {
+    color: var(--lf-echec);
+    font-weight: 500;
+  }
+}
+
+.journal {
+  &__entete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-2);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.0625rem;
+  }
+
+  &__filtre {
+    width: 11rem;
+    margin-bottom: -1.25rem;
+  }
+
+  &__message {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.875rem;
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+  }
+
+  &__table {
+    overflow-x: auto;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 0.5rem;
+    background: var(--mat-sys-surface);
+  }
+
+  &__motif {
+    max-width: 26rem;
+    padding-top: var(--lf-space-1) !important;
+    padding-bottom: var(--lf-space-1) !important;
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+
+  &__operateur {
+    margin-left: var(--lf-space-1);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+  }
+
+  &__avertissement {
+    color: var(--lf-attente);
+    vertical-align: middle;
+  }
+
+  &__inactif {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8125rem;
+  }
+}
+
+.vide {
+  margin: 0;
+  padding: var(--lf-space-4);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+  text-align: center;
+}

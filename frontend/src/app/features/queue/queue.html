@@ -1,2 +1,199 @@
-<h1>File d'attente</h1>
-<p>Profondeur de la file RabbitMQ, messages en echec (DLQ) et rejeu.</p>
+<header class="attente__entete">
+  <h1 class="attente__titre">File d'attente</h1>
+  <button matButton type="button" (click)="chargeLesFiles(); charge()">
+    <mat-icon>refresh</mat-icon>
+    Rafraichir
+  </button>
+</header>
+
+<section class="files" aria-label="Etat des files">
+  @if (files(); as vue) {
+    @for (file of vue.queues; track file.name) {
+      <mat-card
+        appearance="outlined"
+        class="files__carte"
+        [class.files__carte--alerte]="!file.reachable || file.consumerCount === 0"
+      >
+        <p class="files__nom lf-mono">{{ file.name }}</p>
+        @if (file.reachable) {
+          <p class="files__profondeur">{{ file.messageCount }}</p>
+          <p class="files__detail">
+            message(s) en attente ·
+            <!-- Zero consommateur est la mesure la plus lisible d'un listener tombe. -->
+            @if (file.consumerCount === 0) {
+              <span class="files__critique">aucun consommateur</span>
+            } @else {
+              {{ file.consumerCount }} consommateur(s)
+            }
+          </p>
+        } @else {
+          <p class="files__detail files__critique">File injoignable sur le broker.</p>
+        }
+      </mat-card>
+    }
+
+    <mat-card
+      appearance="outlined"
+      class="files__carte"
+      [class.files__carte--alerte]="vue.pendingDeadLetters > 0"
+    >
+      <p class="files__nom">Morts a traiter</p>
+      <p class="files__profondeur">{{ vue.pendingDeadLetters }}</p>
+      <p class="files__detail">en attente d'une decision humaine</p>
+    </mat-card>
+  } @else {
+    <p class="vide">
+      L'etat des files n'a pas pu etre lu : le broker est peut-etre injoignable. Le journal
+      ci-dessous reste consultable.
+    </p>
+  }
+</section>
+
+@if (filesMuettes().length > 0) {
+  <p class="attente__alerte" role="alert">
+    {{ filesMuettes().length }} file(s) sans consommateur : un listener est probablement
+    tombe, et rien ne depile ce qui arrive.
+  </p>
+}
+
+<section class="journal">
+  <header class="journal__entete">
+    <h2 class="journal__titre">Journal des messages morts</h2>
+
+    <mat-form-field appearance="outline" class="journal__filtre">
+      <mat-label>Statut</mat-label>
+      <mat-select [(ngModel)]="statutChoisi" name="statut" (selectionChange)="changeStatut()">
+        <mat-option [value]="undefined">Tous</mat-option>
+        @for (statut of statuts; track statut) {
+          <mat-option [value]="statut">{{ statut }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <button
+      matButton="filled"
+      type="button"
+      [disabled]="selection().size === 0"
+      (click)="rejoueLaSelection()"
+    >
+      <mat-icon>replay</mat-icon>
+      Rejouer la selection ({{ selection().size }})
+    </button>
+  </header>
+
+  @if (message(); as texte) {
+    <p class="journal__message" role="status" aria-atomic="true">{{ texte }}</p>
+  }
+
+  @if (erreur(); as texte) {
+    <p class="journal__erreur" role="alert">{{ texte }}</p>
+  }
+
+  @if (enCours()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Chargement du journal" />
+  }
+
+  <div class="journal__table">
+    <table mat-table [dataSource]="morts()">
+      <ng-container matColumnDef="selection">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let mort">
+          <mat-checkbox
+            [checked]="estSelectionne(mort.id)"
+            [disabled]="mort.status !== 'PENDING'"
+            (change)="bascule(mort.id)"
+            [attr.aria-label]="'Selectionner le message ' + mort.id"
+          />
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="deadAt">
+        <th mat-header-cell *matHeaderCellDef>Mort le</th>
+        <td mat-cell *matCellDef="let mort">{{ mort.deadAt | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="originQueue">
+        <th mat-header-cell *matHeaderCellDef>File d'origine</th>
+        <td mat-cell *matCellDef="let mort" class="lf-mono">{{ mort.originQueue }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="clientName">
+        <th mat-header-cell *matHeaderCellDef>Client</th>
+        <td mat-cell *matCellDef="let mort">{{ mort.clientName || '—' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="failureReason">
+        <th mat-header-cell *matHeaderCellDef>Motif</th>
+        <td mat-cell *matCellDef="let mort" class="journal__motif">
+          {{ mort.failureReason || 'Motif non renseigne' }}
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Statut</th>
+        <td mat-cell *matCellDef="let mort">
+          <app-status-badge [status]="mort.status" />
+          @if (mort.replayedBy) {
+            <span class="journal__operateur">par {{ mort.replayedBy }}</span>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let mort">
+          @if (mort.status === 'PENDING') {
+            <button
+              matIconButton
+              type="button"
+              (click)="rejoue(mort)"
+              [matTooltip]="mort.replayWarning || 'Rejouer ce message'"
+              aria-label="Rejouer ce message"
+            >
+              <mat-icon>replay</mat-icon>
+            </button>
+            <button
+              matIconButton
+              type="button"
+              (click)="ecarte(mort)"
+              matTooltip="Ecarter definitivement"
+              aria-label="Ecarter ce message"
+            >
+              <mat-icon>block</mat-icon>
+            </button>
+            @if (mort.replayWarning) {
+              <!-- L'avertissement est calcule par le serveur : rejouer un lead.qualified le
+                   refait passer par l'attribution, et la rotation se decale. -->
+              <mat-icon class="journal__avertissement" [matTooltip]="mort.replayWarning">
+                warning
+              </mat-icon>
+            }
+          } @else {
+            <span class="journal__inactif">
+              {{ mort.replayedAt | date: 'dd/MM/yyyy HH:mm' }}
+            </span>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+      <tr mat-row *matRowDef="let mort; columns: colonnes"></tr>
+    </table>
+
+    @if (!enCours() && morts().length === 0 && !erreur()) {
+      <p class="vide">
+        Aucun message mort avec ce filtre. C'est l'etat normal : la DLQ est vidée au fil de
+        l'eau vers ce journal.
+      </p>
+    }
+
+    <mat-paginator
+      [length]="total()"
+      [pageIndex]="requete.page"
+      [pageSize]="requete.size"
+      [pageSizeOptions]="[25, 50, 100]"
+      (page)="changePage($event)"
+      aria-label="Pagination du journal"
+    />
+  </div>
+</section>
