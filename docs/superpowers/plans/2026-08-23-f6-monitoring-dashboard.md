@@ -5797,7 +5797,7 @@ Le découpage des trames est la seule logique frontend qui mérite un test unita
 trame SSE arrive en morceaux arbitraires, et un découpage naïf perd les événements coupés au
 milieu.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [x] **Step 1: Écrire le test qui échoue**
 
 ```ts
 import { decoupeTrames } from './lead-stream';
@@ -5838,12 +5838,12 @@ describe('decoupeTrames', () => {
 });
 ```
 
-- [ ] **Step 2: Vérifier que le test échoue**
+- [x] **Step 2: Vérifier que le test échoue**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 Expected: FAIL — `decoupeTrames` n'existe pas.
 
-- [ ] **Step 3: Écrire `LeadStream`**
+- [x] **Step 3: Écrire `LeadStream`**
 
 ```ts
 import { Injectable, NgZone, inject, signal } from '@angular/core';
@@ -5966,7 +5966,7 @@ export class LeadStream {
 }
 ```
 
-- [ ] **Step 4: Écrire `StatsApi` et l'écran**
+- [x] **Step 4: Écrire `StatsApi` et l'écran**
 
 `StatsApi.stats(clientId?, from?, to?)` — un `GET` avec les paramètres présents seulement,
 même règle que `LeadApi`.
@@ -5980,7 +5980,7 @@ un écran que personne ne regarde.
 Pas de camembert ni de courbe : `mat-progress-bar` et des compteurs (3.13). Une valeur à zéro
 s'affiche, elle ne se cache pas — c'est justement l'information.
 
-- [ ] **Step 5: Vérifier et committer**
+- [x] **Step 5: Vérifier et committer**
 
 Run: `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless`
 puis `npm run build`
@@ -6003,6 +6003,25 @@ dehors."
 ```
 
 ---
+
+### Ecarts constates a l'execution de T15
+
+- `decoupeTrames` gagne un cinquieme test : une charge utile **fractionnee sur plusieurs
+  lignes `data:`** est autorisee par la specification SSE et doit se recoller avec un saut
+  de ligne.
+- Le flux se rouvre aussi sur une **fin de flux nette**, pas seulement sur une erreur :
+  l'emetteur serveur expire au bout d'un temps fini, et `done` sans reconnexion laisserait
+  l'ecran muet jusqu'au prochain rechargement. Le minuteur de reconnexion est arme
+  `runOutsideAngular` — reprogramme sans fin dans la zone, il empecherait la stabilisation.
+- Une trame **JSON illisible** est ignoree au lieu de rompre la lecture : le morceau suivant
+  peut etre valide.
+- Les agregats sont relus quand le flux bouge, **au plus une fois toutes les dix secondes** :
+  les relire a chaque evenement noierait le serveur lors d'une rafale. Un bouton
+  « Suspendre » arrete ce rafraichissement, comme l'exige le motif temps reel retenu.
+- Un seul `role="status"` pour tout l'ecran, portant l'etat du flux et l'heure d'arret des
+  chiffres : une region vivante par compteur se disputerait la parole du lecteur d'ecran.
+- **La verification manuelle du critere de recette 4 reste a faire** : elle demande le
+  backend et l'infrastructure lancees, et un lead envoye au webhook.
 
 ## Task 16: Écrans File d'attente et Connecteurs
 

@@ -108,3 +108,19 @@ export interface SalesRepSummary {
   active: boolean;
   crmRef: string | null;
 }
+
+/**
+ * Un evenement du flux temps reel.
+ *
+ * Volontairement maigre : le flux dit qu'un lead a bouge et ou il en est, pas tout ce qu'il
+ * contient. L'ecran de detail reste la source complete, et une charge legere permet de
+ * diffuser a tous les abonnes sans relire la base.
+ */
+export interface StreamEvent {
+  leadId: string;
+  clientId: string;
+  status: LeadStatus;
+  score: number | null;
+  salesRepId: string | null;
+  occurredAt: string;
+}
