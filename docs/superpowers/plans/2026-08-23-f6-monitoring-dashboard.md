@@ -6241,7 +6241,7 @@ que le critere de recette exige de ne pas confondre avec « desactive »."
 `CLAUDE.md` porte **deux affirmations que F6 rend fausses**. Les laisser coûterait plus cher
 que le code lui-même : la prochaine session les lirait comme des invariants.
 
-- [ ] **Step 1: Écrire `docs/monitoring-api.md`**
+- [x] **Step 1: Écrire `docs/monitoring-api.md`**
 
 Sur le modèle de `docs/webhook-integration.md`. Pour chaque endpoint : la méthode, le chemin,
 les paramètres, un exemple `curl` complet avec le `Bearer`, et un exemple de réponse.
@@ -6267,7 +6267,7 @@ htpasswd -bnBC 10 "" 'mot-de-passe' | tr -d ':\n'
 Une section sur le journal des morts : ce qu'il contient, pourquoi il remplace la DLQ, et
 **l'avertissement sur le rejeu de `lead.qualified`**.
 
-- [ ] **Step 2: Corriger `CLAUDE.md`**
+- [x] **Step 2: Corriger `CLAUDE.md`**
 
 Trois modifications, dans l'ordre du fichier.
 
@@ -6293,7 +6293,7 @@ absent : les notifications au commercial (tâche d'agenda ERP, alerte des leads 
 `seuilChaud` de F3 toujours inutilisé, la réattribution manuelle, le CRUD des clients, les
 graphiques, et le déploiement (F7).
 
-- [ ] **Step 3: Ajouter une section « Monitoring » à `CLAUDE.md`**
+- [x] **Step 3: Ajouter une section « Monitoring » à `CLAUDE.md`**
 
 Après la section « Routage », sur le même modèle que les autres : les décisions qu'une
 modification ne doit pas casser.
@@ -6320,7 +6320,7 @@ Mettre à jour aussi la section « Configuration » : `LEADFLOW_JWT_SECRET`,
 `LEADFLOW_ADMIN_USER`, `LEADFLOW_ADMIN_PASSWORD_HASH`, et le fait que l'application refuse de
 démarrer sans secret JWT — comme pour `LEADFLOW_MASTER_KEY`.
 
-- [ ] **Step 4: Vérifier l'ensemble de F6**
+- [x] **Step 4: Vérifier l'ensemble de F6**
 
 ```bash
 cd backend && ./mvnw verify
@@ -6362,6 +6362,41 @@ git merge --no-ff feature/f6-monitoring-dashboard
 ```
 
 ---
+
+### Recette du 24 aout 2026 — resultats reels
+
+**Suite automatisee.** Backend : **294 tests, 0 echec, 0 erreur**, 53 classes, passees en
+quatre lots (les rapports periemes d'une session anterieure ont ete retires avant de compter,
+sans quoi le total etait faux de trois tests). Frontend : **21 tests verts** et build de
+production propre.
+
+**Les sept criteres, un par un.**
+
+| # | Critere | Verification | Resultat |
+| - | ------- | ------------ | -------- |
+| 1 | Connexion, jeton, 401 sans jeton | `AuthenticationTest` + appels reels | **OK** — mot de passe faux et identifiant inconnu rendent le meme 401 |
+| 2 | Lead en echec visible avec son motif, et rejouable | tests + rejeu reel | **OK** — rejeu 200, second rejeu 409 en `ProblemDetail`, `replayedBy = admin` |
+| 3 | Compteurs coherents avec la base | `StatsServiceTest` + `select count(*)` | **OK** — 16 leads, `FAILED 6 / REJECTED 3 / SYNCED 7`, identique des deux cotes |
+| 4 | Un lead apparait sans rechargement | flux SSE ouvert, lead signe envoye | **OK** — `CAPTURED`, `QUALIFIED` (score 80), `ROUTED` recus en direct |
+| 5 | Aucune reponse ne contient de secret | `ClientDirectoryTest` + corps reel | **OK** — aucun terme de secret dans `/api/clients` |
+| 6 | Desactive ≠ actif en echec | `ConnectorHealthServiceTest` + ecran | **OK** — `dolibarr` en « dernier appel en echec », `odoo` en « aucune synchronisation ». L'etat « desactive » n'a pu etre vu qu'en test : les deux fournisseurs sont actifs en configuration |
+| 7 | Le filet ne republie pas en boucle une mort `PENDING` | `QualifiedLeadRelayTest` + observation | **OK avec reserve** — voir ci-dessous |
+
+**Trois defauts trouves et corriges** (commit `657a4e2`) : la file d'origine des morts valait
+« inconnue » sur chaque ligne, le dashboard appelait `slice()` sur le `leadId` nul de la
+capture, et le taux de conversion s'affichait cent fois trop petit.
+
+### Reserve sur le critere 7, a traiter en F7
+
+Le garde-fou de `RoutedLeadRelay` fonctionne, mais il existe une **fenetre de course** : la
+republication met une quarantaine de secondes a mourir (trois tentatives avec backoff), alors
+que le filet balaye toutes les trente secondes. Un lead peut donc etre republie une fois de
+plus avant que sa premiere mort ne soit ecrite, ce qui produit **deux lignes `PENDING` pour le
+meme lead** — observe une fois pendant la recette. Ce n'est pas la boucle infinie que le
+garde-fou empeche, et le nombre reste borne : des qu'une ligne existe, le filet s'arrete.
+
+Deux facons de fermer la fenetre, a trancher en F7 : porter l'intervalle de balayage au-dela
+du temps total de backoff, ou marquer le lead comme « republication en vol » avant de publier.
 
 ## Après F6
 
