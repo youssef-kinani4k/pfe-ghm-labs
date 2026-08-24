@@ -52,8 +52,8 @@ public class DeadLetterListener {
         DeadLetter mort = new DeadLetter();
         String corps = new String(message.getBody(), StandardCharsets.UTF_8);
         mort.setPayload(corps);
-        mort.setOriginQueue(entete(message, "x-first-death-queue", "inconnue"));
         mort.setRoutingKey(entete(message, "x-original-routingKey", "inconnue"));
+        mort.setOriginQueue(fileDOrigine(message, mort.getRoutingKey()));
         mort.setContentType(message.getMessageProperties().getContentType());
         mort.setTypeId(entete(message, "__TypeId__", null));
         mort.setStatus(DeadLetterStatus.PENDING);
@@ -70,6 +70,32 @@ public class DeadLetterListener {
         // Le flux ne repasse pas par le broker : c'est le meme processus.
         diffuseur.diffuseMort(vue(ecrite));
         log.info("Mort journalisee : file {}, cle {}", mort.getOriginQueue(), mort.getRoutingKey());
+    }
+
+    /**
+     * File d'ou vient le message mort.
+     *
+     * <p>Elle se <b>deduit de la cle de routage</b>, et ne se lit pas dans un en-tete :
+     * {@code RepublishMessageRecoverer} n'en pose que quatre — exchange d'origine, cle de
+     * routage, message et trace d'exception. Le {@code x-first-death-queue} du protocole
+     * AMQP vient du mecanisme de dead-lettering du broker, que la republication court-circuite
+     * precisement pour pouvoir joindre la cause de l'echec. Le lire donnait « inconnue » sur
+     * chaque ligne, et rendait sans objet le filtre par file du journal.
+     *
+     * <p>L'en-tete reste consulte en premier : une ligne arrivee par le dead-lettering natif
+     * du broker, sans passer par le recoverer, le porte.
+     */
+    private static String fileDOrigine(Message message, String cleDeRoutage) {
+        String entete = entete(message, "x-first-death-queue", null);
+        if (entete != null) {
+            return entete;
+        }
+        return switch (cleDeRoutage) {
+            case RabbitMQConfig.LEADS_ROUTING_KEY -> RabbitMQConfig.LEADS_QUEUE;
+            case RabbitMQConfig.QUALIFIED_ROUTING_KEY -> RabbitMQConfig.QUALIFIED_QUEUE;
+            case RabbitMQConfig.ROUTED_ROUTING_KEY -> RabbitMQConfig.ROUTED_QUEUE;
+            default -> "inconnue";
+        };
     }
 
     /** Vue maigre : {@code clientName} reste nul, l'ecran rechargeant la liste au clic. */
@@ -118,7 +144,7 @@ public class DeadLetterListener {
         }
     }
 
-    private String entete(Message message, String nom, String defaut) {
+    private static String entete(Message message, String nom, String defaut) {
         Object valeur = message.getMessageProperties().getHeaders().get(nom);
         return valeur == null ? defaut : valeur.toString();
     }

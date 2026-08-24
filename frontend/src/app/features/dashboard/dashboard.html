@@ -48,7 +48,11 @@
 
   <mat-card appearance="outlined" class="compteurs__carte compteurs__carte--vedette">
     <p class="compteurs__libelle">Taux de conversion</p>
-    <p class="compteurs__valeur">{{ (stats()?.tauxDeConversion ?? 0) | number: '1.0-1' }}%</p>
+    <!-- Le backend rend un ratio dans [0,1], pas un pourcentage : la conversion en
+         centiemes se fait ici, au seul endroit qui ajoute le signe %. -->
+    <p class="compteurs__valeur">
+      {{ ((stats()?.tauxDeConversion ?? 0) * 100 | number: '1.0-1') }}%
+    </p>
     <p class="compteurs__note">Part des leads synchronises dans l'ERP</p>
   </mat-card>
 
@@ -155,14 +159,24 @@
           </p>
         }
         @for (evenement of flux.derniersLeads(); track $index) {
-          <a class="evenement" [routerLink]="['/leads', evenement.leadId]">
-            <app-status-badge [status]="evenement.status" />
-            <span class="evenement__id lf-mono">{{ evenement.leadId.slice(0, 8) }}</span>
-            @if (evenement.score !== null) {
-              <span class="evenement__score lf-mono">{{ evenement.score }}</span>
-            }
-            <span class="evenement__heure">{{ evenement.occurredAt | date: 'HH:mm:ss' }}</span>
-          </a>
+          <!-- La capture n'a pas encore d'identifiant de lead : la ligne s'affiche, mais
+               elle ne mene nulle part tant que la qualification n'a pas eu lieu. -->
+          @if (evenement.leadId; as identifiant) {
+            <a class="evenement" [routerLink]="['/leads', identifiant]">
+              <app-status-badge [status]="evenement.status" />
+              <span class="evenement__id lf-mono">{{ identifiant.slice(0, 8) }}</span>
+              @if (evenement.score !== null) {
+                <span class="evenement__score lf-mono">{{ evenement.score }}</span>
+              }
+              <span class="evenement__heure">{{ evenement.occurredAt | date: 'HH:mm:ss' }}</span>
+            </a>
+          } @else {
+            <div class="evenement">
+              <app-status-badge [status]="evenement.status" />
+              <span class="evenement__id">evenement brut</span>
+              <span class="evenement__heure">{{ evenement.occurredAt | date: 'HH:mm:ss' }}</span>
+            </div>
+          }
         } @empty {
           <p class="vide">
             Rien n'est encore passe depuis l'ouverture de cet ecran. Les leads apparaissent

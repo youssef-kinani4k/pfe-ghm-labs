@@ -117,9 +117,14 @@ export interface SalesRepSummary {
  * diffuser a tous les abonnes sans relire la base.
  */
 export interface StreamEvent {
-  leadId: string;
+  /**
+   * Nul pendant la capture : le flux n'a d'identifiant de lead qu'a partir de la
+   * qualification, l'evenement brut n'en ayant pas encore.
+   */
+  leadId: string | null;
   clientId: string;
-  status: LeadStatus;
+  /** `CAPTURED` n'est pas un statut de lead : c'est une etape que seul le flux rapporte. */
+  status: LeadStatus | 'CAPTURED';
   score: number | null;
   salesRepId: string | null;
   occurredAt: string;

@@ -42,8 +42,10 @@ class DeadLetterListenerTest {
         MessageProperties proprietes = new MessageProperties();
         proprietes.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         proprietes.setHeader("__TypeId__", "com.leadflow.qualification.QualifiedLeadMessage");
+        // Volontairement pas de x-first-death-queue : RepublishMessageRecoverer ne pose que
+        // quatre en-tetes — exchange, cle de routage, message et trace d'exception. Poser
+        // ici un en-tete que la production n'emet jamais rendrait ce test complaisant.
         proprietes.setHeader("x-original-routingKey", RabbitMQConfig.QUALIFIED_ROUTING_KEY);
-        proprietes.setHeader("x-first-death-queue", RabbitMQConfig.QUALIFIED_QUEUE);
         proprietes.setHeader("x-exception-message", "Aucun commercial actif pour ce client");
         Message message = MessageBuilder.withBody(corps.getBytes()).andProperties(proprietes)
                 .build();
@@ -55,6 +57,8 @@ class DeadLetterListenerTest {
                 assertThat(mort.getStatus()).isEqualTo(DeadLetterStatus.PENDING);
                 assertThat(mort.getRoutingKey())
                         .isEqualTo(RabbitMQConfig.QUALIFIED_ROUTING_KEY);
+                // La file d'origine se deduit de la cle de routage, faute d'en-tete.
+                assertThat(mort.getOriginQueue()).isEqualTo(RabbitMQConfig.QUALIFIED_QUEUE);
                 assertThat(mort.getTypeId())
                         .isEqualTo("com.leadflow.qualification.QualifiedLeadMessage");
                 assertThat(mort.getFailureReason())

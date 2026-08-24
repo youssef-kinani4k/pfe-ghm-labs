@@ -10,6 +10,8 @@ type Ton = 'succes' | 'attente' | 'echec' | 'neutre';
  * repeter dans quatre ecrans la ferait diverger au premier ajout.
  */
 const TONS: Record<string, { ton: Ton; libelle: string }> = {
+  // Etape rapportee par le seul flux temps reel, avant qu'un lead n'existe.
+  CAPTURED: { ton: 'neutre', libelle: 'Capture' },
   // Leads
   QUALIFIED: { ton: 'neutre', libelle: 'Qualifie' },
   ROUTED: { ton: 'attente', libelle: 'Attribue' },

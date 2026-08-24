@@ -220,13 +220,17 @@ curl -s http://localhost:8090/api/stats -H "Authorization: Bearer $JETON" | jq
   "total": 143,
   "leadsParStatut": { "QUALIFIED": 12, "ROUTED": 9, "SYNCED": 118, "FAILED": 4 },
   "evenementsParStatut": { "RECEIVED": 2, "PUBLISHED": 148, "DISCARDED": 5 },
-  "tauxDeConversion": 82.5,
+  "tauxDeConversion": 0.825,
   "leadsParIntention": { "DEVIS": 88, "INFORMATION": 41, "AUTRE": 14 },
   "leadsParSourceDIntention": { "GEMINI": 130, "RULES": 13 },
   "leadsParCommercial": { "3a90...": 74, "77bd...": 69 },
   "nomsDeCommercial": { "3a90...": "Sara Bennani", "77bd...": "Youssef Alami" }
 }
 ```
+
+**`tauxDeConversion` est un ratio dans `[0,1]`, pas un pourcentage** : `0.825` se lit 82,5 %.
+La multiplication par cent appartient à l'affichage, et un client qui ajoute un signe `%` sans
+convertir affichera une valeur cent fois trop petite.
 
 `leadsParCommercial` a des identifiants pour clés ; `nomsDeCommercial` les accompagne, sans
 quoi un écran afficherait des UUID. Chaque mesure est une requête d'agrégation : rien n'est
