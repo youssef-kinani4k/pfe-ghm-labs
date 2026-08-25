@@ -40,6 +40,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/boutiques/boutiques').then((m) => m.Boutiques),
   },
   {
+    path: 'boutiques/:id',
+    title: 'Boutique',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/boutiques/boutique-detail/boutique-detail').then((m) => m.BoutiqueDetail),
+  },
+  {
     path: 'connectors',
     title: 'Connecteurs ERP',
     canActivate: [authGuard],

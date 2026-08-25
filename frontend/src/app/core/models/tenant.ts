@@ -10,11 +10,7 @@ import { AssignmentStrategy } from './monitoring';
 
 /** Les causes que la sonde peut rendre, telles que l'enumeration du backend les nomme. */
 export type CrmCheckCause =
-  | 'JOIGNABLE'
-  | 'INJOIGNABLE'
-  | 'IDENTIFIANTS_REFUSES'
-  | 'CIBLE_INCONNUE'
-  | 'REPONSE_INATTENDUE';
+  'JOIGNABLE' | 'INJOIGNABLE' | 'IDENTIFIANTS_REFUSES' | 'CIBLE_INCONNUE' | 'REPONSE_INATTENDUE';
 
 /** Ligne de la liste des boutiques. Aucun reglage ERP : la fiche s'en charge. */
 export interface ClientSummaryAdmin {

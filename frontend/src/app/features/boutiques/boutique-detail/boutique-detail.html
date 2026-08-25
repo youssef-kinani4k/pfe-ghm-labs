@@ -1,0 +1,365 @@
+<a matButton routerLink="/boutiques" class="fiche__retour">
+  <mat-icon>arrow_back</mat-icon>
+  Retour aux boutiques
+</a>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement de la boutique" />
+}
+
+@if (erreur(); as texte) {
+  <p class="fiche__erreur" role="alert">{{ texte }}</p>
+}
+
+@if (message(); as texte) {
+  <p class="fiche__message" role="status">{{ texte }}</p>
+}
+
+@if (boutique(); as fiche) {
+  <article class="fiche">
+    <form [formGroup]="formulaire" (ngSubmit)="enregistre()">
+      <mat-card appearance="outlined" class="fiche__bloc">
+        <mat-card-header>
+          <mat-card-title class="fiche__titre">
+            {{ fiche.name }}
+            @if (fiche.active) {
+              <span class="fiche__etat fiche__etat--active">Active</span>
+            } @else {
+              <span class="fiche__etat">Desactivee</span>
+            }
+          </mat-card-title>
+          <mat-card-subtitle>Identite et regle d'attribution</mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content class="fiche__champs">
+          <mat-form-field appearance="outline">
+            <mat-label>Nom de la boutique</mat-label>
+            <input matInput formControlName="name" />
+            @if (formulaire.controls.name.hasError('required')) {
+              <mat-error>Le nom est obligatoire.</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Attribution des leads</mat-label>
+            <mat-select formControlName="assignmentStrategy">
+              @for (strategie of strategies; track strategie.valeur) {
+                <mat-option [value]="strategie.valeur">{{ strategie.libelle }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>
+              Geographique et sectorielle retombent sur le tour de role si leur critere ne trouve
+              personne.
+            </mat-hint>
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="fiche__bloc">
+        <mat-card-header>
+          <mat-card-title class="fiche__sous-titre">ERP</mat-card-title>
+          <mat-card-subtitle>
+            Les champs ci-dessous sont ceux que le connecteur declare : ajouter un ERP au backend
+            les fait apparaitre ici sans toucher au dashboard.
+          </mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content class="fiche__champs">
+          <mat-form-field appearance="outline">
+            <mat-label>Fournisseur</mat-label>
+            <mat-select
+              formControlName="crmProviderId"
+              (selectionChange)="changeDeFournisseur($event.value)"
+            >
+              @for (fournisseur of fournisseurs(); track fournisseur.providerId) {
+                <mat-option [value]="fournisseur.providerId">
+                  {{ fournisseur.providerId }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <div formGroupName="crmSettings" class="fiche__champs">
+            @for (reglage of reglages(); track reglage.cle) {
+              <mat-form-field appearance="outline">
+                <mat-label>{{ reglage.cle }}</mat-label>
+                <input
+                  matInput
+                  [type]="reglage.secret ? 'password' : 'text'"
+                  [formControlName]="reglage.cle"
+                  [placeholder]="reglage.secret ? 'inchangee' : ''"
+                />
+                <mat-hint>{{ reglage.libelle }}</mat-hint>
+              </mat-form-field>
+            }
+          </div>
+
+          @if (reglages().length === 0) {
+            <p class="fiche__vide">
+              Ce fournisseur n'est pas declare par le backend : ses reglages ne peuvent pas etre
+              affiches.
+            </p>
+          }
+        </mat-card-content>
+
+        <mat-card-actions class="fiche__actions">
+          <button matButton type="button" [disabled]="testEnCours()" (click)="teste()">
+            <mat-icon>network_check</mat-icon>
+            Tester la connexion
+          </button>
+          @if (testeAveugle()) {
+            <span class="fiche__note">
+              La sonde ne lit pas la base : saisir la cle pour la tester reellement.
+            </span>
+          }
+        </mat-card-actions>
+
+        @if (testEnCours()) {
+          <mat-progress-bar mode="indeterminate" aria-label="Test de connexion en cours" />
+        }
+
+        @if (resultatDuTest(); as resultat) {
+          <div
+            class="fiche__resultat"
+            [class.fiche__resultat--ok]="resultat.ok"
+            [class.fiche__resultat--echec]="!resultat.ok"
+            role="status"
+          >
+            <mat-icon>{{ resultat.ok ? 'check_circle' : 'error' }}</mat-icon>
+            <span>{{ phrase(resultat.cause) }}</span>
+          </div>
+
+          @if (resultat.detail) {
+            <mat-expansion-panel class="fiche__detail">
+              <mat-expansion-panel-header>
+                <mat-panel-title>Detail technique</mat-panel-title>
+              </mat-expansion-panel-header>
+              <pre class="lf-mono fiche__trace">{{ resultat.detail }}</pre>
+            </mat-expansion-panel>
+          }
+        }
+      </mat-card>
+
+      <div class="fiche__barre">
+        <button
+          matButton="filled"
+          type="submit"
+          [disabled]="enregistrement() || formulaire.invalid"
+        >
+          <mat-icon>save</mat-icon>
+          Enregistrer
+        </button>
+        <button matButton type="button" (click)="basculeLActivation()">
+          <mat-icon>{{ fiche.active ? 'block' : 'play_arrow' }}</mat-icon>
+          {{ fiche.active ? 'Desactiver la boutique' : 'Reactiver la boutique' }}
+        </button>
+      </div>
+    </form>
+
+    <mat-card appearance="outlined" class="fiche__bloc">
+      <mat-card-header>
+        <mat-card-title class="fiche__sous-titre">Commerciaux</mat-card-title>
+        <mat-card-subtitle>
+          Une boutique sans commercial actif capte des leads que personne ne recevra.
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="fiche__table">
+          <table mat-table [dataSource]="fiche.salesReps">
+            <ng-container matColumnDef="fullName">
+              <th mat-header-cell *matHeaderCellDef>Nom</th>
+              <td mat-cell *matCellDef="let rep">{{ rep.fullName }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="email">
+              <th mat-header-cell *matHeaderCellDef>Email</th>
+              <td mat-cell *matCellDef="let rep">{{ rep.email }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="sector">
+              <th mat-header-cell *matHeaderCellDef>Secteur</th>
+              <td mat-cell *matCellDef="let rep">{{ rep.sector || '—' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="zone">
+              <th mat-header-cell *matHeaderCellDef>Zone</th>
+              <td mat-cell *matCellDef="let rep">{{ rep.zone || '—' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="crmRef">
+              <th mat-header-cell *matHeaderCellDef>Ref. ERP</th>
+              <td mat-cell *matCellDef="let rep" class="lf-mono">{{ rep.crmRef || '—' }}</td>
+            </ng-container>
+
+            <ng-container matColumnDef="active">
+              <th mat-header-cell *matHeaderCellDef>Etat</th>
+              <td mat-cell *matCellDef="let rep">
+                @if (rep.active) {
+                  <span class="fiche__etat fiche__etat--active">Actif</span>
+                } @else {
+                  <span class="fiche__etat">Inactif</span>
+                }
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef aria-label="Actions"></th>
+              <td mat-cell *matCellDef="let rep" class="fiche__cellule-actions">
+                <button
+                  matIconButton
+                  type="button"
+                  matTooltip="Modifier"
+                  [attr.aria-label]="'Modifier ' + rep.fullName"
+                  (click)="edite(rep)"
+                >
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button
+                  matIconButton
+                  type="button"
+                  [matTooltip]="rep.active ? 'Desactiver' : 'Reactiver'"
+                  [attr.aria-label]="(rep.active ? 'Desactiver ' : 'Reactiver ') + rep.fullName"
+                  (click)="basculeLeCommercial(rep)"
+                >
+                  <mat-icon>{{ rep.active ? 'person_off' : 'person_add' }}</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+            <tr
+              mat-row
+              *matRowDef="let rep; columns: colonnes"
+              [class.fiche__ligne--inactive]="!rep.active"
+            ></tr>
+          </table>
+
+          @if (fiche.salesReps.length === 0) {
+            <p class="fiche__vide">Aucun commercial. Le formulaire ci-dessous en ajoute un.</p>
+          }
+        </div>
+
+        <form
+          [formGroup]="formulaireCommercial"
+          (ngSubmit)="soumetLeCommercial()"
+          class="commercial"
+        >
+          <h3 class="commercial__titre">
+            {{ commercialEnEdition() ? 'Modifier le commercial' : 'Ajouter un commercial' }}
+          </h3>
+          <div class="commercial__champs">
+            <mat-form-field appearance="outline">
+              <mat-label>Nom complet</mat-label>
+              <input matInput formControlName="fullName" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Email</mat-label>
+              <input matInput type="email" formControlName="email" />
+              @if (formulaireCommercial.controls.email.hasError('email')) {
+                <mat-error>Cette adresse n'est pas valide.</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Secteur</mat-label>
+              <input matInput formControlName="sector" />
+              <mat-hint>Utilise par la strategie sectorielle.</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Zone</mat-label>
+              <input matInput formControlName="zone" />
+              <mat-hint>Utilisee par la strategie geographique.</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Reference ERP</mat-label>
+              <input matInput formControlName="crmRef" />
+              <mat-hint>Laisser vide : le connecteur la resout et la memorise.</mat-hint>
+            </mat-form-field>
+          </div>
+          <div class="commercial__actions">
+            <button matButton="filled" type="submit" [disabled]="formulaireCommercial.invalid">
+              {{ commercialEnEdition() ? 'Enregistrer' : 'Ajouter' }}
+            </button>
+            @if (commercialEnEdition()) {
+              <button matButton type="button" (click)="annuleLEdition()">Annuler</button>
+            }
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="fiche__bloc">
+      <mat-card-header>
+        <mat-card-title class="fiche__sous-titre">Integration</mat-card-title>
+        <mat-card-subtitle>
+          Ce que la boutique doit configurer de son cote pour envoyer ses leads.
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <dl class="champs">
+          <div class="champs__paire">
+            <dt>URL du webhook</dt>
+            <dd class="champs__valeur">
+              <span class="lf-mono">{{ fiche.webhookPath }}</span>
+              <button
+                matIconButton
+                type="button"
+                matTooltip="Copier"
+                aria-label="Copier l'URL du webhook"
+                (click)="copie(fiche.webhookPath)"
+              >
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Cle publique</dt>
+            <dd class="champs__valeur">
+              <span class="lf-mono">{{ fiche.publicKey }}</span>
+              <button
+                matIconButton
+                type="button"
+                matTooltip="Copier"
+                aria-label="Copier la cle publique"
+                (click)="copie(fiche.publicKey)"
+              >
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </dd>
+          </div>
+          <div class="champs__paire">
+            <dt>Secret HMAC</dt>
+            <dd>Jamais reaffiche : il n'est rendu qu'a la creation et a la regeneration.</dd>
+          </div>
+        </dl>
+
+        @if (secretRevele(); as secret) {
+          <div class="secret" role="status">
+            <p class="secret__avertissement">
+              <mat-icon>warning</mat-icon>
+              Nouveau secret. Il ne sera plus jamais affiche — le transmettre a la boutique
+              maintenant.
+            </p>
+            <p class="secret__valeur lf-mono">{{ secret }}</p>
+            <button matButton type="button" (click)="copie(secret)">
+              <mat-icon>content_copy</mat-icon>
+              Copier
+            </button>
+          </div>
+        }
+      </mat-card-content>
+
+      <mat-card-actions class="fiche__actions">
+        <button matButton type="button" (click)="regenereLeSecret()">
+          <mat-icon>key</mat-icon>
+          Regenerer le secret
+        </button>
+        <button matButton type="button" (click)="regenereLaClePublique()">
+          <mat-icon>link</mat-icon>
+          Regenerer la cle publique
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </article>
+}
