@@ -39,6 +39,7 @@ export class App {
     { chemin: '/dashboard', libelle: 'Dashboard', icone: 'monitoring' },
     { chemin: '/leads', libelle: 'Leads', icone: 'contacts' },
     { chemin: '/queue', libelle: "File d'attente", icone: 'inbox' },
+    { chemin: '/boutiques', libelle: 'Boutiques', icone: 'storefront' },
     { chemin: '/connectors', libelle: 'Connecteurs', icone: 'cable' },
   ];
 

@@ -34,6 +34,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/queue/queue').then((m) => m.Queue),
   },
   {
+    path: 'boutiques',
+    title: 'Boutiques',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/boutiques/boutiques').then((m) => m.Boutiques),
+  },
+  {
     path: 'connectors',
     title: 'Connecteurs ERP',
     canActivate: [authGuard],

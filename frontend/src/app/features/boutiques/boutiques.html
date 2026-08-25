@@ -1,0 +1,98 @@
+<header class="boutiques__entete">
+  <h1 class="boutiques__titre">Boutiques</h1>
+  <button matButton type="button" [disabled]="enCours()" (click)="charge()">
+    <mat-icon>refresh</mat-icon>
+    Rafraichir
+  </button>
+  <span class="boutiques__espace"></span>
+  <button matButton="filled" type="button" routerLink="/boutiques/nouvelle">
+    <mat-icon>add</mat-icon>
+    Nouvelle boutique
+  </button>
+</header>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+@if (erreur(); as message) {
+  <p class="boutiques__erreur" role="alert">{{ message }}</p>
+}
+
+@if (sansCommercial().length > 0) {
+  <p class="boutiques__alerte" role="alert">
+    {{ sansCommercial().length }} boutique(s) active(s) sans commercial : leurs leads seront
+    captes mais ne pourront etre attribues a personne.
+  </p>
+}
+
+<div class="boutiques__table">
+  <table mat-table [dataSource]="boutiques()">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Nom</th>
+      <td mat-cell *matCellDef="let boutique">{{ boutique.name }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="crmProviderId">
+      <th mat-header-cell *matHeaderCellDef>ERP</th>
+      <td mat-cell *matCellDef="let boutique" class="lf-mono">{{ boutique.crmProviderId }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="assignmentStrategy">
+      <th mat-header-cell *matHeaderCellDef>Attribution</th>
+      <td mat-cell *matCellDef="let boutique">{{ strategie(boutique.assignmentStrategy) }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="activeSalesReps">
+      <th mat-header-cell *matHeaderCellDef>Commerciaux</th>
+      <td mat-cell *matCellDef="let boutique">
+        <!-- Zero commercial actif est la mesure la plus lisible d'un routage qui echouera. -->
+        @if (boutique.activeSalesReps === 0) {
+          <span class="boutiques__critique">aucun commercial</span>
+        } @else {
+          {{ boutique.activeSalesReps }}
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="active">
+      <th mat-header-cell *matHeaderCellDef>Etat</th>
+      <td mat-cell *matCellDef="let boutique">
+        <!-- Le libelle accompagne toujours la couleur : le vert seul ne se distingue pas
+             pour une partie des lecteurs, et l'ecran s'imprime en noir et blanc. -->
+        @if (boutique.active) {
+          <span class="boutiques__etat boutiques__etat--active">Active</span>
+        } @else {
+          <span class="boutiques__etat">Desactivee</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef aria-label="Actions"></th>
+      <td mat-cell *matCellDef="let boutique">
+        <a
+          matIconButton
+          [routerLink]="['/boutiques', boutique.id]"
+          matTooltip="Ouvrir la fiche"
+          [attr.aria-label]="'Ouvrir la fiche de ' + boutique.name"
+        >
+          <mat-icon>chevron_right</mat-icon>
+        </a>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+    <tr
+      mat-row
+      *matRowDef="let boutique; columns: colonnes"
+      class="boutiques__ligne"
+      [class.boutiques__ligne--inactive]="!boutique.active"
+      [routerLink]="['/boutiques', boutique.id]"
+    ></tr>
+  </table>
+
+  @if (boutiques().length === 0 && !enCours()) {
+    <p class="vide">Aucune boutique. Le bouton « Nouvelle boutique » en cree une.</p>
+  }
+</div>
