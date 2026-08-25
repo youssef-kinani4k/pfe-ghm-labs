@@ -7,6 +7,7 @@ import com.leadflow.tenant.dto.ClientCreated;
 import com.leadflow.tenant.dto.ClientDetailAdmin;
 import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
+import com.leadflow.tenant.dto.SecretRotated;
 import com.leadflow.tenant.dto.SalesRepAdminView;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -156,6 +157,34 @@ public class ClientAdminService {
         // Les commerciaux ne sont pas touches : la reactivation doit restituer la
         // configuration telle quelle, et coupler les deux ferait perdre qui etait actif.
         client.setActive(actif);
+        return fiche(client.getId());
+    }
+
+    /**
+     * Regenere le secret HMAC.
+     *
+     * <p>Irreversible : l'ancien n'est nulle part, et le formulaire de la boutique cessera de
+     * fonctionner tant qu'elle n'aura pas mis a jour son cote. L'ecran l'annonce avant de
+     * confirmer.
+     */
+    @Transactional
+    public SecretRotated tourneLeSecret(UUID id) {
+        Client client = trouve(id);
+        String secret = generateur.secretHmac();
+        client.setHmacSecret(secret);
+        return new SecretRotated(secret);
+    }
+
+    /**
+     * Regenere la cle publique, donc l'URL du webhook.
+     *
+     * <p>C'est precisement pour cela que la cle publique est distincte de la cle primaire :
+     * elle est revocable sans recreer la ligne, et sans perdre les leads deja captures.
+     */
+    @Transactional
+    public ClientDetailAdmin tourneLaClePublique(UUID id) {
+        Client client = trouve(id);
+        client.setPublicKey(generateur.clePublique());
         return fiche(client.getId());
     }
 

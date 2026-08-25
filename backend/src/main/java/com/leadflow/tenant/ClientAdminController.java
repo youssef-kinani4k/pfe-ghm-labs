@@ -4,6 +4,7 @@ import com.leadflow.tenant.dto.ClientCreated;
 import com.leadflow.tenant.dto.ClientDetailAdmin;
 import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
+import com.leadflow.tenant.dto.SecretRotated;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -65,5 +66,19 @@ public class ClientAdminController {
     @PostMapping("/{id}/deactivate")
     public ClientDetailAdmin desactive(@PathVariable UUID id) {
         return service.change(id, false);
+    }
+
+    /**
+     * Le secret tourne est rendu par cette seule reponse : ni la fiche ni la liste ne le
+     * portent, donc l'ecran doit le faire copier maintenant ou le perdre.
+     */
+    @PostMapping("/{id}/rotate-secret")
+    public SecretRotated tourneLeSecret(@PathVariable UUID id) {
+        return service.tourneLeSecret(id);
+    }
+
+    @PostMapping("/{id}/rotate-public-key")
+    public ClientDetailAdmin tourneLaClePublique(@PathVariable UUID id) {
+        return service.tourneLaClePublique(id);
     }
 }
