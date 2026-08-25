@@ -335,18 +335,12 @@
         </dl>
 
         @if (secretRevele(); as secret) {
-          <div class="secret" role="status">
-            <p class="secret__avertissement">
-              <mat-icon>warning</mat-icon>
-              Nouveau secret. Il ne sera plus jamais affiche — le transmettre a la boutique
-              maintenant.
-            </p>
-            <p class="secret__valeur lf-mono">{{ secret }}</p>
-            <button matButton type="button" (click)="copie(secret)">
-              <mat-icon>content_copy</mat-icon>
-              Copier
-            </button>
-          </div>
+          <app-secret-revele
+            [secret]="secret"
+            [clePublique]="fiche.publicKey"
+            [cheminWebhook]="fiche.webhookPath"
+            (accuse)="secretRevele.set(null)"
+          />
         }
       </mat-card-content>
 

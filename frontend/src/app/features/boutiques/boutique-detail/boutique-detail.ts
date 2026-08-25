@@ -26,6 +26,7 @@ import {
   CrmTestResult,
   SalesRepAdminView,
 } from '../../../core/models/tenant';
+import { SecretRevele } from '../secret-revele/secret-revele';
 
 const STRATEGIES: { valeur: AssignmentStrategy; libelle: string }[] = [
   { valeur: 'ROUND_ROBIN', libelle: 'Tour de role' },
@@ -59,6 +60,7 @@ const STRATEGIES: { valeur: AssignmentStrategy; libelle: string }[] = [
     MatProgressBarModule,
     MatExpansionModule,
     MatTooltipModule,
+    SecretRevele,
   ],
   templateUrl: './boutique-detail.html',
   styleUrl: './boutique-detail.scss',
@@ -103,6 +105,9 @@ export class BoutiqueDetail implements OnInit {
 
   private readonly providerId = signal('');
 
+  /** Incremente a chaque frappe dans le bloc ERP : voir `testeAveugle`. */
+  private readonly saisie = signal(0);
+
   /** Les champs du fournisseur choisi, tels que le backend les declare. */
   readonly reglages = computed(
     () => this.fournisseurs().find((f) => f.providerId === this.providerId())?.settings ?? [],
@@ -113,11 +118,14 @@ export class BoutiqueDetail implements OnInit {
    * Un champ secret laisse vide se teste donc a vide, et le dire evite un « IDENTIFIANTS
    * REFUSES » incomprehensible.
    */
-  readonly testeAveugle = computed(() =>
-    this.reglages().some(
+  readonly testeAveugle = computed(() => {
+    // `saisie` n'est pas utilise : il rend le calcul dependant de la frappe, que les
+    // controles de formulaire ne signalent pas d'eux-memes a un `computed`.
+    this.saisie();
+    return this.reglages().some(
       (reglage) => reglage.secret && !this.reglagesGroup.get(reglage.cle)?.value,
-    ),
-  );
+    );
+  });
 
   get reglagesGroup(): FormGroup {
     return this.formulaire.get('crmSettings') as FormGroup;
@@ -185,10 +193,9 @@ export class BoutiqueDetail implements OnInit {
       // Un reglage secret n'est jamais rendu par l'API : le champ part vide, et vide veut
       // dire « inchange » cote backend.
       const valeur = reglage.secret ? '' : (valeurs[reglage.cle] ?? '');
-      groupe.addControl(
-        reglage.cle,
-        new FormControl(valeur, reglage.secret ? [] : [Validators.required]),
-      );
+      const controle = new FormControl(valeur, reglage.secret ? [] : [Validators.required]);
+      controle.valueChanges.subscribe(() => this.saisie.update((tour) => tour + 1));
+      groupe.addControl(reglage.cle, controle);
     }
   }
 

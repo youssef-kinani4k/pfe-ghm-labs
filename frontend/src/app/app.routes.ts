@@ -40,6 +40,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/boutiques/boutiques').then((m) => m.Boutiques),
   },
   {
+    path: 'boutiques/nouvelle',
+    title: 'Nouvelle boutique',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/boutiques/boutique-nouvelle/boutique-nouvelle').then(
+        (m) => m.BoutiqueNouvelle,
+      ),
+  },
+  {
     path: 'boutiques/:id',
     title: 'Boutique',
     canActivate: [authGuard],

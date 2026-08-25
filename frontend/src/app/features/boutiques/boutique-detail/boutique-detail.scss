@@ -187,29 +187,3 @@
     gap: var(--lf-space-1);
   }
 }
-
-// Le secret revele se distingue du reste de la fiche : c'est la seule zone dont le contenu
-// disparait au rechargement, et l'operateur doit comprendre qu'il ne la retrouvera pas.
-.secret {
-  margin-top: var(--lf-space-3);
-  padding: var(--lf-space-2);
-  border: 1px solid var(--lf-attente);
-  border-radius: 0.5rem;
-  background: var(--lf-attente-fond);
-
-  &__avertissement {
-    display: flex;
-    align-items: center;
-    gap: var(--lf-space-1);
-    margin: 0 0 var(--lf-space-1);
-    color: var(--lf-attente);
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  &__valeur {
-    margin: 0 0 var(--lf-space-2);
-    font-size: 0.875rem;
-    overflow-wrap: anywhere;
-  }
-}
