@@ -9,7 +9,9 @@ import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
 import com.leadflow.config.RabbitMQConfig;
 import com.leadflow.crm.model.CrmAssignee;
+import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmLead;
+import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
@@ -24,6 +26,7 @@ import com.leadflow.tenant.SalesRep;
 import com.leadflow.tenant.SalesRepRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -70,6 +73,16 @@ class CrmSyncListenerTest {
                 @Override
                 public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
                     return "U-1";
+                }
+
+                @Override
+                public List<CrmSettingSpec> reglagesAttendus() {
+                    return List.of();
+                }
+
+                @Override
+                public CrmCheck verifieAcces(CrmTarget cible) {
+                    return CrmCheck.joignable(null);
                 }
             };
         }

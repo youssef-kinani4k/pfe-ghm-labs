@@ -1,7 +1,7 @@
 package com.leadflow.monitoring.deadletter;
 
+import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.config.RabbitMQConfig;
-import com.leadflow.monitoring.RessourceIntrouvableException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;

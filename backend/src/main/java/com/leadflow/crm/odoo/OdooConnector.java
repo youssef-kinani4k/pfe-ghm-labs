@@ -2,13 +2,16 @@ package com.leadflow.crm.odoo;
 
 import com.leadflow.crm.CrmConnector;
 import com.leadflow.crm.model.CrmAssignee;
+import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmLead;
+import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmSyncResult;
 import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -73,6 +76,20 @@ public class OdooConnector implements CrmConnector {
     public String resolveAssignee(CrmAssignee assignee, CrmTarget target) {
         return client.chercheUtilisateurParEmail(
                 target, client.authentifie(target), assignee.email());
+    }
+
+    @Override
+    public List<CrmSettingSpec> reglagesAttendus() {
+        return List.of(
+                new CrmSettingSpec("baseUrl", "Adresse du serveur, sans /jsonrpc", false),
+                new CrmSettingSpec("database", "Base Odoo visee", false),
+                new CrmSettingSpec("username", "Login du compte de service", false),
+                new CrmSettingSpec("apiKey", "Mot de passe ou cle d'API de ce compte", true));
+    }
+
+    @Override
+    public CrmCheck verifieAcces(CrmTarget cible) {
+        return client.verifieAcces(cible);
     }
 
     private Map<String, Object> champsSociete(CrmLead lead) {

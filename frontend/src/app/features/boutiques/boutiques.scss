@@ -1,0 +1,87 @@
+:host {
+  display: block;
+}
+
+.boutiques {
+  &__entete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-3);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+  }
+
+  // Pousse la creation a l'oppose des actions de lecture : le geste qui ecrit ne doit pas
+  // se trouver sous le curseur de celui qui ne fait que consulter.
+  &__espace {
+    flex: 1 1 auto;
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+  }
+
+  &__alerte {
+    margin: 0 0 var(--lf-space-3);
+    padding: var(--lf-space-2);
+    border-left: 3px solid var(--lf-attente);
+    border-radius: 0.25rem;
+    background: var(--lf-attente-fond);
+    color: var(--lf-attente);
+    font-size: 0.875rem;
+  }
+
+  // Le tableau defile dans son propre cadre : sur un ecran etroit, une table large qui
+  // deborde pousserait toute la page horizontalement.
+  &__table {
+    overflow-x: auto;
+    border: 1px solid var(--mat-sys-outline-variant);
+    border-radius: 0.5rem;
+    background: var(--mat-sys-surface);
+  }
+
+  &__ligne {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--mat-sys-surface-container-low);
+    }
+
+    // Une boutique desactivee reste lisible mais recule : elle ne capte plus rien, et rien
+    // ne sert de la donner a lire au meme rang que les autres.
+    &--inactive {
+      opacity: 0.6;
+    }
+  }
+
+  &__critique {
+    color: var(--lf-echec);
+    font-weight: 500;
+  }
+
+  &__etat {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8125rem;
+
+    &--active {
+      color: var(--lf-succes);
+      font-weight: 500;
+    }
+  }
+}
+
+.vide {
+  margin: 0;
+  padding: var(--lf-space-4);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+  text-align: center;
+}

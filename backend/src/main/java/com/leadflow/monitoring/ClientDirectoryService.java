@@ -1,5 +1,6 @@
 package com.leadflow.monitoring;
 
+import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.monitoring.dto.ClientSummary;
 import com.leadflow.monitoring.dto.SalesRepSummary;
 import com.leadflow.tenant.Client;

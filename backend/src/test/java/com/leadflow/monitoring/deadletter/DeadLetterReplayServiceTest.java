@@ -82,7 +82,7 @@ class DeadLetterReplayServiceTest {
     @Test
     void mortInconnueRendUneRessourceIntrouvable() {
         assertThatThrownBy(() -> service.rejoue(UUID.randomUUID(), "camille"))
-                .isInstanceOf(com.leadflow.monitoring.RessourceIntrouvableException.class);
+                .isInstanceOf(com.leadflow.common.RessourceIntrouvableException.class);
     }
 
     private DeadLetter mortEnAttente() {

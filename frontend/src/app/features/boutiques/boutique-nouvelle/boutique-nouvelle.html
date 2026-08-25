@@ -1,0 +1,184 @@
+<a matButton routerLink="/boutiques" class="nouvelle__retour">
+  <mat-icon>arrow_back</mat-icon>
+  Retour aux boutiques
+</a>
+
+@if (creee(); as rendu) {
+  <app-secret-revele
+    [secret]="rendu.hmacSecret"
+    [clePublique]="rendu.publicKey"
+    [cheminWebhook]="rendu.webhookPath"
+    (accuse)="termine()"
+  />
+} @else {
+  <h1 class="nouvelle__titre">Nouvelle boutique</h1>
+
+  @if (message(); as texte) {
+    <p class="nouvelle__erreur" role="alert">{{ texte }}</p>
+  }
+
+  <form [formGroup]="formulaire" (ngSubmit)="cree()" class="nouvelle">
+    <mat-card appearance="outlined" class="nouvelle__bloc">
+      <mat-card-header>
+        <mat-card-title class="nouvelle__sous-titre">Identite</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="nouvelle__champs">
+        <mat-form-field appearance="outline">
+          <mat-label>Nom de la boutique</mat-label>
+          <input matInput formControlName="name" />
+          @if (formulaire.controls.name.touched && formulaire.controls.name.invalid) {
+            <mat-error>Le nom est obligatoire.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Attribution des leads</mat-label>
+          <mat-select formControlName="assignmentStrategy">
+            @for (strategie of strategies; track strategie.valeur) {
+              <mat-option [value]="strategie.valeur">{{ strategie.libelle }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Modifiable plus tard depuis la fiche.</mat-hint>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="nouvelle__bloc">
+      <mat-card-header>
+        <mat-card-title class="nouvelle__sous-titre">ERP</mat-card-title>
+        <mat-card-subtitle>
+          Les champs sont ceux que le connecteur declare. La connexion doit etre testee avant de
+          creer.
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content class="nouvelle__champs">
+        <mat-form-field appearance="outline">
+          <mat-label>Fournisseur</mat-label>
+          <mat-select
+            formControlName="crmProviderId"
+            (selectionChange)="changeDeFournisseur($event.value)"
+          >
+            @for (fournisseur of fournisseurs(); track fournisseur.providerId) {
+              <mat-option [value]="fournisseur.providerId">
+                {{ fournisseur.providerId }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div formGroupName="crmSettings" class="nouvelle__champs">
+          @for (reglage of reglages(); track reglage.cle) {
+            <mat-form-field appearance="outline">
+              <mat-label>{{ reglage.cle }}</mat-label>
+              <input
+                matInput
+                [type]="reglage.secret ? 'password' : 'text'"
+                [formControlName]="reglage.cle"
+              />
+              <mat-hint>{{ reglage.libelle }}</mat-hint>
+            </mat-form-field>
+          }
+        </div>
+      </mat-card-content>
+
+      <mat-card-actions class="nouvelle__actions">
+        <button
+          matButton
+          type="button"
+          [disabled]="testEnCours() || reglagesGroup.invalid"
+          (click)="teste()"
+        >
+          <mat-icon>network_check</mat-icon>
+          Tester la connexion
+        </button>
+      </mat-card-actions>
+
+      @if (testEnCours()) {
+        <mat-progress-bar mode="indeterminate" aria-label="Test de connexion en cours" />
+      }
+
+      @if (resultatDuTest(); as resultat) {
+        <div
+          class="nouvelle__resultat"
+          [class.nouvelle__resultat--ok]="resultat.ok"
+          [class.nouvelle__resultat--echec]="!resultat.ok"
+          role="status"
+        >
+          <mat-icon>{{ resultat.ok ? 'check_circle' : 'error' }}</mat-icon>
+          <span>{{ phrase(resultat.cause) }}</span>
+        </div>
+
+        @if (resultat.detail) {
+          <mat-expansion-panel class="nouvelle__detail">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Detail technique</mat-panel-title>
+            </mat-expansion-panel-header>
+            <pre class="lf-mono nouvelle__trace">{{ resultat.detail }}</pre>
+          </mat-expansion-panel>
+        }
+      }
+    </mat-card>
+
+    <mat-card appearance="outlined" class="nouvelle__bloc" formGroupName="firstSalesRep">
+      <mat-card-header>
+        <mat-card-title class="nouvelle__sous-titre">Premier commercial</mat-card-title>
+        <mat-card-subtitle>
+          Obligatoire : sans commercial actif, les leads de cette boutique ne pourraient etre
+          attribues a personne et finiraient en file des messages morts.
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content class="nouvelle__champs">
+        <mat-form-field appearance="outline">
+          <mat-label>Nom complet</mat-label>
+          <input matInput formControlName="fullName" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email" />
+          @if (formulaire.controls.firstSalesRep.controls.email.hasError('email')) {
+            <mat-error>Cette adresse n'est pas valide.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Secteur</mat-label>
+          <input matInput formControlName="sector" />
+          <mat-hint>Utilise par la strategie sectorielle.</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Zone</mat-label>
+          <input matInput formControlName="zone" />
+          <mat-hint>Utilisee par la strategie geographique.</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Reference ERP</mat-label>
+          <input matInput formControlName="crmRef" />
+          <mat-hint>Laisser vide : le connecteur la resout et la memorise.</mat-hint>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    @if (enCours()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Creation en cours" />
+    }
+
+    <div class="nouvelle__barre">
+      <button matButton="filled" type="submit" [disabled]="!peutCreer()">
+        <mat-icon>add_business</mat-icon>
+        Creer la boutique
+      </button>
+      <!-- Dire pourquoi le bouton est inactif : un bouton grise sans explication se lit
+           comme une panne de l'application. -->
+      @if (!peutCreer() && !enCours()) {
+        <span class="nouvelle__note">
+          @if (!testeAvecSucces()) {
+            La connexion ERP doit d'abord etre testee avec succes.
+          } @else {
+            Le formulaire est incomplet : nom, reglages ERP et premier commercial.
+          }
+        </span>
+      }
+    </div>
+  </form>
+}

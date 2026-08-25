@@ -1,6 +1,8 @@
 package com.leadflow.crm.dolibarr;
 
 import com.leadflow.crm.CrmHttpConfig;
+import com.leadflow.crm.model.CrmCheck;
+import com.leadflow.crm.model.CrmCheckCause;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmTarget;
 import java.util.List;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -130,6 +133,41 @@ public class DolibarrClient {
             return id == null ? null : String.valueOf(id);
         } catch (RestClientException e) {
             throw echec("/users", e);
+        }
+    }
+
+    /**
+     * Sonde d'acces, appelee par l'ecran d'administration avant d'enregistrer une boutique.
+     *
+     * <p>{@code /status} plutot que {@code /users} : il est concu pour cela, ne lit aucune
+     * donnee metier et valide d'un coup l'adresse et la cle d'API.
+     *
+     * <p>Elle ne leve jamais : un echec de sonde est une reponse, pas un incident. C'est ce
+     * qui permet a l'endpoint de test de rendre 200 avec une cause.
+     */
+    public CrmCheck verifieAcces(CrmTarget target) {
+        String base = target.settings() == null ? null : target.settings().get("baseUrl");
+        String cle = target.settings() == null ? null : target.settings().get("apiKey");
+        if (base == null || base.isBlank() || cle == null || cle.isBlank()) {
+            return CrmCheck.echec(
+                    CrmCheckCause.REPONSE_INATTENDUE, "Reglage 'baseUrl' ou 'apiKey' absent");
+        }
+        try {
+            restClient(target).get().uri("/status").retrieve().body(Map.class);
+            return CrmCheck.joignable(null);
+        } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
+            return CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, e.getMessage());
+        } catch (HttpClientErrorException.NotFound e) {
+            return CrmCheck.echec(CrmCheckCause.CIBLE_INCONNUE, e.getMessage());
+        } catch (ResourceAccessException e) {
+            return CrmCheck.echec(CrmCheckCause.INJOIGNABLE, e.getMessage());
+        } catch (RestClientException e) {
+            return CrmCheck.echec(CrmCheckCause.REPONSE_INATTENDUE, e.getMessage());
+        } catch (RuntimeException e) {
+            // Filet : la sonde promet de ne jamais lever, et une adresse fournie par
+            // l'operateur peut faire echouer la pile HTTP avant meme Spring — l'ecran doit
+            // rendre une cause, pas une trace.
+            return CrmCheck.echec(CrmCheckCause.REPONSE_INATTENDUE, String.valueOf(e));
         }
     }
 

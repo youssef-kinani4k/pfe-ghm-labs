@@ -250,6 +250,15 @@ et de filtrer cote serveur — ce n'est pas une extension de l'existant.
 `Authorization`, et mettre le jeton en parametre d'URL le ferait apparaitre dans tous les
 journaux d'acces. Le frontend lit `/api/stream/leads` par `fetch` + `ReadableStream`.
 
+**Le CRUD des boutiques vit dans `tenant/`, pas ici.** Depuis F7, l'API d'administration
+(`/api/admin/clients`, `/api/admin/sales-reps`, `/api/admin/crm`) ecrit : elle cree des
+boutiques, tourne des secrets, active des commerciaux. La placer dans `monitoring/` aurait
+casse la seule propriete qui rend cet observateur sur : il lit et n'ecrit que `dead_letter`.
+Les deux packages parlent des memes tables et se consomment depuis le meme ecran, mais l'un
+observe et l'autre gouverne. La suppression n'est exposee nulle part — `lead` et
+`raw_lead_event` referencent `client` sans cascade, donc Postgres la refuserait des la
+premiere boutique ayant recu un lead ; la desactivation la remplace.
+
 **Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
 service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
 
@@ -384,7 +393,7 @@ a montrer.
 
 ```
 crm/
-├── CrmConnector.java          port : providerId(), sync(CrmLead, CrmTarget, CrmSyncState), resolveAssignee
+├── CrmConnector.java          port : providerId(), sync(...), resolveAssignee, reglagesAttendus, verifieAcces
 ├── CrmConnectorRegistry.java  resout l'adaptateur par providerId, applique `enabled`
 ├── CrmSyncService.java        orchestration : cible, etat anterieur, trace
 ├── CrmSyncTraceWriter.java    ecriture de la trace en transaction propre
@@ -415,6 +424,16 @@ Contact en deux endpoints, alors qu'Odoo met les deux dans `res.partner` disting
 `CrmConnectorRegistry` collecte les connecteurs par injection de `List<CrmConnector>` : il
 n'y a aucune liste de fournisseurs a maintenir a la main, et aucun `switch` sur le nom de
 l'ERP a ajouter quelque part.
+
+**Le port porte deux methodes que F7 a ajoutees, et aucune n'a d'implementation par defaut.**
+`reglagesAttendus()` declare les cles que l'adaptateur attend dans `crm_config`, avec leur
+libelle et leur caractere secret : le formulaire d'administration se genere a partir de la,
+donc ajouter un ERP ne touche ni `tenant/` ni le frontend. `verifieAcces(CrmTarget)` eprouve
+une cible sans rien creer et rend un `CrmCheck`, dont la cause appartient a une enumeration
+sans terme propre a un fournisseur. Un `default` rendant « non verifiable » aurait laisse un
+futur adaptateur degrader silencieusement la promesse faite a l'ecran de creation — d'ou
+l'obligation. La sonde ne lit pas la base, comme le reste de l'adaptateur : elle n'eprouve
+que les reglages qu'on lui passe.
 
 `sync` prend un `CrmTarget(providerId, settings)` decrivant **l'instance** ERP visee, car
 deux clients sur le meme type d'ERP ont chacun leur serveur. Les cles de `settings`
@@ -511,9 +530,9 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 
 ## Etat actuel
 
-Le pipeline est **complet de bout en bout et observable** : capture (F2), qualification (F3),
-routage et synchronisation ERP (F4), sur le socle multi-tenant de F1, les adaptateurs de F5
-et le monitoring de F6.
+Le pipeline est **complet de bout en bout, observable et administrable** : capture (F2),
+qualification (F3), routage et synchronisation ERP (F4), sur le socle multi-tenant de F1, les
+adaptateurs de F5, le monitoring de F6 et la gestion des boutiques de F7.
 
 Ce qui existe : la configuration, le chiffrement des secrets, les six entites et leurs
 repositories, les migrations `V1` a `V4`, le port `CrmConnector` et son registre, les
@@ -524,8 +543,14 @@ Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention.
 Et desormais la couche `monitoring` : authentification JWT, API de lecture du pipeline
 (`/api/leads`, `/api/stats`, `/api/clients`, `/api/connectors`, `/api/queues`), journal des
 messages morts rejouable un par un, flux SSE, filets de republication de `lead.qualified` et
-`lead.routed` — plus les cinq ecrans Angular : connexion, dashboard, leads et detail, file
-d'attente, connecteurs.
+`lead.routed`.
+
+Et depuis F7, l'administration des boutiques dans `tenant/` : creation, mise a jour,
+activation, rotation du secret HMAC et de la cle publique, gestion des commerciaux, et une
+sonde d'acces sur le port `CrmConnector` qui eprouve une cible ERP sans rien y creer.
+**Ajouter une boutique ne demande plus la base** : c'est un formulaire, et le secret n'a
+jamais a etre chiffre a la main. Huit ecrans Angular en tout : connexion, dashboard, leads et
+detail, file d'attente, connecteurs, boutiques, fiche d'une boutique, creation.
 
 Ce qui n'existe pas :
 
@@ -534,11 +559,13 @@ Ce qui n'existe pas :
   figer la forme du document, mais **rien ne s'en sert encore**.
 - **Aucune reattribution manuelle** : un lead attribue au mauvais commercial ne se corrige
   que par un rejeu depuis le journal des morts, ou en base.
-- **Aucun CRUD des clients ni des commerciaux** : ajouter un client reste une insertion SQL.
-  Le dashboard ne fait que lire l'annuaire.
 - **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
   Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
-- **Aucun deploiement** (F7) : pas d'integration continue, pas d'image de production, et CORS
-  n'autorise toujours que `http://localhost:4200`.
+- **Aucun deploiement** : pas d'integration continue, pas d'image de production, et CORS
+  n'autorise toujours que `http://localhost:4200`. C'est desormais le dernier chantier avant
+  une mise en service.
+- **Aucune restriction sur les destinations de `POST /api/admin/crm/test`** : le serveur
+  appelle l'URL que l'operateur lui donne. Acceptable sur une console interne a compte
+  unique ; a restreindre si le dashboard s'ouvre a des utilisateurs moins fiables.
 
 Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.

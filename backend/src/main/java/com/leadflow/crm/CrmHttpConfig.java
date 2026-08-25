@@ -1,8 +1,9 @@
 package com.leadflow.crm;
 
 import com.leadflow.config.CrmProperties;
+import java.net.http.HttpClient;
 import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -13,6 +14,13 @@ import org.springframework.web.client.RestClient;
  * si bien qu'ajouter un ERP ne demande rien ici. C'est ce qui maintient l'invariant des
  * trois gestes — un sous-package, un {@code @Component} implementant {@code CrmConnector},
  * une entree {@code leadflow.crm.providers.<provider>}.
+ *
+ * <p>La fabrique repose sur {@code java.net.http.HttpClient} et non sur
+ * {@code HttpURLConnection} : ce dernier analyse l'en-tete {@code WWW-Authenticate} des
+ * reponses 401 et leve {@code IllegalArgumentException: invalid start or end} quand elle est
+ * vide — ce que Dolibarr renvoie precisement lorsqu'une cle d'API est fausse. L'exception
+ * n'etant pas une {@code RestClientException}, elle traversait les adaptateurs et rendait un
+ * 500 opaque la ou la sonde devait dire « identifiants refuses ».
  *
  * <p>Les timeouts sont poses ici et non dans l'adaptateur : un test peut ainsi injecter un
  * builder nu branche sur {@code MockRestServiceServer} sans que la fabrique de requetes de
@@ -40,8 +48,9 @@ public class CrmHttpConfig {
             throw new IllegalStateException(
                     "leadflow.crm.providers." + providerId + " est absente de la configuration");
         }
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(provider.connectTimeout());
+        HttpClient httpClient =
+                HttpClient.newBuilder().connectTimeout(provider.connectTimeout()).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
         factory.setReadTimeout(provider.readTimeout());
         return factory;
     }
