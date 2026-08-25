@@ -451,7 +451,162 @@ trames lui-même.
 
 ---
 
-## 10. Erreurs
+## 10. Administration des boutiques
+
+Ces routes **écrivent**, contrairement à toutes les précédentes. Elles vivent dans le package
+`tenant/` et non dans `monitoring/`, qui reste un observateur en lecture seule ; elles sont
+regroupées ici parce que c'est la même console qui les consomme, avec le même jeton.
+
+La suppression n'est exposée nulle part. `lead` et `raw_lead_event` référencent `client` sans
+cascade : Postgres refuserait d'effacer la première boutique ayant reçu un lead. La
+désactivation la remplace.
+
+### Lister et lire
+
+```bash
+curl -s http://localhost:8090/api/admin/clients   -H "Authorization: Bearer $JETON"
+```
+
+```json
+[
+  {
+    "id": "3f2a...",
+    "name": "Boutique du Nord",
+    "crmProviderId": "dolibarr",
+    "assignmentStrategy": "ROUND_ROBIN",
+    "active": true,
+    "activeSalesReps": 3
+  }
+]
+```
+
+`GET /api/admin/clients/{id}` rend la fiche : identité, `publicKey`, `webhookPath`,
+`crmSettings` **non secrets uniquement**, et la liste des commerciaux. Le secret HMAC n'y
+figure à aucun titre, et la clé d'API de l'ERP non plus — les deux sont chiffrés au repos et
+ne sont jamais rendus en lecture.
+
+### Créer
+
+```bash
+curl -s -X POST http://localhost:8090/api/admin/clients   -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json'   -d '{"name":"Boutique du Nord",
+       "crmProviderId":"dolibarr",
+       "assignmentStrategy":"ROUND_ROBIN",
+       "crmSettings":{"baseUrl":"http://localhost:8081/api/index.php","apiKey":"..."},
+       "firstSalesRep":{"fullName":"Amine Idrissi","email":"amine@boutique.fr"}}'
+```
+
+```json
+{
+  "id": "3f2a...",
+  "publicKey": "pk_live_...",
+  "hmacSecret": "le-secret-en-clair",
+  "webhookPath": "/api/webhooks/leads/pk_live_..."
+}
+```
+
+**Le secret n'est rendu qu'ici, et une seule fois.** Il est chiffré en AES-256-GCM au repos ;
+aucune autre réponse de l'API ne le contient, et il n'existe aucun endpoint pour le relire.
+Perdu, il ne peut qu'être régénéré.
+
+`firstSalesRep` est **obligatoire** à la création : une boutique sans commercial actif
+capterait des leads que le routage ne pourrait attribuer à personne, et qui finiraient en
+DLQ dès le premier formulaire.
+
+### Mettre à jour, activer, désactiver
+
+```bash
+curl -s -X PUT  http://localhost:8090/api/admin/clients/$ID -H "Authorization: Bearer $JETON" ...
+curl -s -X POST http://localhost:8090/api/admin/clients/$ID/deactivate -H "Authorization: Bearer $JETON"
+curl -s -X POST http://localhost:8090/api/admin/clients/$ID/activate   -H "Authorization: Bearer $JETON"
+```
+
+Dans le `PUT`, un réglage **secret laissé vide vaut « inchangé »** : la fusion précède la
+validation, sans quoi tout formulaire dont la clé d'API reste vide serait refusé. Un réglage
+non secret vide, lui, est bien une valeur vide et sera refusé s'il est requis.
+
+L'activation est une sous-ressource et non un champ du `PUT` : elle coupe ou rétablit la
+capture, une conséquence qui mérite un geste distinct de l'enregistrement d'un formulaire.
+
+### Rotations
+
+```bash
+curl -s -X POST http://localhost:8090/api/admin/clients/$ID/rotate-secret     -H "Authorization: Bearer $JETON"
+curl -s -X POST http://localhost:8090/api/admin/clients/$ID/rotate-public-key -H "Authorization: Bearer $JETON"
+```
+
+La première rend `{"hmacSecret":"..."}` — encore une fois, la seule et dernière occasion de
+le lire. L'ancien secret cesse immédiatement de signer : le webhook rend `401`. La seconde
+change l'**URL** du webhook ; l'ancienne n'est plus reconnue.
+
+### Commerciaux
+
+```
+GET  /api/admin/clients/{id}/sales-reps
+POST /api/admin/clients/{id}/sales-reps
+PUT  /api/admin/sales-reps/{id}
+POST /api/admin/sales-reps/{id}/activate
+POST /api/admin/sales-reps/{id}/deactivate
+```
+
+Désactiver le **dernier commercial actif** d'une boutique est refusé en `409` : le routage
+lèverait `AssignmentException` au premier lead suivant, et trois tentatives plus tard le lead
+serait en DLQ. Le refus porte la raison.
+
+### Fournisseurs ERP et test de connexion
+
+```bash
+curl -s http://localhost:8090/api/admin/crm/providers -H "Authorization: Bearer $JETON"
+```
+
+```json
+[
+  {
+    "providerId": "dolibarr",
+    "settings": [
+      { "cle": "baseUrl", "libelle": "Adresse de l'API, /api/index.php compris", "secret": false },
+      { "cle": "apiKey", "libelle": "Cle d'API de l'utilisateur de service", "secret": true }
+    ]
+  }
+]
+```
+
+Les fournisseurs **implémentés et activés**, chacun avec les réglages qu'il déclare. Le
+formulaire du dashboard se génère à partir de cette réponse : ajouter un ERP ne demande
+aucune modification du frontend, ce qui prolonge la promesse des trois gestes jusqu'à
+l'écran.
+
+```bash
+curl -s -X POST http://localhost:8090/api/admin/crm/test   -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json'   -d '{"crmProviderId":"dolibarr","crmSettings":{"baseUrl":"http://127.0.0.1:9","apiKey":"x"}}'
+```
+
+```json
+{ "ok": false, "cause": "INJOIGNABLE", "detail": "I/O error on GET request..." }
+```
+
+Les réglages sont **éprouvés sans être enregistrés** : tout l'intérêt est de vérifier avant
+de sauver. Un test qui échoue rend `200` — c'est un résultat de diagnostic, pas une panne du
+serveur ; le traiter en `502` ferait passer l'intercepteur du dashboard pour un incident. Un
+fournisseur inconnu, lui, rend bien `400`.
+
+`cause` appartient à `{JOIGNABLE, INJOIGNABLE, IDENTIFIANTS_REFUSES, CIBLE_INCONNUE,
+REPONSE_INATTENDUE}`. C'est un nom d'énumération et non une phrase : l'écran phrase en
+français, et un libellé construit ici obligerait à redéployer le backend pour le corriger.
+
+La sonde **ne lit pas la base**, comme tout adaptateur : elle éprouve les réglages qu'on lui
+passe, jamais ceux qui sont enregistrés. Tester une boutique existante sans retaper sa clé
+d'API teste donc une clé vide.
+
+> **Réserve de sécurité.** `POST /api/admin/crm/test` fait émettre au serveur un appel HTTP
+> vers une URL fournie par l'opérateur — une requête sortante déclenchée depuis l'extérieur.
+> C'est acceptable sur une console interne authentifiée par un compte unique d'agence, qui
+> est le modèle actuel du dashboard. Le jour où celui-ci s'ouvrirait à des utilisateurs moins
+> fiables — les boutiques elles-mêmes, par exemple — il faudrait restreindre les
+> destinations : liste blanche d'hôtes, refus des adresses privées et de `localhost`, et
+> plafonnement du nombre d'appels.
+
+---
+
+## 11. Erreurs
 
 Toutes les erreurs sont des `ProblemDetail` (RFC 7807) :
 

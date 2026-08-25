@@ -94,4 +94,29 @@ class DolibarrSondeTest {
         assertThat(resultat.cause()).isEqualTo(CrmCheckCause.REPONSE_INATTENDUE);
         serveur.verify();
     }
+
+    /**
+     * Regression de la recette F7 : Dolibarr renvoie un en-tete {@code WWW-Authenticate}
+     * <b>vide</b> sur 401, et {@code HttpURLConnection} levait dessus une
+     * {@code IllegalArgumentException} — pas une {@code RestClientException}. L'endpoint de
+     * test rendait alors 500 avec une trace la ou l'operateur attendait une phrase.
+     *
+     * <p>La cause est traitee a la racine dans {@code CrmHttpConfig}, qui n'utilise plus
+     * {@code HttpURLConnection}. Ce test verrouille le filet : quoi qu'il arrive sous la
+     * pile HTTP, la sonde rend une cause et ne leve pas.
+     */
+    @Test
+    void unEchecHorsRestClientExceptionNeTraverseJamaisLaSonde() {
+        prepare();
+        serveur.expect(requestTo("http://erp.test/api/index.php/status"))
+                .andRespond(request -> {
+                    throw new IllegalArgumentException("invalid start or end");
+                });
+
+        CrmCheck resultat = client.verifieAcces(CIBLE);
+
+        assertThat(resultat.ok()).isFalse();
+        assertThat(resultat.cause()).isEqualTo(CrmCheckCause.REPONSE_INATTENDUE);
+        assertThat(resultat.detail()).contains("invalid start or end");
+    }
 }

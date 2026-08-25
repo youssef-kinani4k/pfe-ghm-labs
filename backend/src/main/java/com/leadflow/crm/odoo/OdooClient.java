@@ -119,6 +119,10 @@ public class OdooClient {
                 return CrmCheck.echec(CrmCheckCause.CIBLE_INCONNUE, echec.getMessage());
             }
             return CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, echec.getMessage());
+        } catch (RuntimeException e) {
+            // Meme filet que la sonde Dolibarr : une adresse fournie par l'operateur peut
+            // faire echouer la pile HTTP avant Spring, et la sonde promet de ne jamais lever.
+            return CrmCheck.echec(CrmCheckCause.REPONSE_INATTENDUE, String.valueOf(e));
         }
     }
 

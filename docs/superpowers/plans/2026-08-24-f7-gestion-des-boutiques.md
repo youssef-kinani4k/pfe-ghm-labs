@@ -2479,3 +2479,129 @@ rejoint les invariants, avec les deux methodes ajoutees au port CrmConnector."
 ```
 
 Puis la fusion, selon la méthode du projet : `feature/f7-gestion-des-boutiques` est fusionnée dans `main` en `--no-ff` et **conservée** — elle sert d'historique de la feature.
+
+---
+
+# Résultats de recette — 25 août 2026
+
+Pile réelle : `docker compose --profile dolibarr up -d` (Postgres, RabbitMQ, Dolibarr 23.0.2
+avec module API, Tiers et Projets activés), backend en profil `dev` sur `:8090`, frontend
+`ng serve` sur `:4200`. Les gestes ont été passés par l'API que consomme le dashboard, avec
+le même jeton et les mêmes routes que les écrans.
+
+| # | Critère | Résultat |
+| - | ------- | -------- |
+| 1 | Créer une boutique sans ouvrir la base, et voir son premier lead aller jusqu'à l'ERP | **Vérifié** |
+| 2 | Une clé d'API fausse est signalée en français avant enregistrement | **Vérifié après correction** |
+| 3 | Le bouton de création reste inactif sans test ERP ni commercial | **Vérifié, avec réserve** |
+| 4 | Le secret n'est visible qu'une fois ; aucune autre réponse ne le contient | **Vérifié** |
+| 5 | Après rotation, l'ancien secret ne signe plus | **Vérifié** |
+| 6 | Une boutique désactivée rend `401`, et se réactive sans perte | **Vérifié** |
+| 7 | Désactiver le dernier commercial actif est refusé, avec la raison | **Vérifié** |
+
+## Critère 1 — de la création à Dolibarr
+
+`POST /api/admin/clients` a rendu `id`, `publicKey`, `hmacSecret` et
+`webhookPath` ; aucune requête SQL n'a été écrite de toute la recette. Un formulaire signé
+HMAC posté sur le chemin rendu a été accepté en `202`, et le lead était `SYNCED` **au premier
+sondage, moins de trois secondes plus tard** : score 70, intention `DEVIS` par le lexique
+(`GEMINI_API_KEY` absente, repli nominal), attribué à Amina Benali — la commerciale créée
+avec la boutique.
+
+Côté Dolibarr, le tiers et le contact existent bien, portant l'adresse du prospect. La même
+requête rejouée a rendu **le même `eventId`** : l'idempotence de la capture tient sur une
+boutique créée par l'interface comme sur celle de démonstration.
+
+Deux observations, sans conséquence sur le critère :
+
+- Mon corps de test omettait d'abord `source`, obligatoire au contrat de capture : le webhook
+  a rendu `400`. C'était une erreur de la recette, pas du produit.
+- `companyName` est resté `null` alors que le corps le portait. `PayloadFieldMapper` reconnaît
+  `societe`, `entreprise`, `company`, `raisonsociale` et `organisation`, mais pas
+  `companyname`. Comportement de F3, documenté, hors périmètre de F7 — mais l'alias mériterait
+  d'être ajouté, la clé étant naturelle pour un intégrateur anglophone.
+
+## Critère 2 — le défaut que seule la pile réelle pouvait montrer
+
+Premier passage : **une clé d'API fausse rendait `500` avec une trace Java**, exactement ce
+que le critère interdit.
+
+La cause n'était ni dans la sonde ni dans le contrôleur. **Dolibarr renvoie un en-tête
+`WWW-Authenticate` vide sur ses `401`.** `HttpURLConnection` — la pile derrière
+`SimpleClientHttpRequestFactory`, que `CrmHttpConfig` utilisait — analyse cet en-tête et lève
+`IllegalArgumentException: invalid start or end` **avant** que Spring ne voie le code de
+statut. L'exception n'étant pas une `RestClientException`, aucun `catch` de la sonde ne la
+rattrapait, et elle remontait jusqu'au gestionnaire d'erreurs global.
+
+Corrigé en deux endroits :
+
+1. **À la racine** — `CrmHttpConfig` construit désormais un `JdkClientHttpRequestFactory` sur
+   `java.net.http.HttpClient`, qui n'analyse pas cet en-tête. Le `401` redevient un
+   `HttpClientErrorException.Unauthorized`, donc `IDENTIFIANTS_REFUSES`. La correction profite
+   à tous les appels ERP, pas seulement à la sonde : la même exception aurait produit une mort
+   opaque en DLQ lors d'une synchronisation avec une clé périmée.
+2. **En filet** — les deux sondes rattrapent toute `RuntimeException` et rendent
+   `REPONSE_INATTENDUE`. Leur contrat dit qu'elles ne lèvent jamais ; il est maintenant tenu
+   quoi qu'il arrive sous la pile HTTP. Un test de régression le verrouille
+   (`DolibarrSondeTest`).
+
+Après correction, les quatre cas rendent tous `200` avec leur cause :
+
+| Réglages | Cause rendue |
+| -------- | ------------ |
+| adresse et clé justes | `JOIGNABLE` |
+| clé fausse | `IDENTIFIANTS_REFUSES` |
+| port fermé | `INJOIGNABLE` |
+| adresse qui pointe ailleurs | `CIBLE_INCONNUE` |
+
+Un fournisseur inconnu rend bien `400`, et non `200`.
+
+## Critère 3 — la réserve
+
+La règle a deux moitiés. Côté serveur, `POST /api/admin/clients` **sans `firstSalesRep` rend
+`400`** : vérifié sur la pile réelle. Côté écran, l'état du bouton est verrouillé par cinq
+tests (`boutique-nouvelle.spec.ts`) qui couvrent le formulaire complet sans test ERP, le test
+réussi, l'invalidation par modification d'un champ ERP, l'absence de commercial et un test en
+échec.
+
+**Ce qui n'a pas été fait : cliquer le bouton dans un navigateur.** Le frontend a été servi
+contre la pile réelle et son proxy vérifié — `/api/admin/crm/providers` répond `401` sans
+jeton et rend les deux fournisseurs avec jeton, le chunk `boutiques` est servi — mais
+l'assertion sur l'état visuel du bouton repose sur les tests, pas sur une manipulation. C'est
+la même réserve que le critère 7 de F6.
+
+## Critère 4 — le secret ne fuit nulle part
+
+Le secret rendu à la création a été cherché littéralement dans le corps de cinq réponses :
+`/api/admin/clients`, la fiche, `/api/clients`, la liste des commerciaux et `/api/leads`.
+**Absent partout.** La fiche ne porte aucun champ de secret, et ses `crmSettings` ne
+contiennent que `baseUrl` — `apiKey`, déclaré secret par le connecteur, n'est pas rendu.
+
+## Critères 5 et 6 — rotations et désactivation
+
+Le webhook répond `202` avant désactivation, `401` pendant, `202` de nouveau après
+réactivation ; la fiche retrouve ses réglages ERP et ses commerciaux dans l'état exact où ils
+étaient, y compris celui qui avait été désactivé entre-temps.
+
+Après `rotate-secret`, l'ancien secret rend `401` et le nouveau `202`. Après
+`rotate-public-key`, l'ancienne URL rend `401` et la nouvelle `202`. Les leads déjà reçus ne
+bougent pas.
+
+## Critère 7 — le dernier commercial
+
+Le refus est un `409` portant sa raison en clair : « C'est le dernier commercial actif de
+cette boutique. Sans lui, ses leads partiraient en file d'échec : ajouter un remplaçant
+d'abord, ou désactiver la boutique. » Après ajout d'un second commercial, la désactivation du
+premier passe, sa réactivation aussi, et celle du second également — la règle porte bien sur
+le *dernier actif*, pas sur un commercial en particulier.
+
+## Ce qui reste ouvert
+
+- **Le bouton de création n'a pas été manipulé dans un navigateur** (critère 3).
+- **`POST /api/admin/crm/test` fait émettre au serveur un appel vers une URL fournie par
+  l'opérateur.** Acceptable sur une console interne à compte unique ; à restreindre — liste
+  blanche d'hôtes, refus des adresses privées — si le dashboard s'ouvre un jour aux boutiques
+  elles-mêmes. Consigné dans `docs/monitoring-api.md` et dans `CLAUDE.md`.
+- **L'alias `companyname` manque à `PayloadFieldMapper`** (F3, hors périmètre).
+- Le connecteur Odoo n'a pas été éprouvé pendant cette recette : seul le profil `dolibarr`
+  était monté. Sa sonde reste couverte par `OdooSondeTest`.

@@ -163,6 +163,11 @@ public class DolibarrClient {
             return CrmCheck.echec(CrmCheckCause.INJOIGNABLE, e.getMessage());
         } catch (RestClientException e) {
             return CrmCheck.echec(CrmCheckCause.REPONSE_INATTENDUE, e.getMessage());
+        } catch (RuntimeException e) {
+            // Filet : la sonde promet de ne jamais lever, et une adresse fournie par
+            // l'operateur peut faire echouer la pile HTTP avant meme Spring — l'ecran doit
+            // rendre une cause, pas une trace.
+            return CrmCheck.echec(CrmCheckCause.REPONSE_INATTENDUE, String.valueOf(e));
         }
     }
 
