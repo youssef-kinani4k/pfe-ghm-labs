@@ -4,6 +4,8 @@ import com.leadflow.tenant.dto.ClientCreated;
 import com.leadflow.tenant.dto.ClientDetailAdmin;
 import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
+import com.leadflow.tenant.dto.SalesRepAdminView;
+import com.leadflow.tenant.dto.SalesRepForm;
 import com.leadflow.tenant.dto.SecretRotated;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,9 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClientAdminController {
 
     private final ClientAdminService service;
+    private final SalesRepAdminService commerciaux;
 
-    public ClientAdminController(ClientAdminService service) {
+    public ClientAdminController(
+            ClientAdminService service, SalesRepAdminService commerciaux) {
         this.service = service;
+        this.commerciaux = commerciaux;
     }
 
     @GetMapping
@@ -80,5 +85,18 @@ public class ClientAdminController {
     @PostMapping("/{id}/rotate-public-key")
     public ClientDetailAdmin tourneLaClePublique(@PathVariable UUID id) {
         return service.tourneLaClePublique(id);
+    }
+
+    @GetMapping("/{id}/sales-reps")
+    public List<SalesRepAdminView> commerciaux(@PathVariable UUID id) {
+        return commerciaux.deLaBoutique(id);
+    }
+
+    /** Imbriquee sous la boutique, parce que c'est elle qui recrute. */
+    @PostMapping("/{id}/sales-reps")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SalesRepAdminView ajoute(
+            @PathVariable UUID id, @Valid @RequestBody SalesRepForm formulaire) {
+        return commerciaux.ajoute(id, formulaire);
     }
 }
