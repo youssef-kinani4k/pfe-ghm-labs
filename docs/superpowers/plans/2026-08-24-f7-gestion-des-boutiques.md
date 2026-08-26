@@ -2605,3 +2605,27 @@ le *dernier actif*, pas sur un commercial en particulier.
 - **L'alias `companyname` manque à `PayloadFieldMapper`** (F3, hors périmètre).
 - Le connecteur Odoo n'a pas été éprouvé pendant cette recette : seul le profil `dolibarr`
   était monté. Sa sonde reste couverte par `OdooSondeTest`.
+
+## En attente d'une décision (25 août, fin de session)
+
+Deux ajouts de documentation ont été proposés et **non tranchés** — rien n'a été écrit :
+
+1. **Annexe « produire l'URL et la clé depuis l'interface Dolibarr »** dans
+   `docs/boutique-onboarding.md`. Le document dit aujourd'hui « la boutique fournit sa clé
+   d'API » sans expliquer à son informaticien comment la générer : activer les modules API,
+   Tiers et Projets, créer un utilisateur de service plutôt qu'utiliser `admin` — la clé
+   hérite de ses permissions —, initialiser la clé sur sa fiche, et composer l'URL en
+   ajoutant `/api/index.php` à la racine.
+2. **Note sur le doublon de tiers.** `DolibarrConnector` ne cherche pas de tiers existant
+   par email avant d'en créer un : seule l'opportunité est cherchée par sa `ref`. Deux leads
+   du même prospect séparés par plus que la fenêtre de déduplication produisent donc **deux
+   tiers** dans l'ERP, à fusionner à la main. C'est cohérent avec l'invariant « un adaptateur
+   ne lit jamais la base », mais un exploitant le découvrirait autrement six mois après la
+   mise en service.
+
+Un troisième point, plus lourd, est apparu en fin de session : **`client.scoring_config`
+n'est exposé par aucune route `/api/admin/**`**. Le barème de scoring d'une boutique — poids
+des critères, seuil « chaud », listes cibles — ne se règle donc toujours qu'en base, ce qui
+contredit la règle « toute opération courante passe par l'interface ». Ce serait le contenu
+naturel d'un F7.1, avec l'occasion de faire enfin servir `ScoringConfig.seuilChaud`, lu et
+porté depuis F3 sans que rien ne s'en serve.
