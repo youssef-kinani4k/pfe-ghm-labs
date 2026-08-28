@@ -41,6 +41,7 @@ export class App {
     { chemin: '/queue', libelle: "File d'attente", icone: 'inbox' },
     { chemin: '/boutiques', libelle: 'Boutiques', icone: 'storefront' },
     { chemin: '/connectors', libelle: 'Connecteurs', icone: 'cable' },
+    { chemin: '/parametres', libelle: 'Parametres', icone: 'settings' },
   ];
 
   basculeMenu(): void {

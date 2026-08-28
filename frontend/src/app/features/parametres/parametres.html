@@ -1,0 +1,174 @@
+<header class="parametres__entete">
+  <h1 class="parametres__titre">Parametres</h1>
+  <button matButton type="button" (click)="charge()">
+    <mat-icon>refresh</mat-icon>
+    Rafraichir
+  </button>
+</header>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement du reglage" />
+}
+
+@if (erreur(); as texte) {
+  <p class="parametres__erreur" role="alert">{{ texte }}</p>
+}
+
+@if (etat(); as reglage) {
+  <!-- Le bandeau dit ce que le pipeline fait, pas ce que le formulaire contient : une cle
+       enregistree mais coupee, ou absente, laisse la qualification en mode lexical, et
+       c'est cela que l'operateur doit voir en premier. -->
+  <section
+    class="bandeau"
+    [class.bandeau--actif]="analyseActive()"
+    role="status"
+    aria-live="polite"
+  >
+    <mat-icon class="bandeau__icone">
+      {{ analyseActive() ? 'auto_awesome' : 'rule' }}
+    </mat-icon>
+    <div class="bandeau__texte">
+      <p class="bandeau__mode">
+        {{ analyseActive() ? 'Analyse par IA active' : 'Mode lexical' }}
+      </p>
+      <p class="bandeau__detail">
+        @if (analyseActive()) {
+          Les messages des prospects sont classes par
+          <span class="lf-mono">{{ reglage.modele }}</span
+          >, avec repli automatique sur le lexique en cas de panne.
+        } @else if (!reglage.cleDefinie) {
+          Aucune cle n'est enregistree : l'intention est deduite d'un lexique de mots-cles. Aucun
+          lead n'est perdu pour autant.
+        } @else {
+          Une cle est enregistree mais l'analyse est coupee : l'intention est deduite du lexique.
+        }
+      </p>
+    </div>
+    <dl class="bandeau__compteurs">
+      <div class="bandeau__paire">
+        <dt>Par le modele</dt>
+        <dd class="lf-mono">{{ parGemini() }}</dd>
+      </div>
+      <div class="bandeau__paire">
+        <dt>Par le lexique</dt>
+        <dd class="lf-mono">{{ parRegles() }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <mat-card appearance="outlined" class="parametres__bloc">
+    <mat-card-header>
+      <mat-card-title class="parametres__sous-titre">Cle d'API Gemini</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <p class="parametres__note">
+        La cle est globale a l'instance : elle sert toutes les boutiques. Elle est chiffree au repos
+        et n'est jamais reaffichee — seuls ses quatre derniers caracteres le sont.
+      </p>
+
+      <p class="cle-en-place">
+        <mat-icon>{{ reglage.cleDefinie ? 'key' : 'key_off' }}</mat-icon>
+        @if (reglage.cleDefinie) {
+          Cle en place : <span class="lf-mono">····{{ reglage.apercu }}</span>
+          <span class="cle-en-place__source">{{ libelleSource() }}</span>
+        } @else {
+          Aucune cle enregistree
+        }
+      </p>
+
+      <div class="parametres__champs">
+        <mat-form-field appearance="outline" class="parametres__champ">
+          <mat-label>Nouvelle cle</mat-label>
+          <input
+            matInput
+            name="cle"
+            autocomplete="off"
+            spellcheck="false"
+            [type]="cleVisible() ? 'text' : 'password'"
+            [ngModel]="cleSaisie()"
+            (ngModelChange)="cleSaisie.set($event)"
+            placeholder="Coller la cle du projet Google"
+          />
+          <button
+            matIconButton
+            matSuffix
+            type="button"
+            (click)="basculeVisibilite()"
+            [attr.aria-label]="cleVisible() ? 'Masquer la cle' : 'Afficher la cle'"
+            [attr.aria-pressed]="cleVisible()"
+          >
+            <mat-icon>{{ cleVisible() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint>Laisser vide conserve la cle deja enregistree.</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <!-- Eprouver avant d'enregistrer, comme le test de connexion d'une boutique : une cle
+           fausse mise en service ne se verrait qu'au lead suivant, en mode degrade. -->
+      <div class="parametres__actions">
+        <button matButton type="button" (click)="teste()" [disabled]="enCours()">
+          <mat-icon>bolt</mat-icon>
+          Tester la cle
+        </button>
+        <button
+          matButton="filled"
+          type="button"
+          (click)="enregistre()"
+          [disabled]="enCours() || cleSaisie().length === 0"
+        >
+          <mat-icon>save</mat-icon>
+          Enregistrer
+        </button>
+      </div>
+
+      @if (diagnostic(); as resultat) {
+        <p
+          class="diagnostic"
+          [class.diagnostic--ok]="resultat.ok"
+          [class.diagnostic--echec]="!resultat.ok"
+          role="status"
+        >
+          <mat-icon>{{ resultat.ok ? 'check_circle' : 'error' }}</mat-icon>
+          <span>
+            {{ libelleCause(resultat.cause) }}
+            @if (resultat.ok && resultat.intention) {
+              — message d'exemple classe en
+              <span class="lf-mono">{{ resultat.intention }}</span>
+            }
+            <!-- Le motif rendu par Google distingue une cle fausse d'une API non activee sur
+                 le projet : sans lui, l'operateur refait une cle qui n'etait pas en cause. -->
+            @if (!resultat.ok && resultat.detail) {
+              <span class="diagnostic__motif lf-mono">{{ resultat.detail }}</span>
+            }
+          </span>
+        </p>
+      }
+
+      @if (message(); as texte) {
+        <p class="parametres__message" role="status">{{ texte }}</p>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card appearance="outlined" class="parametres__bloc">
+    <mat-card-header>
+      <mat-card-title class="parametres__sous-titre">Analyse par IA</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <mat-slide-toggle
+        [checked]="reglage.actif"
+        (change)="basculeAnalyse($event.checked)"
+        [disabled]="enCours()"
+      >
+        Classer l'intention avec le modele
+      </mat-slide-toggle>
+
+      <p class="parametres__note">
+        Couper l'interrupteur n'efface pas la cle et ne perd aucun lead : la qualification retombe
+        sur le lexique de mots-cles, et la colonne « source d'intention » le montre lead par lead.
+      </p>
+    </mat-card-content>
+  </mat-card>
+}

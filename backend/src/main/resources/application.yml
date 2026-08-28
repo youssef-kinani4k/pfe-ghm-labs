@@ -110,10 +110,15 @@ leadflow:
     gemini:
       enabled: true
       # Cle globale a l'instance : l'analyse d'intention est un service de l'agence, pas un
-      # reglage de tenant. Absente ou vide, l'application demarre et qualifie en mode RULES.
+      # reglage de tenant. Depuis F7.2 ce n'est plus qu'un REPLI : la cle enregistree depuis
+      # l'ecran « Parametres » (table intent_setting) l'emporte sur cette variable. Sans
+      # l'une ni l'autre, l'application demarre et qualifie en mode RULES.
       api-key: ${GEMINI_API_KEY:}
       base-url: https://generativelanguage.googleapis.com/v1beta/models/
-      model: gemini-2.5-flash
+      # gemini-2.5-flash n'est plus servi aux nouvelles cles : Google renvoie 404 en
+      # invitant a passer au modele ci-dessous. C'est une propriete et non une constante
+      # precisement pour qu'un retrait de modele se repare par la configuration.
+      model: gemini-3.6-flash
       connect-timeout: 3s
       read-timeout: 8s
       # Garde-fou sur le texte envoye au modele.

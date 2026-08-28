@@ -168,10 +168,20 @@ rebalaye — un echec deterministe range sous `FAILED` serait republie a chaque 
 **L'analyse d'intention ne peut pas echouer.** `GeminiIntentAnalyzer` est `@Primary` sous
 `leadflow.intent.gemini.enabled` et decore `RuleBasedIntentAnalyzer` ; toute defaillance —
 delai depasse, quota, reponse hors vocabulaire — retombe sur le lexique avec
-`IntentSource.RULES`. La cle d'API est **globale a l'instance** (`GEMINI_API_KEY`), pas
-portee par le client. La reponse du modele n'est acceptee que si elle appartient a
+`IntentSource.RULES`. La cle d'API est **globale a l'instance**, pas portee par le client.
+La reponse du modele n'est acceptee que si elle appartient a
 l'enumeration `LeadIntent` : c'est la parade a une injection de prompt glissee dans le
 message du prospect.
+
+**La cle d'API se regle depuis l'ecran « Parametres », plus seulement au demarrage.** Elle
+vit chiffree dans la ligne unique de `intent_setting` (`V5`), et **la base l'emporte sur
+`GEMINI_API_KEY`**, qui reste un repli pour les instances deja deployees. L'analyseur ne
+connait ni la base ni les proprietes : il interroge le port `ReglageIntent` **a chaque
+analyse**, ce qui fait qu'un changement dans la console prend effet au lead suivant, sans
+redemarrage. `SondeIntent` eprouve une cle sans l'enregistrer et nomme la cause de l'echec,
+la ou l'analyseur avale tout ; les deux partagent `GeminiClient`, seul endroit qui connaisse
+le prompt et la forme de la reponse. La cle ne ressort jamais de l'API : `EtatIntent` n'en
+porte que les quatre derniers caracteres.
 
 **`client.scoring_config` a desormais une forme**, fixee par `ScoringConfig` : bareme additif
 a criteres fixes, seuls les poids et les listes cibles sont configurables. La lecture est
@@ -307,7 +317,7 @@ Cinq variables gouvernent l'instance :
 | `LEADFLOW_JWT_SECRET`          | Cle de signature HS256 des jetons du dashboard           |
 | `LEADFLOW_ADMIN_USER`          | Identifiant de l'operateur (defaut `admin`)              |
 | `LEADFLOW_ADMIN_PASSWORD_HASH` | **Hash BCrypt** du mot de passe, jamais le mot de passe  |
-| `GEMINI_API_KEY`               | Cle de l'analyse d'intention, globale a l'instance       |
+| `GEMINI_API_KEY`               | Repli de la cle d'analyse d'intention ; l'ecran prime    |
 
 **`LEADFLOW_JWT_SECRET` n'a aucune valeur de repli en production, comme `LEADFLOW_MASTER_KEY`** :
 l'application refuse de demarrer plutot que de signer avec un secret devinable. Le controle
@@ -331,11 +341,12 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Quatre migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Cinq migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
-`V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`) et
-`V4__dead_letter.sql` (journal des messages morts).
+`V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
+`V4__dead_letter.sql` (journal des messages morts) et `V5__intent_setting.sql` (cle d'API de
+l'analyse d'intention, ligne unique, chiffree au repos).
 
 `V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
 messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le
@@ -549,8 +560,13 @@ Et depuis F7, l'administration des boutiques dans `tenant/` : creation, mise a j
 activation, rotation du secret HMAC et de la cle publique, gestion des commerciaux, et une
 sonde d'acces sur le port `CrmConnector` qui eprouve une cible ERP sans rien y creer.
 **Ajouter une boutique ne demande plus la base** : c'est un formulaire, et le secret n'a
-jamais a etre chiffre a la main. Huit ecrans Angular en tout : connexion, dashboard, leads et
-detail, file d'attente, connecteurs, boutiques, fiche d'une boutique, creation.
+jamais a etre chiffre a la main.
+
+Et l'ecran « Parametres » : la cle d'API de l'analyse d'intention s'y colle, s'y eprouve
+avant d'etre enregistree, et l'analyse s'y coupe sans perdre la cle. Le bandeau d'etat
+compte les leads classes par le modele et par le lexique, pour que le mode degrade se voie.
+Neuf ecrans Angular en tout : connexion, dashboard, leads et detail, file d'attente,
+connecteurs, boutiques, fiche d'une boutique, creation, parametres.
 
 Ce qui n'existe pas :
 
@@ -561,6 +577,11 @@ Ce qui n'existe pas :
   que par un rejeu depuis le journal des morts, ou en base.
 - **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
   Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
+- **Le modele de l'analyse d'intention est un reglage, pas une constante** : Google retire
+  des modeles au fil du temps, et l'ancien nom se met a rendre `404`. Le libelle vit sous
+  `leadflow.intent.gemini.model` pour que ce retrait se repare sans toucher au code. La
+  forme du corps de requete, elle, se verrouille par un test contractuel — `thinkingBudget`
+  a ete remplace par `thinkingLevel`, l'ancienne forme faisant rendre un `400` muet.
 - **Aucun deploiement** : pas d'integration continue, pas d'image de production, et CORS
   n'autorise toujours que `http://localhost:4200`. C'est desormais le dernier chantier avant
   une mise en service.

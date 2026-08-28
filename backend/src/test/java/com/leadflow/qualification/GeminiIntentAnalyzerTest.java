@@ -51,8 +51,20 @@ class GeminiIntentAnalyzerTest {
         repli = new RuleBasedIntentAnalyzer();
     }
 
+    /** La cle vient desormais du reglage, que la console peut changer a chaud. */
     private GeminiIntentAnalyzer analyseur(String cle) {
-        return new GeminiIntentAnalyzer(repli, config(cle), builder);
+        ReglageIntent reglage = new ReglageIntent() {
+            @Override
+            public String cleEffective() {
+                return cle;
+            }
+
+            @Override
+            public boolean actif() {
+                return true;
+            }
+        };
+        return new GeminiIntentAnalyzer(repli, config(cle), reglage, builder);
     }
 
     @Test
@@ -136,6 +148,24 @@ class GeminiIntentAnalyzerTest {
 
         assertThat(analyse.intent()).isEqualTo(LeadIntent.AUTRE);
         assertThat(analyse.source()).isEqualTo(IntentSource.RULES);
+        serveur.verify();
+    }
+
+    @Test
+    void demandeLaReflexionLaPlusFaibleDansLaFormeAttendueParLeModele() {
+        serveur.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("thinkingLevel")))
+                // thinkingBudget etait la forme de gemini-2.5-flash ; les modeles suivants
+                // rendent 400 « Request contains an invalid argument » en la recevant, sans
+                // rien dire de plus, et l'analyse restait en mode lexical pour toujours.
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("thinkingBudget"))))
+                .andRespond(withSuccess(reponse("DEVIS"), MediaType.APPLICATION_JSON));
+
+        analyseur("cle-de-test").analyse(MESSAGE);
+
         serveur.verify();
     }
 
