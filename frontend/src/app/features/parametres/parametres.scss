@@ -159,4 +159,13 @@
     color: var(--lf-echec);
     background: var(--lf-echec-fond);
   }
+
+  /* Le motif brut du fournisseur : utile, mais secondaire par rapport a la consigne. */
+  &__motif {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    opacity: 0.85;
+    overflow-wrap: anywhere;
+  }
 }

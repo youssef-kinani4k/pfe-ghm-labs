@@ -7,6 +7,7 @@ export type CauseIntent =
   | 'CLE_ABSENTE'
   | 'CLE_REFUSEE'
   | 'QUOTA_DEPASSE'
+  | 'MODELE_INCONNU'
   | 'INJOIGNABLE'
   | 'ERREUR_SERVEUR'
   | 'REPONSE_INATTENDUE';

@@ -24,6 +24,12 @@ public enum CauseIntent {
     /** Rien au bout du fil : reseau, proxy, ou racine d'API mal saisie. */
     INJOIGNABLE,
 
+    /**
+     * Le modele configure n'existe pas pour cette cle ou cette version d'API. Refaire la
+     * cle n'y changerait rien : c'est {@code leadflow.intent.gemini.model} qu'il faut revoir.
+     */
+    MODELE_INCONNU,
+
     /** Panne chez le fournisseur. */
     ERREUR_SERVEUR,
 

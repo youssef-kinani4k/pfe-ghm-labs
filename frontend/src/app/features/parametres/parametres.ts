@@ -156,6 +156,8 @@ export class Parametres implements OnInit {
       CLE_ABSENTE: 'Aucune cle a eprouver : en coller une ci-dessus',
       CLE_REFUSEE: 'Cle refusee : verifier la cle et que l API Gemini est activee sur le projet',
       QUOTA_DEPASSE: 'Quota epuise : la cle est bonne, le service repartira plus tard',
+      MODELE_INCONNU:
+        'Modele introuvable pour cette cle : refaire la cle n y changerait rien, c est le modele configure qui est en cause',
       INJOIGNABLE: 'Serveur injoignable : verifier le reseau ou le proxy sortant',
       ERREUR_SERVEUR: 'Panne chez le fournisseur : reessayer plus tard',
       REPONSE_INATTENDUE: 'Reponse inattendue du modele',

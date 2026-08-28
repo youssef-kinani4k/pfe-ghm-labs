@@ -2,6 +2,7 @@ package com.leadflow.qualification;
 
 import com.leadflow.config.IntentProperties;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -28,12 +29,26 @@ public class SondeIntent {
     /** Un message dont l'intention ne fait pas de doute : le diagnostic verifie la chaine. */
     private static final String EXEMPLE = "Bonjour, je souhaite un devis pour 50 unites.";
 
-    private final GeminiClient client;
-    private final IntentSettings reglages;
+    /** Ce qu'on garde du motif rendu par le fournisseur. Assez pour agir, pas un roman. */
+    private static final int DETAIL_MAX = 300;
 
+    private final GeminiClient client;
+    private final ReglageIntent reglages;
+
+    /**
+     * {@code @Autowired} est obligatoire : la classe a deux constructeurs depuis que les
+     * tests en ont un a eux, et Spring irait chercher un constructeur sans argument.
+     */
+    @Autowired
     public SondeIntent(IntentProperties proprietes, IntentSettings reglages) {
-        this.client = new GeminiClient(proprietes.gemini(),
+        this(proprietes.gemini(), reglages,
                 RestClient.builder().requestFactory(requestFactory(proprietes.gemini())));
+    }
+
+    /** Constructeur des tests : un builder nu, branche sur {@code MockRestServiceServer}. */
+    SondeIntent(
+            IntentProperties.Gemini config, ReglageIntent reglages, RestClient.Builder builder) {
+        this.client = new GeminiClient(config, builder);
         this.reglages = reglages;
     }
 
@@ -58,7 +73,7 @@ public class SondeIntent {
                     ? echec(CauseIntent.REPONSE_INATTENDUE, "Reponse hors vocabulaire")
                     : new IntentTestResult(true, CauseIntent.OK, "Cle valide", intention.name());
         } catch (HttpStatusCodeException refus) {
-            return echec(cause(refus.getStatusCode()), refus.getStatusCode().toString());
+            return echec(cause(refus.getStatusCode()), motif(refus));
         } catch (ResourceAccessException injoignable) {
             return echec(CauseIntent.INJOIGNABLE, injoignable.getMessage());
         } catch (Exception illisible) {
@@ -70,7 +85,44 @@ public class SondeIntent {
         if (statut.value() == 429) {
             return CauseIntent.QUOTA_DEPASSE;
         }
+        if (statut.value() == 404) {
+            return CauseIntent.MODELE_INCONNU;
+        }
         return statut.is5xxServerError() ? CauseIntent.ERREUR_SERVEUR : CauseIntent.CLE_REFUSEE;
+    }
+
+    /**
+     * Le message du fournisseur, qui seul distingue une cle fausse d'une API non activee sur
+     * le projet. Il ne contient pas la cle — Google renvoie le motif, jamais le secret — et
+     * il est tronque : un corps d'erreur n'a pas vocation a remplir l'ecran.
+     */
+    private static String motif(HttpStatusCodeException refus) {
+        String corps = refus.getResponseBodyAsString();
+        String message = extraitLeMessage(corps);
+        String texte = message != null ? message : corps;
+        if (texte == null || texte.isBlank()) {
+            return refus.getStatusCode().toString();
+        }
+        texte = texte.length() > DETAIL_MAX ? texte.substring(0, DETAIL_MAX) : texte;
+        return refus.getStatusCode().value() + " — " + texte;
+    }
+
+    /**
+     * Extraction textuelle et non deserialisation : le corps d'erreur d'un fournisseur n'a
+     * aucun contrat, et un document inattendu ne doit pas faire echouer le diagnostic
+     * lui-meme.
+     */
+    private static String extraitLeMessage(String corps) {
+        if (corps == null) {
+            return null;
+        }
+        int debut = corps.indexOf("\"message\"");
+        if (debut < 0) {
+            return null;
+        }
+        int ouvrante = corps.indexOf('"', corps.indexOf(':', debut) + 1);
+        int fermante = ouvrante < 0 ? -1 : corps.indexOf('"', ouvrante + 1);
+        return fermante < 0 ? null : corps.substring(ouvrante + 1, fermante);
     }
 
     private static LeadIntent vocabulaire(String texte) {

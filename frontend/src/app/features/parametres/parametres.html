@@ -136,6 +136,11 @@
               — message d'exemple classe en
               <span class="lf-mono">{{ resultat.intention }}</span>
             }
+            <!-- Le motif rendu par Google distingue une cle fausse d'une API non activee sur
+                 le projet : sans lui, l'operateur refait une cle qui n'etait pas en cause. -->
+            @if (!resultat.ok && resultat.detail) {
+              <span class="diagnostic__motif lf-mono">{{ resultat.detail }}</span>
+            }
           </span>
         </p>
       }
