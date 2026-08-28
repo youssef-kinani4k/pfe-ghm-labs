@@ -577,6 +577,11 @@ Ce qui n'existe pas :
   que par un rejeu depuis le journal des morts, ou en base.
 - **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
   Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
+- **Le modele de l'analyse d'intention est un reglage, pas une constante** : Google retire
+  des modeles au fil du temps, et l'ancien nom se met a rendre `404`. Le libelle vit sous
+  `leadflow.intent.gemini.model` pour que ce retrait se repare sans toucher au code. La
+  forme du corps de requete, elle, se verrouille par un test contractuel — `thinkingBudget`
+  a ete remplace par `thinkingLevel`, l'ancienne forme faisant rendre un `400` muet.
 - **Aucun deploiement** : pas d'integration continue, pas d'image de production, et CORS
   n'autorise toujours que `http://localhost:4200`. C'est desormais le dernier chantier avant
   une mise en service.
