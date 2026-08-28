@@ -1,0 +1,162 @@
+:host {
+  display: block;
+}
+
+.parametres {
+  &__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--lf-space-3);
+    margin-bottom: var(--lf-space-3);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+  }
+
+  &__sous-titre {
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.0625rem;
+  }
+
+  &__bloc {
+    margin-bottom: var(--lf-space-3);
+    max-width: 46rem;
+  }
+
+  &__note {
+    margin: 0 0 var(--lf-space-3);
+    color: var(--lf-neutre);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  &__champs {
+    display: grid;
+    grid-template-columns: minmax(16rem, 30rem);
+    gap: var(--lf-space-2);
+  }
+
+  &__champ {
+    width: 100%;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--lf-space-2);
+    margin-top: var(--lf-space-1);
+  }
+
+  &__message {
+    margin: var(--lf-space-3) 0 0;
+    color: var(--lf-succes);
+    font-size: 0.875rem;
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+  }
+}
+
+/* Le bandeau porte l'information la plus utile de l'ecran : ce que le pipeline fait
+   reellement. Il se lit avant le formulaire, d'ou sa place et son contraste. */
+.bandeau {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lf-space-3);
+  margin-bottom: var(--lf-space-3);
+  padding: var(--lf-space-3);
+  max-width: 46rem;
+  border: 1px solid var(--lf-neutre-fond);
+  border-left: 4px solid var(--lf-attente);
+  border-radius: 8px;
+  background: var(--lf-attente-fond);
+
+  &--actif {
+    border-left-color: var(--lf-succes);
+    background: var(--lf-succes-fond);
+  }
+
+  &__icone {
+    flex: none;
+  }
+
+  &__texte {
+    flex: 1 1 18rem;
+  }
+
+  &__mode {
+    margin: 0 0 0.25rem;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-weight: 600;
+  }
+
+  &__detail {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  &__compteurs {
+    display: flex;
+    gap: var(--lf-space-4);
+    margin: 0;
+  }
+
+  &__paire {
+    dt {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--lf-neutre);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+  }
+}
+
+.cle-en-place {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--lf-space-1);
+  margin: 0 0 var(--lf-space-3);
+
+  &__source {
+    color: var(--lf-neutre);
+    font-size: 0.8125rem;
+  }
+}
+
+/* Icone et libelle accompagnent la couleur : le vert et le rouge seuls ne se distinguent
+   pas pour tous les lecteurs. */
+.diagnostic {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lf-space-1);
+  margin: var(--lf-space-3) 0 0;
+  padding: var(--lf-space-2);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+
+  &--ok {
+    color: var(--lf-succes);
+    background: var(--lf-succes-fond);
+  }
+
+  &--echec {
+    color: var(--lf-echec);
+    background: var(--lf-echec-fond);
+  }
+}

@@ -110,7 +110,9 @@ leadflow:
     gemini:
       enabled: true
       # Cle globale a l'instance : l'analyse d'intention est un service de l'agence, pas un
-      # reglage de tenant. Absente ou vide, l'application demarre et qualifie en mode RULES.
+      # reglage de tenant. Depuis F7.2 ce n'est plus qu'un REPLI : la cle enregistree depuis
+      # l'ecran « Parametres » (table intent_setting) l'emporte sur cette variable. Sans
+      # l'une ni l'autre, l'application demarre et qualifie en mode RULES.
       api-key: ${GEMINI_API_KEY:}
       base-url: https://generativelanguage.googleapis.com/v1beta/models/
       model: gemini-2.5-flash

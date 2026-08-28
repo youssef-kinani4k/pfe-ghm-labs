@@ -604,6 +604,62 @@ d'API teste donc une clé vide.
 > destinations : liste blanche d'hôtes, refus des adresses privées et de `localhost`, et
 > plafonnement du nombre d'appels.
 
+### Analyse d'intention : clé d'API et interrupteur
+
+L'écran « Paramètres » du dashboard se sert de trois routes. Le réglage est **global à
+l'instance** : l'analyse d'intention est un service que l'agence rend à ses boutiques, pas
+un paramètre de tenant.
+
+```bash
+curl -s http://localhost:8090/api/admin/intent -H "Authorization: Bearer $JETON"
+```
+
+```json
+{
+  "actif": true,
+  "cleDefinie": true,
+  "apercu": "rete",
+  "source": "BASE",
+  "modele": "gemini-2.5-flash"
+}
+```
+
+`apercu` ne porte que les **quatre derniers caractères** de la clé, et rien de plus ne sort
+jamais de cette API : assez pour reconnaître la clé en place, trop peu pour s'en servir. Un
+test asserte l'absence de la clé entière dans le corps JSON, et non dans le DTO — c'est le
+corps qui part sur le réseau.
+
+`source` vaut `BASE` (clé saisie dans la console), `ENV` (repli sur `GEMINI_API_KEY`) ou
+`AUCUNE`. **La base l'emporte sur l'environnement** : une instance déjà déployée continue de
+fonctionner sans qu'on y touche, et la console devient le chemin normal.
+
+```bash
+curl -s -X PUT http://localhost:8090/api/admin/intent   -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json'   -d '{"apiKey":"AIza...","actif":true}'
+```
+
+`apiKey` **absente ou vide conserve la clé enregistrée** : l'opérateur ne voit jamais la clé
+en clair, donc l'obliger à la ressaisir pour actionner l'interrupteur reviendrait à lui
+demander l'impossible. Le changement prend effet **au lead suivant**, sans redémarrage : la
+clé et l'interrupteur sont relus à chaque analyse.
+
+```bash
+curl -s -X POST http://localhost:8090/api/admin/intent/test   -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json'   -d '{"apiKey":"AIza..."}'
+```
+
+```json
+{ "ok": true, "cause": "OK", "detail": "Cle valide", "intention": "DEVIS" }
+```
+
+Le diagnostic classe un message d'exemple et **n'enregistre rien** : éprouver une clé n'est
+pas la mettre en service. Sans `apiKey`, c'est la clé en service qui est éprouvée. Comme
+pour le test de connexion ERP, un échec rend `200` avec sa cause, prise dans
+`{OK, CLE_ABSENTE, CLE_REFUSEE, QUOTA_DEPASSE, INJOIGNABLE, ERREUR_SERVEUR,
+REPONSE_INATTENDUE}` — l'écran phrase en français ce que l'opérateur doit faire.
+
+La sonde ne réutilise pas `GeminiIntentAnalyzer` : celui-ci avale toute défaillance pour ne
+perdre aucun lead, ce qui est l'inverse de ce qu'un diagnostic doit faire. Les deux partagent
+`GeminiClient`, donc le même appel et le même prompt.
+
 ---
 
 ## 11. Erreurs

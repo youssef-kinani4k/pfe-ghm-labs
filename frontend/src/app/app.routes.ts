@@ -56,6 +56,12 @@ export const routes: Routes = [
       import('./features/boutiques/boutique-detail/boutique-detail').then((m) => m.BoutiqueDetail),
   },
   {
+    path: 'parametres',
+    title: 'Parametres',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/parametres/parametres').then((m) => m.Parametres),
+  },
+  {
     path: 'connectors',
     title: 'Connecteurs ERP',
     canActivate: [authGuard],

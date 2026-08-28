@@ -51,8 +51,20 @@ class GeminiIntentAnalyzerTest {
         repli = new RuleBasedIntentAnalyzer();
     }
 
+    /** La cle vient desormais du reglage, que la console peut changer a chaud. */
     private GeminiIntentAnalyzer analyseur(String cle) {
-        return new GeminiIntentAnalyzer(repli, config(cle), builder);
+        ReglageIntent reglage = new ReglageIntent() {
+            @Override
+            public String cleEffective() {
+                return cle;
+            }
+
+            @Override
+            public boolean actif() {
+                return true;
+            }
+        };
+        return new GeminiIntentAnalyzer(repli, config(cle), reglage, builder);
     }
 
     @Test

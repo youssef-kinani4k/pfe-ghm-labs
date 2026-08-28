@@ -17,6 +17,13 @@
  * toute defaillance retombe sur {@link com.leadflow.qualification.RuleBasedIntentAnalyzer},
  * et {@code intent_source} garde la trace de qui a repondu.
  *
+ * <p>Ce paquet porte aussi le seul reglage global de l'instance :
+ * {@link com.leadflow.qualification.IntentSettings}, la cle d'API et l'interrupteur de
+ * l'analyse, servis par {@link com.leadflow.qualification.IntentAdminController}. Il vit ici
+ * et non dans {@code monitoring/} — qui n'ecrit que {@code dead_letter} — ni dans
+ * {@code tenant/}, qui ne porte que ce qui distingue une boutique d'une autre. La cle est
+ * relue a chaque analyse, si bien qu'un changement prend effet au lead suivant.
+ *
  * <p>L'idempotence est tranchee par la contrainte unique {@code lead.raw_event_id}, jamais
  * par une lecture prealable. La livraison etant at-least-once, deux messages peuvent porter
  * le meme {@code eventId} en parallele.
