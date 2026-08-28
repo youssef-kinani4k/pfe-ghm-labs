@@ -122,6 +122,23 @@ class SondeIntentTest {
     }
 
     @Test
+    void neRecopiePasTouteLaReponseDuFournisseurAEcran() {
+        repond(HttpStatus.NOT_FOUND,
+                "This model models/gemini-2.5-flash is no longer available to new users. "
+                        + "Please update your code to use models/gemini-3.6-flash for the latest "
+                        + "features and improvements. We recommend you to use the Interactions "
+                        + "API for all new work, see https://ai.google.dev for details.");
+
+        IntentTestResult resultat = sonde().eprouve("cle-valide");
+
+        // La premiere phrase dit ce qu'il faut savoir ; recopier le corps entier transforme
+        // un diagnostic en decharge de texte, et l'ecran devient illisible.
+        assertThat(resultat.detail()).contains("no longer available to new users");
+        assertThat(resultat.detail()).doesNotContain("We recommend");
+        assertThat(resultat.detail()).hasSizeLessThan(160);
+    }
+
+    @Test
     void leDetailNeContientJamaisLaCleEprouvee() {
         repond(HttpStatus.BAD_REQUEST, "API key not valid");
 

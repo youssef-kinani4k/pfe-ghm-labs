@@ -620,7 +620,7 @@ curl -s http://localhost:8090/api/admin/intent -H "Authorization: Bearer $JETON"
   "cleDefinie": true,
   "apercu": "rete",
   "source": "BASE",
-  "modele": "gemini-2.5-flash"
+  "modele": "gemini-3.6-flash"
 }
 ```
 

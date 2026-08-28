@@ -45,7 +45,7 @@ class GeminiClient {
     String classe(String message, String cle) {
         Map<String, Object> corps = Map.of(
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", CONSIGNE + message)))),
-                // thinkingBudget a zero : gemini-2.5-flash reflechit par defaut, et ses
+                // thinkingBudget a zero : les modeles flash reflechissent par defaut, et leurs
                 // jetons de reflexion se paient sur maxOutputTokens. Sans cela la reponse
                 // revient en MAX_TOKENS, sans « parts », et le mode degrade devient permanent
                 // sans que rien ne le distingue d'une panne. Classer un message dans un
