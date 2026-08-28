@@ -45,15 +45,19 @@ class GeminiClient {
     String classe(String message, String cle) {
         Map<String, Object> corps = Map.of(
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", CONSIGNE + message)))),
-                // thinkingBudget a zero : les modeles flash reflechissent par defaut, et leurs
-                // jetons de reflexion se paient sur maxOutputTokens. Sans cela la reponse
-                // revient en MAX_TOKENS, sans « parts », et le mode degrade devient permanent
-                // sans que rien ne le distingue d'une panne. Classer un message dans un
-                // vocabulaire ferme ne demande aucune reflexion.
+                // La reflexion est ramenee au minimum, et ses jetons se paient sur
+                // maxOutputTokens : sans garde-fou la reponse revient en MAX_TOKENS, sans
+                // « parts », et le mode degrade devient permanent sans que rien ne le
+                // distingue d'une panne. Classer un message dans un vocabulaire ferme ne
+                // demande aucune reflexion.
+                //
+                // La forme compte : « thinkingBudget », valide pour gemini-2.5-flash, fait
+                // rendre 400 « Request contains an invalid argument » aux modeles suivants,
+                // sans autre precision — un test verrouille donc « thinkingLevel ».
                 "generationConfig", Map.of(
                         "temperature", 0,
-                        "maxOutputTokens", 32,
-                        "thinkingConfig", Map.of("thinkingBudget", 0)));
+                        "maxOutputTokens", 256,
+                        "thinkingConfig", Map.of("thinkingLevel", "low")));
 
         Map<String, Object> reponse = builder.build()
                 .post()

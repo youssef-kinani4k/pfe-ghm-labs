@@ -152,6 +152,24 @@ class GeminiIntentAnalyzerTest {
     }
 
     @Test
+    void demandeLaReflexionLaPlusFaibleDansLaFormeAttendueParLeModele() {
+        serveur.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("thinkingLevel")))
+                // thinkingBudget etait la forme de gemini-2.5-flash ; les modeles suivants
+                // rendent 400 « Request contains an invalid argument » en la recevant, sans
+                // rien dire de plus, et l'analyse restait en mode lexical pour toujours.
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString("thinkingBudget"))))
+                .andRespond(withSuccess(reponse("DEVIS"), MediaType.APPLICATION_JSON));
+
+        analyseur("cle-de-test").analyse(MESSAGE);
+
+        serveur.verify();
+    }
+
+    @Test
     void tronqueLeMessageAvantDeLEnvoyer() {
         String tres_long = "a".repeat(5000);
         serveur.expect(requestTo(org.hamcrest.Matchers.any(String.class)))
