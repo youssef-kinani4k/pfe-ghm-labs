@@ -1,7 +1,19 @@
 # F8 — barème réglable et badge « chaud » : état de fin de session
 
-Session du 29 août 2026. La feature est **complète sur les sept tâches** ; il reste la recette
-manuelle à l'écran, que l'utilisateur fait lui-même, puis la fusion.
+Session du 29 août 2026. La feature est **complète, fusionnée dans `main` et poussée**. Il
+reste la recette manuelle à l'écran, que l'utilisateur fait lui-même — elle n'a pas eu lieu
+avant la fusion, à sa demande.
+
+**Fusion :** `deb0867`, `merge: F8 — bareme reglable et badge « chaud »`, 38 fichiers,
++3627 lignes. L'arbre fusionné était identique octet pour octet au sommet de la branche
+éprouvée (`git diff feature/f8-bareme-reglable main` vide), donc la suite verte s'y applique
+sans relance.
+
+**Poussé sur GitHub :** `main` (62 commits, `ce5da3d..deb0867`) et les quatre branches de
+feature qui n'existaient que localement — `f6`, `f7`, `f7.2`, `f8`. Les dix branches locales
+ont désormais leur équivalent distant ; l'historique par feature ne dépend plus du poste.
+
+**Branche conservée**, comme les huit précédentes.
 
 ## Ce qui a été livré
 
@@ -89,6 +101,23 @@ tapée mais non validée par Entrée disparaissait au moment d'enregistrer.
 - Les deux tests neufs ont été éprouvés contre une implémentation naïve : un seuil global fait
   échouer 3 des 6 tests de `LeadChaudTest`, et le test du plancher rend `-155` sans le
   correctif.
+
+## Un détail d'environnement, à connaître
+
+L'Angular CLI écrit un identifiant de télémétrie dans `frontend/angular.json` (`"analytics":
+"…"`) dès qu'on lance `npm test` ou `npm run build`. Ce n'est pas une modification voulue et
+elle ne doit pas entrer dans un commit : `git checkout -- frontend/angular.json` avant de
+committer. Le cas s'est présenté juste avant la fusion.
+
+## La prochaine session
+
+L'ordre de la feuille de route est **F11 → F9 → F10 → F12 → F13 → F14**. La suivante est donc
+**F11 — déploiement, CI, durcissement**, estimée à 2 ou 3 sessions, sans migration. C'est le
+seul chantier sans écran : il n'y a ni intégration continue, ni image de production, et CORS
+n'autorise toujours que `http://localhost:4200`. Elle porte aussi le contournement de
+`lieResponsable`, le trou de perte silencieuse de l'adaptateur Dolibarr.
+
+`V6` reste la prochaine migration à écrire, mais elle appartient à F10.
 
 ## Ce qui reste ouvert
 
