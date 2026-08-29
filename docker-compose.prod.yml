@@ -1,0 +1,94 @@
+# La pile complete. Un seul fichier, un seul port publie :
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Le --env-file n'est PAS facultatif : « env_file: » ci-dessous alimente les variables DU
+# CONTENEUR, tandis que les « ${...} » de ce fichier sont interpoles A SA LECTURE, depuis
+# le shell ou depuis .env — jamais depuis .env.prod. Sans lui, la commande echoue sur
+# POSTGRES_PASSWORD des la premiere ligne.
+#
+# Le docker-compose.yml de la racine garde son role — les dependances du developpement,
+# avec les ERP de test sous profils. Un profil « prod » dans ce fichier-la aurait du
+# surcharger les ports publies et les mots de passe, ce que les profils ne savent pas
+# faire.
+#
+# Le nom de projet est fige ici, et ce n'est pas cosmetique. Sans lui, Compose le derive du
+# nom du repertoire — le meme pour les deux fichiers — et, les services s'appelant
+# « postgres » et « rabbitmq » de part et d'autre, monter la production RECREE les
+# conteneurs du developpement sous la definition de production. Les volumes nommes
+# survivent, mais l'environnement de developpement est demonte sans un mot.
+name: leadflow-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: leadflow-prod-postgres
+    environment:
+      POSTGRES_DB: leadflow
+      POSTGRES_USER: leadflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env.prod}
+    # Aucun port publie : la base ne parle qu'au reseau interne du compose.
+    volumes:
+      - prod-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadflow -d leadflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    # Meme image que le compose de developpement, CLAUDE.md demandant qu'elles restent
+    # alignees. La console de gestion qu'elle embarque n'est pas un risque ici : aucun
+    # port n'est publie, donc rien ne l'atteint depuis l'hote.
+    image: rabbitmq:3-management-alpine
+    container_name: leadflow-prod-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: leadflow
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?RABBITMQ_DEFAULT_PASS manquant dans .env.prod}
+    volumes:
+      - prod-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  backend:
+    build: ./backend
+    image: leadflow-backend:latest
+    container_name: leadflow-prod-backend
+    env_file: .env.prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8090
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # wget et non curl : l'image JRE Alpine n'a pas curl, busybox fournit wget.
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  web:
+    build: ./frontend
+    image: leadflow-web:latest
+    container_name: leadflow-prod-web
+    depends_on:
+      backend:
+        # Sans cette condition, nginx se leverait pendant que Flyway migre encore et
+        # relaierait vers un backend qui n'ecoute pas.
+        condition: service_healthy
+    # 80 par defaut, ce que veut une machine de production. WEB_PORT existe pour les
+    # postes ou un autre serveur tient deja le 80 : Docker s'y lie alors sans erreur mais
+    # le trafic continue d'aller a l'occupant, et la pile parait repondre alors qu'on lit
+    # l'autre serveur. Un port choisi vaut mieux qu'une verification trompeuse.
+    ports:
+      - "${WEB_PORT:-80}:80"
+
+volumes:
+  prod-postgres-data:
+  prod-rabbitmq-data:
