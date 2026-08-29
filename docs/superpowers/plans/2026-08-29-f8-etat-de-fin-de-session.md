@@ -129,7 +129,9 @@ déplacer sans qu'aucun score n'ait changé**. C'est la démonstration de la fea
 Pour la suite :
 
 - **Le badge reste passif.** `seuilChaud` a enfin un consommateur, mais personne n'est prévenu :
-  un lead chaud se voit si quelqu'un regarde l'écran. La notification est le sujet de F11.
+  un lead chaud se voit si quelqu'un regarde l'écran. Aucune feature de F8 à F14 ne couvre la
+  notification : la feuille de route l'assume explicitement comme une conséquence à porter en
+  soutenance.
 - **Aucun recalcul rétroactif des scores.** Changer un barème ne touche pas les leads déjà
   qualifiés. C'est voulu, mais cela surprend — à dire dans l'aide de l'écran si la question
   revient.
