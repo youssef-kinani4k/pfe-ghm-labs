@@ -22,6 +22,12 @@ export interface LeadSummary {
   salesRepName: string | null;
   countryCode: string | null;
   sector: string | null;
+  /**
+   * Calcule par le serveur, jamais stocke : c'est `score >= seuilChaud` du bareme de la
+   * boutique du lead. Deux leads au meme score peuvent donc differer, et le recalculer ici
+   * demanderait de connaitre le bareme de chaque boutique de la page.
+   */
+  chaud: boolean;
 }
 
 /** Commercial attribue, tel que le detail d'un lead le porte. */
@@ -79,4 +85,5 @@ export interface LeadDetail {
   salesRep: SalesRepView | null;
   syncAttempts: SyncAttemptView[];
   rawEvent: RawEventView | null;
+  chaud: boolean;
 }
