@@ -10,6 +10,7 @@ import com.leadflow.monitoring.dto.RawEventView;
 import com.leadflow.monitoring.dto.SalesRepView;
 import com.leadflow.monitoring.dto.SyncAttemptView;
 import com.leadflow.qualification.Lead;
+import com.leadflow.qualification.ScoringConfig;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import com.leadflow.tenant.SalesRepRepository;
@@ -52,9 +53,14 @@ public class LeadDetailService {
         Lead lead = leads.findById(leadId).orElseThrow(
                 () -> new RessourceIntrouvableException("Lead inconnu : " + leadId));
 
-        String nomDuClient = clients.findById(lead.getClientId())
-                .map(Client::getName)
-                .orElse(null);
+        // La boutique est gardee entiere et non reduite a son nom : le drapeau `chaud` a
+        // besoin de son bareme, et la relire une seconde fois pour cela serait une requete
+        // de plus pour rien.
+        Client boutique = clients.findById(lead.getClientId()).orElse(null);
+        String nomDuClient = boutique == null ? null : boutique.getName();
+        boolean chaud = boutique != null
+                && lead.getScore()
+                        >= ScoringConfig.depuis(boutique.getScoringConfig()).seuilChaud();
 
         SalesRepView commercial = lead.getAssignedSalesRepId() == null
                 ? null
@@ -78,7 +84,7 @@ public class LeadDetailService {
                 nomDuClient, lead.getCompanyName(), lead.getFirstName(), lead.getLastName(),
                 lead.getEmail(), lead.getPhone(), lead.getMessage(), lead.getDetectedIntent(),
                 lead.getIntentSource(), lead.getScore(), lead.getStatus(),
-                lead.getCountryCode(), lead.getSector(), commercial, historique, brut);
+                lead.getCountryCode(), lead.getSector(), commercial, historique, brut, chaud);
     }
 
     private SyncAttemptView vue(CrmSyncAttempt tentative) {

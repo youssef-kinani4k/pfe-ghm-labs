@@ -111,3 +111,35 @@ export interface CrmTestResult {
   cause: CrmCheckCause;
   detail: string | null;
 }
+
+/**
+ * Bareme de scoring d'une boutique, recopie de `ScoringForm` cote serveur.
+ *
+ * `intention` est un `Record<string, number>` et non un type litteral : les cles sont les
+ * noms de `LeadIntent`, et le serveur est deja la source de verite de cette liste. En figer
+ * une copie typee ici ferait diverger les deux le jour ou une intention s'ajoute.
+ */
+export interface ScoringForm {
+  telephonePresent: number;
+  societePresente: number;
+  nomPresent: number;
+  messagePresent: number;
+  intention: Record<string, number>;
+  secteursCibles: string[];
+  paysCibles: string[];
+  bonusCible: number;
+  seuilChaud: number;
+}
+
+/**
+ * Ce que l'ecran affiche : les valeurs *effectives* — defauts compris, car c'est le bareme
+ * que le scoreur applique reellement — plus le maximum atteignable et le fait qu'un seuil
+ * soit hors de portee. Les deux derniers sont calcules par le serveur : le formulaire les
+ * recalcule a la frappe, mais c'est la reponse qui fait foi.
+ */
+export interface ScoringView {
+  valeurs: ScoringForm;
+  scoreMaximum: number;
+  seuilInatteignable: boolean;
+  defauts: ScoringForm;
+}

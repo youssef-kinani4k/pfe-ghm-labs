@@ -187,6 +187,18 @@ porte que les quatre derniers caracteres.
 a criteres fixes, seuls les poids et les listes cibles sont configurables. La lecture est
 tolerante — un document malforme donne les defauts, jamais une erreur.
 
+**Le bareme se regle depuis l'ecran « Bareme » d'une boutique**, plus seulement en base
+(`GET`/`PUT /api/admin/clients/{id}/scoring`, ecrits dans `tenant/` comme le reste de
+l'administration). Les bornes `[0, 100]` des poids viennent du bornage du score par
+`LeadScorer` : au-dela, un poids n'aurait aucun effet observable. Le `PUT` remplace le
+document entier — une fusion partielle rendrait indecidable la difference entre « poids
+absent » et « poids remis a zero ».
+
+**Le bareme s'applique au prochain lead, jamais aux scores deja ecrits.** `lead.score` est
+fige a la qualification, et rien ne le recalcule. Ce qui bouge immediatement, c'est le badge
+« chaud » du monitoring, calcule a la lecture : c'est la seule chose que `seuilChaud`
+alimente aujourd'hui.
+
 **La sortie est `leadflow.leads.qualified`.** La publication est un appel direct apres le
 retour de `LeadWriter.insere`, donc apres le commit — et non un
 `@TransactionalEventListener` comme en F2, qui serait silencieusement ignore hors
@@ -268,6 +280,15 @@ Les deux packages parlent des memes tables et se consomment depuis le meme ecran
 observe et l'autre gouverne. La suppression n'est exposee nulle part — `lead` et
 `raw_lead_event` referencent `client` sans cascade, donc Postgres la refuserait des la
 premiere boutique ayant recu un lead ; la desactivation la remplace.
+
+**Le badge « chaud » est calcule a la lecture**, jamais stocke : c'est
+`score >= seuilChaud` du bareme de **la boutique du lead**, donc deux leads au meme score
+peuvent differer. Le figer en base a la qualification ferait mentir la liste des qu'une
+boutique deplace son seuil. La comparaison ne peut pas se faire en SQL — `client.scoring_config`
+est chiffre au repos, illisible par Postgres, et `Lead` ne porte aucune association vers
+`Client` — donc `?chaud=true` construit une disjonction de couples (boutique, seuil), et le
+drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur nom. Le filtre
+n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
 **Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
 service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
@@ -565,14 +586,22 @@ jamais a etre chiffre a la main.
 Et l'ecran « Parametres » : la cle d'API de l'analyse d'intention s'y colle, s'y eprouve
 avant d'etre enregistree, et l'analyse s'y coupe sans perdre la cle. Le bandeau d'etat
 compte les leads classes par le modele et par le lexique, pour que le mode degrade se voie.
-Neuf ecrans Angular en tout : connexion, dashboard, leads et detail, file d'attente,
-connecteurs, boutiques, fiche d'une boutique, creation, parametres.
+Et depuis F8, l'ecran « Bareme » d'une boutique : les poids, les listes cibles et le seuil de
+chaleur s'y reglent, avec le maximum atteignable recalcule a la frappe et un avertissement
+quand le seuil est hors de portee. La liste des leads porte une pastille « chaud » et une case
+« chauds seulement ». **Regler un bareme ne demande plus la base.**
+
+Dix ecrans Angular en tout : connexion, dashboard, leads et detail, file d'attente,
+connecteurs, boutiques, fiche d'une boutique, bareme, creation, parametres.
 
 Ce qui n'existe pas :
 
 - **Aucune notification n'est envoyee au commercial** : ni tache d'agenda dans l'ERP, ni
-  alerte pour les leads chauds. `ScoringConfig.seuilChaud` est lu et porte depuis F3 pour
-  figer la forme du document, mais **rien ne s'en sert encore**.
+  alerte pour les leads chauds. Depuis F8, `ScoringConfig.seuilChaud` a un consommateur — le
+  badge du dashboard — mais **il reste passif** : un lead chaud se voit si quelqu'un regarde
+  l'ecran, personne n'est prevenu.
+- **Aucun recalcul retroactif des scores** : changer un bareme ne touche pas les leads deja
+  qualifies. Le badge se deplace, le score non — c'est voulu, mais cela surprend.
 - **Aucune reattribution manuelle** : un lead attribue au mauvais commercial ne se corrige
   que par un rejeu depuis le journal des morts, ou en base.
 - **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.

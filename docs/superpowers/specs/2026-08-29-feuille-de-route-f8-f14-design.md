@@ -76,10 +76,12 @@ Le cycle de packages est un fait ; le test est la garantie qui compte.
 
 **Le badge chaud se calcule a la lecture, jamais stocke.** C'est la seule forme qui donne
 l'effet promis : on bouge le seuil, on recharge, les badges se deplacent. `LeadSummary` et
-`LeadDetail` portent deja `score`. Comme `scoring_config` est en clair, le filtre « leads
-chauds » est une vraie clause SQL —
-`score >= COALESCE((c.scoring_config->>'seuilChaud')::int, 70)` — donc ni N+1, ni calcul cote
-navigateur.
+`LeadDetail` portent deja `score`. Le design de F8 a corrige la voie envisagee ici : `Lead` ne
+porte pas d'association vers `Client` — seulement un `clientId` — et `scoringConfig` passe par
+`@JdbcTypeCode(SqlTypes.JSON)`, donc une clause SQL sur le document n'est pas ecrivable dans
+le Criteria ou vivent les huit filtres existants. Les seuils sont charges en une requete puis
+appliques en Java, et le filtre devient un `OR` de couples (boutique, seuil) — ni N+1, ni
+couplage du monitoring au format du document. Voir `2026-08-29-f8-bareme-reglable-design.md`.
 
 **Ce que la feature referme** : le bareme d'une boutique ne se reglera plus en base, et
 `seuilChaud`, lu et porte depuis F3 sans consommateur, en retrouve un qui se voit.

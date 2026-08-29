@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -38,6 +39,7 @@ import { StatusBadge } from '../../shared/status-badge/status-badge';
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatIconModule,
     MatProgressBarModule,
     StatusBadge,
@@ -81,6 +83,7 @@ export class Leads implements OnInit {
   statutsChoisis: LeadStatus[] = [];
   minScore?: number;
   recherche = '';
+  chaudsSeulement = false;
 
   requete: LeadQuery = { page: 0, size: 25, sort: 'createdAt,desc' };
 
@@ -108,6 +111,8 @@ export class Leads implements OnInit {
       status: this.statutsChoisis,
       minScore: this.minScore,
       q: this.recherche.trim(),
+      // `undefined` et non `false` quand la case est decochee : voir `LeadQuery.chaud`.
+      chaud: this.chaudsSeulement ? true : undefined,
     };
     this.charge();
   }
@@ -117,6 +122,7 @@ export class Leads implements OnInit {
     this.statutsChoisis = [];
     this.minScore = undefined;
     this.recherche = '';
+    this.chaudsSeulement = false;
     this.appliqueFiltres();
   }
 

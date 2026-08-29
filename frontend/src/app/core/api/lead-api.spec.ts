@@ -58,6 +58,24 @@ describe('LeadApi', () => {
     requete.flush({});
   });
 
+  /**
+   * Le type de `chaud` est `true` et non `boolean`, et la case decochee vaut `undefined` :
+   * la boucle de construction ne saute que `undefined`, `null` et la chaine vide, donc un
+   * `false` partirait dans l URL et ajouterait un predicat cote serveur — le filtre chaud
+   * n a pas de negation, `chaud=false` n est pas « les tiedes ».
+   */
+  it("n'envoie le parametre chaud que lorsqu'il est demande", () => {
+    api.liste({ page: 0, size: 20, sort: 'createdAt,desc', chaud: true }).subscribe();
+    const requete = httpMock.expectOne((r) => r.url === '/api/leads');
+    expect(requete.request.params.get('chaud')).toBe('true');
+    requete.flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 });
+
+    api.liste({ page: 0, size: 20, sort: 'createdAt,desc' }).subscribe();
+    const sansFiltre = httpMock.expectOne((r) => r.url === '/api/leads');
+    expect(sansFiltre.request.params.has('chaud')).toBeFalse();
+    sansFiltre.flush({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 });
+  });
+
   it("n'envoie pas un tableau de statuts vide", () => {
     api.liste({ page: 0, size: 25, sort: 'createdAt,desc', status: [] }).subscribe();
 

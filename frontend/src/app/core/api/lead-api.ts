@@ -17,6 +17,13 @@ export interface LeadQuery {
   from?: string;
   to?: string;
   q?: string;
+  /**
+   * `true` et non `boolean` : la boucle ci-dessous ne saute que `undefined`, `null` et la
+   * chaine vide, donc un `false` partirait dans l'URL et ajouterait un predicat cote
+   * serveur. Le filtre n'a pas de negation — « pas seulement les chauds » veut dire « tous »,
+   * ce qui est l'absence du parametre. La case decochee doit donc valoir `undefined`.
+   */
+  chaud?: true;
 }
 
 /**

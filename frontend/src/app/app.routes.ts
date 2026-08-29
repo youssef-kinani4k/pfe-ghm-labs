@@ -49,6 +49,12 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'boutiques/:id/bareme',
+    title: 'Bareme de scoring',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/boutiques/bareme/bareme').then((m) => m.Bareme),
+  },
+  {
     path: 'boutiques/:id',
     title: 'Boutique',
     canActivate: [authGuard],

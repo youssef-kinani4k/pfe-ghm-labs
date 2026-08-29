@@ -117,6 +117,7 @@ GET /api/leads
 | `minScore`     | entier                  | Score minimal                                 |
 | `from`, `to`   | instant ISO-8601        | Fenêtre sur `createdAt`                       |
 | `q`            | chaîne                  | Recherche libre (email, société)              |
+| `chaud`        | `true`                  | Ne rend que les leads chauds                  |
 
 Un paramètre absent n'ajoute aucun prédicat. Une taille supérieure à 100 est **plafonnée en
 silence** plutôt que refusée : une taille excessive est une maladresse d'appelant, pas une
@@ -125,6 +126,13 @@ faute qui mérite de faire échouer l'écran.
 **Le tri ne porte que sur les colonnes de la table `lead`** — `createdAt`, `companyName`,
 `email`, `detectedIntent`, `score`, `status`. `clientName` et `salesRepName` sont résolus
 après la requête, par une seconde lecture : les trier ferait rendre `500`.
+
+**`chaud` n'a pas de négation.** Seul `chaud=true` pose un prédicat ; `chaud=false` est traité
+comme l'absence du paramètre, parce que « pas seulement les chauds » veut dire « tous ». Le
+prédicat n'est pas une comparaison de score : le seuil appartient à chaque boutique, donc la
+clause est une disjonction de couples *(boutique, seuil)*, construite après lecture des
+barèmes. `client.scoring_config` est chiffré au repos et illisible par Postgres — aucune
+comparaison SQL directe n'est possible.
 
 ```bash
 curl -s 'http://localhost:8090/api/leads?status=FAILED&minScore=60&sort=createdAt,desc&size=25' \
@@ -148,7 +156,8 @@ curl -s 'http://localhost:8090/api/leads?status=FAILED&minScore=60&sort=createdA
       "assignedSalesRepId": "3a90...",
       "salesRepName": "Sara Bennani",
       "countryCode": "MA",
-      "sector": "industrie"
+      "sector": "industrie",
+      "chaud": true
     }
   ],
   "page": 0,
@@ -166,7 +175,12 @@ GET /api/leads/{id}
 
 Rend le lead, son commercial, **tout l'historique `crm_sync_attempt`** et l'événement brut
 d'origine avec sa charge utile. C'est ce dernier bloc qui répond à « pourquoi ce lead n'a pas
-de téléphone » sans ouvrir `psql`.
+de téléphone » sans ouvrir `psql`. La fiche porte le même `chaud` que la liste.
+
+**`chaud` est calculé à la lecture, jamais stocké** : c'est `score >= seuilChaud` du barème de
+la boutique du lead. Deux leads au même score peuvent donc différer, et un barème modifié
+change le verdict des leads déjà écrits sans qu'aucun score ne bouge. Le figer en base à la
+qualification ferait mentir la liste dès le lendemain.
 
 ```bash
 curl -s "http://localhost:8090/api/leads/6f1c..." -H "Authorization: Bearer $JETON" | jq
@@ -551,6 +565,69 @@ POST /api/admin/sales-reps/{id}/deactivate
 Désactiver le **dernier commercial actif** d'une boutique est refusé en `409` : le routage
 lèverait `AssignmentException` au premier lead suivant, et trois tentatives plus tard le lead
 serait en DLQ. Le refus porte la raison.
+
+### Barème de scoring
+
+```
+GET /api/admin/clients/{id}/scoring
+PUT /api/admin/clients/{id}/scoring
+```
+
+Le barème d'une boutique — les poids, les listes cibles et le seuil de chaleur. Il vit dans
+`client.scoring_config`, chiffré au repos. **Le jeu de critères est fermé** : seuls les poids
+et les listes se règlent, il n'y a pas de moteur de règles.
+
+`GET` rend les valeurs **effectives**, défauts compris, car c'est le barème que `LeadScorer`
+applique réellement — un document vide ne rend donc pas des zéros. Il rend en plus
+`scoreMaximum`, borné à `[0, 100]` comme le score lui-même, et `seuilInatteignable`.
+
+```bash
+curl -s http://localhost:8090/api/admin/clients/$ID/scoring -H "Authorization: Bearer $JETON" | jq
+```
+
+```json
+{
+  "valeurs": {
+    "telephonePresent": 15,
+    "societePresente": 10,
+    "nomPresent": 5,
+    "messagePresent": 10,
+    "intention": { "DEVIS": 40, "ACHAT": 40, "INFORMATION": 15, "SUPPORT": 5, "AUTRE": 0 },
+    "secteursCibles": ["industrie"],
+    "paysCibles": ["MA"],
+    "bonusCible": 10,
+    "seuilChaud": 70
+  },
+  "scoreMaximum": 90,
+  "seuilInatteignable": false,
+  "defauts": { "...": "le barème par défaut, pour le bouton de remise à zéro" }
+}
+```
+
+`PUT` **remplace le document entier** : pas de fusion partielle, qui rendrait indécidable la
+différence entre « poids absent » et « poids remis à zéro ». Le corps est un `ScoringForm`,
+c'est-à-dire le contenu de `valeurs` ci-dessus.
+
+| Refus                                                    | Code  |
+| -------------------------------------------------------- | ----- |
+| Un poids, le bonus ou le seuil hors de `[0, 100]`         | `400` |
+| Un code pays qui n'est pas deux lettres                   | `400` |
+| Un secteur de plus de 80 caractères                       | `400` |
+| Boutique inconnue                                         | `404` |
+
+Les bornes `[0, 100]` ne sont pas arbitraires : `LeadScorer` plafonne le total à 100, donc un
+poids au-delà serait sans effet observable.
+
+**Un seuil au-dessus du maximum atteignable est accepté**, et signalé par
+`seuilInatteignable: true`. Ce n'est pas une erreur de saisie mais un état légitime, le temps
+de monter les poids — le refuser empêcherait de régler le barème dans l'ordre qu'on veut.
+
+Les listes sont **normalisées** à la relecture : les secteurs en minuscules, les pays en
+majuscules. La réponse du `PUT` montre donc la forme retenue, qui peut différer de ce qui a
+été envoyé.
+
+Le barème s'applique **au prochain lead reçu** : les scores déjà écrits ne sont pas recalculés.
+Le badge « chaud », lui, est calculé à la lecture — il se déplace immédiatement.
 
 ### Fournisseurs ERP et test de connexion
 

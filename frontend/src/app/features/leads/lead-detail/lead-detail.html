@@ -49,7 +49,19 @@
           </div>
           <div class="champs__paire">
             <dt>Score</dt>
-            <dd class="lf-mono">{{ lead.score }}</dd>
+            <dd class="lf-mono">
+              {{ lead.score }}
+              <!-- Ici le mot est ecrit en toutes lettres, la ou la liste se contente de
+                   l'icone : l'ecran de diagnostic n'a pas la contrainte de densite d'une
+                   table, et c'est souvent le premier endroit ou l'on se demande pourquoi un
+                   lead est signale. -->
+              @if (lead.chaud) {
+                <span class="detail__chaud">
+                  <mat-icon>local_fire_department</mat-icon>
+                  Chaud
+                </span>
+              }
+            </dd>
           </div>
           <div class="champs__paire">
             <dt>Pays / secteur</dt>

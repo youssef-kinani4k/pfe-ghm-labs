@@ -1,0 +1,117 @@
+:host {
+  display: block;
+}
+
+.bareme {
+  display: grid;
+  gap: var(--lf-space-3);
+
+  &__retour {
+    margin-bottom: var(--lf-space-2);
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-2);
+    color: var(--lf-echec);
+  }
+
+  &__bloc {
+    padding-bottom: var(--lf-space-1);
+    margin-bottom: var(--lf-space-3);
+  }
+
+  &__titre {
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.0625rem;
+    letter-spacing: -0.01em;
+  }
+
+  // Meme grille que la fiche d'une boutique : deux colonnes tant que la place le permet,
+  // une seule ensuite. Les poids se comparent a l'oeil, ils doivent rester alignes.
+  &__champs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--lf-space-2) var(--lf-space-3);
+    align-items: start;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-4);
+  }
+
+  &__message {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.875rem;
+  }
+}
+
+// Repris de l'ecran Parametres, avec la meme regle : la couleur ne porte jamais seule
+// l'information, une icone et une phrase la doublent. L'etat par defaut est neutre et non
+// vert — un bareme regle n'est pas un succes, c'est l'etat normal.
+.bandeau {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lf-space-3);
+  margin-bottom: var(--lf-space-3);
+  padding: var(--lf-space-3);
+  max-width: 46rem;
+  border: 1px solid var(--lf-neutre-fond);
+  border-left: 4px solid var(--lf-neutre);
+  border-radius: 8px;
+  background: var(--lf-neutre-fond);
+
+  // Un seuil hors de portee n'est pas une erreur de saisie : le serveur l'accepte, et le
+  // bareme reste enregistrable. D'ou l'orange de l'attente, jamais le rouge de l'echec.
+  &--alerte {
+    border-left-color: var(--lf-attente);
+    background: var(--lf-attente-fond);
+    color: var(--lf-attente);
+  }
+
+  &__icone {
+    flex: none;
+  }
+
+  &__texte {
+    flex: 1 1 18rem;
+  }
+
+  &__mode {
+    margin: 0 0 0.25rem;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-weight: 600;
+  }
+
+  &__detail {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  &__compteurs {
+    display: flex;
+    gap: var(--lf-space-4);
+    margin: 0;
+  }
+
+  &__paire {
+    dt {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--lf-neutre);
+    }
+
+    dd {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+  }
+}

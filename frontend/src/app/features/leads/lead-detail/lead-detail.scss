@@ -16,6 +16,28 @@
     font-size: 1rem;
   }
 
+  // Meme ton que la liste : l'attente, et non l'echec — un lead chaud demande une action,
+  // ce n'est pas une panne.
+  &__chaud {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    margin-left: var(--lf-space-1);
+    padding: 0.125rem var(--lf-space-1);
+    border-radius: 999px;
+    background: var(--lf-attente-fond);
+    color: var(--lf-attente);
+    font-family: Roboto, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+
+    mat-icon {
+      width: 1rem;
+      height: 1rem;
+      font-size: 1rem;
+    }
+  }
+
   &__source {
     margin-left: var(--lf-space-1);
     color: var(--mat-sys-on-surface-variant);
