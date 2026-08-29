@@ -53,6 +53,15 @@
             </mat-hint>
           </mat-form-field>
         </mat-card-content>
+
+        <!-- Le bareme a son propre ecran plutot qu un cinquieme bloc ici : c est dix champs
+             de plus, et cette fiche en porte deja assez pour qu un champ s y perde. -->
+        <mat-card-actions class="fiche__actions">
+          <a matButton [routerLink]="['/boutiques', fiche.id, 'bareme']">
+            <mat-icon>tune</mat-icon>
+            Regler le bareme de scoring
+          </a>
+        </mat-card-actions>
       </mat-card>
 
       <mat-card appearance="outlined" class="fiche__bloc">

@@ -1,0 +1,196 @@
+<a matButton [routerLink]="['/boutiques']" class="bareme__retour">
+  <mat-icon>arrow_back</mat-icon>
+  Retour aux boutiques
+</a>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement du bareme" />
+}
+
+@if (erreur(); as texte) {
+  <p class="bareme__erreur" role="alert">{{ texte }}</p>
+}
+
+@if (vue()) {
+  <article class="bareme">
+    <!-- Le bandeau dit ce que le reglage produira, pas ce que le formulaire contient : un
+         seuil hors de portee est la seule erreur que le serveur accepte, et c'est donc ici
+         qu'elle doit se voir. L'icone double la couleur : le vert et l'orange seuls ne se
+         distinguent pas pour tous les lecteurs. -->
+    <section
+      class="bandeau"
+      [class.bandeau--alerte]="seuilInatteignable()"
+      role="status"
+      aria-live="polite"
+    >
+      <mat-icon class="bandeau__icone">
+        {{ seuilInatteignable() ? 'warning' : 'local_fire_department' }}
+      </mat-icon>
+      <div class="bandeau__texte">
+        <p class="bandeau__mode">
+          @if (seuilInatteignable()) {
+            Aucun lead ne pourra etre chaud
+          } @else {
+            Un lead est chaud a partir de {{ formulaire.controls.seuilChaud.value }} points
+          }
+        </p>
+        <p class="bandeau__detail">
+          @if (seuilInatteignable()) {
+            Le seuil depasse le maximum que ce bareme peut atteindre. Baissez le seuil, ou montez
+            les poids.
+          } @else {
+            Le bareme reste enregistrable en l etat ; il s applique au prochain lead recu.
+          }
+        </p>
+      </div>
+      <dl class="bandeau__compteurs">
+        <div class="bandeau__paire">
+          <dt>Maximum atteignable</dt>
+          <dd class="lf-mono">{{ scoreMaximum() }}</dd>
+        </div>
+        <div class="bandeau__paire">
+          <dt>Seuil</dt>
+          <dd class="lf-mono">{{ formulaire.controls.seuilChaud.value }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <form [formGroup]="formulaire" (ngSubmit)="enregistre()">
+      <mat-card appearance="outlined" class="bareme__bloc">
+        <mat-card-header>
+          <mat-card-title class="bareme__titre">Poids de presence</mat-card-title>
+          <mat-card-subtitle>
+            Points apportes par un champ rempli. Un champ absent n apporte rien : il n y a pas de
+            malus.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="bareme__champs">
+          <mat-form-field appearance="outline">
+            <mat-label>Telephone renseigne</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="telephonePresent" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Societe renseignee</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="societePresente" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Nom renseigne</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="nomPresent" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Message renseigne</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="messagePresent" />
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="bareme__bloc">
+        <mat-card-header>
+          <mat-card-title class="bareme__titre">Poids par intention</mat-card-title>
+          <mat-card-subtitle>
+            L intention detectee dans le message du prospect. Une seule s applique par lead : c est
+            le poids le plus eleve qui compte dans le maximum ci-dessus.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="bareme__champs" formGroupName="intention">
+          @for (intention of intentions; track intention.cle) {
+            <mat-form-field appearance="outline">
+              <mat-label>{{ intention.libelle }}</mat-label>
+              <input matInput type="number" min="0" max="100" [formControlName]="intention.cle" />
+            </mat-form-field>
+          }
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="bareme__bloc">
+        <mat-card-header>
+          <mat-card-title class="bareme__titre">Ciblage</mat-card-title>
+          <mat-card-subtitle>
+            Le bonus ne se cumule pas : un lead du bon secteur <em>et</em> du bon pays reste un seul
+            lead cible, pas deux fois meilleur.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="bareme__champs">
+          <mat-form-field appearance="outline">
+            <mat-label>Secteurs cibles</mat-label>
+            <mat-chip-grid #grilleSecteurs aria-label="Secteurs cibles">
+              @for (secteur of secteurs(); track secteur) {
+                <mat-chip-row (removed)="retireUnSecteur(secteur)">
+                  {{ secteur }}
+                  <button matChipRemove [attr.aria-label]="'Retirer ' + secteur">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
+                </mat-chip-row>
+              }
+              <input
+                placeholder="industrie, puis Entree"
+                [matChipInputFor]="grilleSecteurs"
+                [matChipInputAddOnBlur]="true"
+                (matChipInputTokenEnd)="ajouteUnSecteur($event)"
+              />
+            </mat-chip-grid>
+            <mat-hint>
+              La correspondance est exacte : « industrie » ne reconnait pas « industrie du textile
+              ». Enumerez les deux si vous voulez les deux.
+            </mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Pays cibles</mat-label>
+            <mat-chip-grid #grillePays aria-label="Pays cibles">
+              @for (code of pays(); track code) {
+                <mat-chip-row (removed)="retireUnPays(code)">
+                  {{ code }}
+                  <button matChipRemove [attr.aria-label]="'Retirer ' + code">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
+                </mat-chip-row>
+              }
+              <input
+                placeholder="FR, puis Entree"
+                [matChipInputFor]="grillePays"
+                [matChipInputAddOnBlur]="true"
+                (matChipInputTokenEnd)="ajouteUnPays($event)"
+              />
+            </mat-chip-grid>
+            <mat-hint>Codes a deux lettres, comme FR ou BE.</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Bonus si le lead est cible</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="bonusCible" />
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="bareme__bloc">
+        <mat-card-header>
+          <mat-card-title class="bareme__titre">Seuil de chaleur</mat-card-title>
+          <mat-card-subtitle>
+            A partir de combien de points un lead est signale comme chaud dans la liste. Le score
+            total est borne a 100.
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content class="bareme__champs">
+          <mat-form-field appearance="outline">
+            <mat-label>Seuil chaud</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="seuilChaud" />
+            <mat-hint>Maximum atteignable avec ce bareme : {{ scoreMaximum() }}.</mat-hint>
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="bareme__actions">
+        <button matButton="filled" type="submit" [disabled]="enregistrement()">
+          Enregistrer le bareme
+        </button>
+        <button matButton type="button" (click)="revientAuxDefauts()">
+          Revenir aux valeurs par defaut
+        </button>
+        @if (message(); as texte) {
+          <p class="bareme__message" role="status">{{ texte }}</p>
+        }
+      </div>
+    </form>
+  </article>
+}

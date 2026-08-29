@@ -9,6 +9,8 @@ import {
   CrmTestResult,
   SalesRepAdminView,
   SalesRepForm,
+  ScoringForm,
+  ScoringView,
   SecretRotated,
 } from '../models/tenant';
 
@@ -82,6 +84,16 @@ export class TenantApi {
 
   desactiveUnCommercial(id: string) {
     return this.http.post<SalesRepAdminView>(`/api/admin/sales-reps/${id}/deactivate`, {});
+  }
+
+  bareme(id: string) {
+    return this.http.get<ScoringView>(`/api/admin/clients/${id}/scoring`);
+  }
+
+  // PUT et non PATCH : le document est remplace en entier. Une fusion partielle rendrait
+  // indecidable la difference entre « poids absent » et « poids remis a zero ».
+  enregistreBareme(id: string, formulaire: ScoringForm) {
+    return this.http.put<ScoringView>(`/api/admin/clients/${id}/scoring`, formulaire);
   }
 
   fournisseurs() {
