@@ -1,0 +1,27 @@
+# Ce que la production doit faire AUTREMENT du developpement, et rien d'autre :
+# application.yml est deja ecrit pour elle — tout y passe par des variables
+# d'environnement et aucun secret n'y a de valeur de repli.
+
+spring:
+  flyway:
+    # Explicite, alors que c'est deja le defaut : db/dev porte R__demo_data.sql, et
+    # l'ecrire ici rend visible qu'aucune donnee de demonstration n'entre en production.
+    # Une instance neuve demarre sur une base vide ; la premiere boutique se cree par
+    # l'ecran, jamais en SQL.
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.leadflow: INFO
+    org.hibernate.SQL: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # metrics et prometheus n'ont aucun consommateur aujourd'hui et exposent la forme
+        # interne de l'application. Les rouvrir le jour ou une supervision les lira.
+        include: health
+  endpoint:
+    health:
+      show-details: never
