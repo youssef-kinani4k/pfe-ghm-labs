@@ -46,10 +46,12 @@ public class LeadQueryController {
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Boolean chaud,
             Pageable pagination) {
 
         LeadFilter filtre = new LeadFilter(
-                clientId, status, intent, intentSource, salesRepId, minScore, from, to, q);
+                clientId, status, intent, intentSource, salesRepId, minScore, from, to, q,
+                chaud);
         return service.cherche(filtre, plafonne(pagination));
     }
 

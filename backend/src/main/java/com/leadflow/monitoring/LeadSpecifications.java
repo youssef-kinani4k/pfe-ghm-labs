@@ -4,6 +4,8 @@ import com.leadflow.qualification.Lead;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
@@ -16,7 +18,13 @@ final class LeadSpecifications {
 
     private LeadSpecifications() {}
 
-    static Specification<Lead> depuis(LeadFilter filtre) {
+    /**
+     * @param seuils seuil de chaleur par boutique, deja resolu par l'appelant. Le passer en
+     *     argument plutot que d'aller le chercher ici garde cette classe sans dependance : une
+     *     {@code Specification} qui lirait une autre table serait un aller-retour cache au
+     *     milieu d'une requete.
+     */
+    static Specification<Lead> depuis(LeadFilter filtre, Map<UUID, Integer> seuils) {
         return (racine, requete, constructeur) -> {
             List<Predicate> predicats = new ArrayList<>();
 
@@ -56,6 +64,25 @@ final class LeadSpecifications {
                         constructeur.like(constructeur.lower(racine.get("email")), motif),
                         constructeur.like(
                                 constructeur.lower(racine.get("companyName")), motif)));
+            }
+            // Chaque boutique a son seuil : le predicat est une disjonction de couples
+            // (boutique, seuil). Une clause SQL sur scoring_config n'est pas possible ici —
+            // Lead ne porte pas d'association vers Client, et le document est chiffre au
+            // repos, donc illisible par Postgres.
+            if (Boolean.TRUE.equals(filtre.chaud())) {
+                if (seuils.isEmpty()) {
+                    // Aucune boutique connue : aucun lead ne peut etre chaud. Sans ce cas,
+                    // le `or` vide vaudrait `false` chez Hibernate mais la lecture du code
+                    // laisserait croire l'inverse.
+                    return constructeur.disjunction();
+                }
+                List<Predicate> parBoutique = seuils.entrySet().stream()
+                        .map(entree -> constructeur.and(
+                                constructeur.equal(racine.get("clientId"), entree.getKey()),
+                                constructeur.greaterThanOrEqualTo(
+                                        racine.get("score"), entree.getValue())))
+                        .toList();
+                predicats.add(constructeur.or(parBoutique.toArray(Predicate[]::new)));
             }
             return constructeur.and(predicats.toArray(Predicate[]::new));
         };

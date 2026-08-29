@@ -34,5 +34,6 @@ public record LeadDetail(
         String sector,
         SalesRepView salesRep,
         List<SyncAttemptView> syncAttempts,
-        RawEventView rawEvent) {
+        RawEventView rawEvent,
+        boolean chaud) {
 }

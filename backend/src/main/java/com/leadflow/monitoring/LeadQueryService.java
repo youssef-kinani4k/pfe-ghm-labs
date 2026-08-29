@@ -3,6 +3,7 @@ package com.leadflow.monitoring;
 import com.leadflow.monitoring.dto.LeadSummary;
 import com.leadflow.monitoring.dto.PageResponse;
 import com.leadflow.qualification.Lead;
+import com.leadflow.qualification.ScoringConfig;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import com.leadflow.tenant.SalesRep;
@@ -28,6 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
  * association ajoutee aux entites du pipeline pour le confort d'un ecran.
  *
  * <p>{@code open-in-view} est a false : la conversion en DTO se fait ici, sous transaction.
+ *
+ * <p>Le drapeau {@code chaud} se calcule ici et non en base : le seuil vit dans
+ * {@code client.scoring_config}, un document chiffre au repos que Postgres ne sait pas lire.
+ * Les boutiques de la page sont donc chargees entieres — elles l'etaient deja pour leur nom,
+ * et garder l'entite au lieu du seul nom ne coute aucune requete de plus.
  */
 @Service
 public class LeadQueryService {
@@ -47,9 +53,15 @@ public class LeadQueryService {
 
     @Transactional(readOnly = true)
     public PageResponse<LeadSummary> cherche(LeadFilter filtre, Pageable pagination) {
-        Page<Lead> page = leads.findAll(LeadSpecifications.depuis(filtre), pagination);
+        // Les seuils ne sont charges que si le filtre les reclame : la liste sans filtre est
+        // le cas courant, et elle n'a pas a payer une lecture de toutes les boutiques.
+        Map<UUID, Integer> seuilsDuFiltre = Boolean.TRUE.equals(filtre.chaud())
+                ? seuils(filtre.clientId())
+                : Map.of();
+        Page<Lead> page = leads.findAll(
+                LeadSpecifications.depuis(filtre, seuilsDuFiltre), pagination);
 
-        Map<UUID, String> nomsDeClient = nomsDeClient(page.getContent());
+        Map<UUID, Client> boutiques = boutiques(page.getContent());
         Map<UUID, String> nomsDeCommercial = nomsDeCommercial(page.getContent());
 
         List<LeadSummary> lignes = page.getContent().stream()
@@ -57,7 +69,7 @@ public class LeadQueryService {
                         lead.getId(),
                         lead.getCreatedAt(),
                         lead.getClientId(),
-                        nom(nomsDeClient, lead.getClientId()),
+                        nomDeBoutique(boutiques, lead.getClientId()),
                         lead.getCompanyName(),
                         lead.getEmail(),
                         lead.getDetectedIntent(),
@@ -67,7 +79,8 @@ public class LeadQueryService {
                         lead.getAssignedSalesRepId(),
                         nom(nomsDeCommercial, lead.getAssignedSalesRepId()),
                         lead.getCountryCode(),
-                        lead.getSector()))
+                        lead.getSector(),
+                        estChaud(lead, boutiques)))
                 .toList();
 
         return PageResponse.de(page, lignes);
@@ -82,7 +95,21 @@ public class LeadQueryService {
         return identifiant == null ? null : noms.get(identifiant);
     }
 
-    private Map<UUID, String> nomsDeClient(List<Lead> page) {
+    /**
+     * Meme tolerance que ci-dessus, sur la boutique plutot que sur son seul nom. Le nom
+     * differe de {@code nom} parce que l'effacement de type rendrait les deux signatures
+     * identiques.
+     */
+    private String nomDeBoutique(Map<UUID, Client> boutiques, UUID identifiant) {
+        Client boutique = identifiant == null ? null : boutiques.get(identifiant);
+        return boutique == null ? null : boutique.getName();
+    }
+
+    /**
+     * Les boutiques de la page, entieres : le nom et le seuil en sortent ensemble, la ou la
+     * version precedente ne gardait que le nom.
+     */
+    private Map<UUID, Client> boutiques(List<Lead> page) {
         Set<UUID> identifiants = page.stream()
                 .map(Lead::getClientId)
                 .filter(Objects::nonNull)
@@ -91,7 +118,36 @@ public class LeadQueryService {
             return Map.of();
         }
         return clients.findAllById(identifiants).stream()
-                .collect(Collectors.toMap(Client::getId, Client::getName));
+                .collect(Collectors.toMap(Client::getId, boutique -> boutique));
+    }
+
+    /**
+     * Seuils de toutes les boutiques, ou d'une seule quand le filtre en designe une. Charger
+     * toutes les boutiques est acceptable a l'echelle d'une agence, et c'est le seul moyen :
+     * le seuil n'est pas requetable en SQL.
+     */
+    private Map<UUID, Integer> seuils(UUID clientId) {
+        List<Client> boutiques = clientId == null
+                ? clients.findAll()
+                : clients.findById(clientId).stream().toList();
+        return boutiques.stream()
+                .collect(Collectors.toMap(
+                        Client::getId,
+                        boutique -> ScoringConfig.depuis(boutique.getScoringConfig())
+                                .seuilChaud()));
+    }
+
+    /**
+     * Un lead dont la boutique a disparu n'est pas chaud : sans seuil, il n'y a pas de
+     * verdict a rendre, et {@code false} est le seul defaut qui ne mente pas a l'ecran.
+     */
+    private boolean estChaud(Lead lead, Map<UUID, Client> boutiques) {
+        Client boutique = lead.getClientId() == null ? null : boutiques.get(lead.getClientId());
+        if (boutique == null) {
+            return false;
+        }
+        return lead.getScore()
+                >= ScoringConfig.depuis(boutique.getScoringConfig()).seuilChaud();
     }
 
     /**
