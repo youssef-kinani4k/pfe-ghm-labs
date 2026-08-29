@@ -21,6 +21,10 @@ leadflow:
     # profil dev contre une base partagee ne chiffre pas avec une cle publiee dans le
     # depot. Ne jamais utiliser cette valeur de repli hors du poste de developpement.
     master-key: ${LEADFLOW_MASTER_KEY:gmLN1lvFdN9MsO6NuKFrFHHVzFzWQF7bgrJYmNY8Rok=}
+    cors:
+      # ng serve et le backend sont deux origines distinctes tant qu'on developpe.
+      allowed-origins:
+        - http://localhost:4200
   dashboard:
     # Meme regle que la cle maitre ci-dessus : repli de developpement seulement, pour que
     # `spring-boot:run -Pdev` demarre sans preparer d'environnement. Les variables restent

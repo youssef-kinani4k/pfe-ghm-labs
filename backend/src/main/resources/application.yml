@@ -58,6 +58,11 @@ leadflow:
     # Cle AES-256 en base64 sur 32 octets. Aucune valeur de repli : l'application
     # doit refuser de demarrer plutot que de chiffrer avec une cle devinable.
     master-key: ${LEADFLOW_MASTER_KEY:}
+    cors:
+      # Vide par defaut, et c'est le cas de production : Nginx sert le dashboard et relaie
+      # l'API sous une origine unique, donc il n'y a aucune requete cross-origin. Seul le
+      # profil dev la peuple, ou ng serve tient le :4200 face au backend sur :8090.
+      allowed-origins: []
   dashboard:
     # Cle de signature du jeton de session. Aucune valeur de repli, comme la cle maitre :
     # l'application doit refuser de demarrer plutot que de signer avec un secret devinable.
