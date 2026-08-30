@@ -115,6 +115,40 @@ for chemin in "${CHEMINS[@]}"; do
     || echoue "X-Frame-Options absent sur $chemin"
 done
 
+etape "3c. Les polices sont servies par l origine, et les icones existent"
+# La CSP dit `font-src 'self'`. Tant que index.html chargeait Google Fonts, elle bloquait
+# la police a ligatures de Material Symbols et AUCUNE icone ne s'affichait — un defaut
+# invisible pour curl, qui ne lit pas le CSS. On l'eprouve donc en deux temps.
+#
+# D'abord : plus aucune ressource tierce dans la page ni dans sa feuille principale. Le
+# grep porte sur les deux, parce que le build inline une partie du CSS dans index.html et
+# laisse le reste dans styles-<hash>.css — verifier la seule page laisserait passer la
+# moitie du fichier.
+FEUILLE=$(printf '%s' "$INDEX_HTML" | grep -oE 'styles-[A-Za-z0-9]+\.css' | head -1 || true)
+[ -n "$FEUILLE" ] || echoue "aucune feuille styles-<hash>.css trouvee dans /index.html"
+CSS=$(curl -fsS "$BASE/$FEUILLE")
+
+# Un « grep && echoue » nu tuerait le script sous set -e des que le grep ne trouve rien,
+# c'est-a-dire dans le cas qui passe. L'assertion doit donc s'ecrire en if.
+for source in "$INDEX_HTML" "$CSS"; do
+  if printf '%s' "$source" | grep -qi 'fonts\.googleapis\.com\|fonts\.gstatic\.com'; then
+    echoue "une police est encore chargee depuis Google : la CSP la bloquera"
+  fi
+done
+
+# Ensuite : la police d'icones est bien la, et servie comme une police. Un 404 rendrait la
+# page identique a curl et vide d'icones dans un navigateur.
+ICONES=$(printf '%s' "$CSS" | grep -oE '[^"()]*material-symbols[^"()]*\.woff2' | head -1 || true)
+[ -n "$ICONES" ] || echoue "police d icones introuvable dans $FEUILLE"
+ICONES=${ICONES#./}
+TYPE=$(curl -sS -o /dev/null -w '%{content_type}' "$BASE/$ICONES")
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$ICONES")
+[ "$code" = "200" ] || echoue "la police d icones /$ICONES rend $code, attendu 200"
+case "$TYPE" in
+  font/woff2*) ;;
+  *) echoue "la police d icones est servie en '$TYPE', attendu font/woff2" ;;
+esac
+
 etape "4. L'API est atteinte, et fermee"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/leads")
 [ "$code" = "401" ] || echoue "GET /api/leads sans jeton rend $code, attendu 401"

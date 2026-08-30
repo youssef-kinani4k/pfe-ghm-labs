@@ -518,6 +518,30 @@ Chaque route de `app.routes.ts` utilise `loadComponent` : les features sont des 
 separes, verifiable dans la sortie de `npm run build`. Ajouter une feature = un dossier sous
 `features/` plus une entree `loadComponent`.
 
+### Polices — servies par l'origine, jamais par un CDN
+
+**Le dashboard ne charge aucune ressource tierce a l'execution.** Les polices (Fira Sans,
+Roboto, Fira Code) et surtout **Material Symbols Outlined**, la police d'icones, vivent dans
+`frontend/src/fonts/` et sont versionnees. Ce n'est pas une preference : la CSP de production
+dit `font-src 'self'`, donc tout ce qui vient de `fonts.gstatic.com` est bloque. Material
+Symbols est une police **a ligatures** — `mat-icon` ecrit le nom de l'icone en texte et laisse
+la police y substituer le glyphe — si bien qu'une police bloquee ne degrade pas les icones :
+elle les fait disparaitre.
+
+`src/fonts.css` est **genere**, pas ecrit a la main : `python build-fonts.py` depuis
+`frontend/` rapatrie les sous-ensembles `latin` et `latin-ext` et reconstruit la feuille. Il
+en emet aussi la classe `.material-symbols-outlined`, que Google servait avec son CSS et dont
+`MAT_ICON_DEFAULT_OPTIONS` depend : sans elle, les fichiers sont servis et aucune icone
+n'apparait. Le script deduplique par empreinte — Roboto et Fira Code sont des polices
+variables, un seul fichier porte toutes leurs graisses sous une plage `font-weight`.
+
+Les polices sont sous `src/` et non `public/` **pour que le build les hache**. Le bloc Nginx
+des ressources statiques pose `Cache-Control: immutable` sur un an ; sous `public/` les noms
+seraient stables, et une police regeneree resterait figee un an dans les navigateurs.
+
+L'etape `3c` de `scripts/smoke-prod.sh` verrouille l'ensemble : aucune reference a Google dans
+la page ni dans sa feuille, et la police d'icones servie en `font/woff2`.
+
 ### Appels API
 
 `environment.apiBaseUrl` est **volontairement vide dans les deux environnements** : en dev

@@ -33,6 +33,7 @@
               }
             ],
             "styles": [
+              "src/fonts.css",
               "src/styles.scss"
             ]
           },
@@ -100,6 +101,7 @@
               }
             ],
             "styles": [
+              "src/fonts.css",
               "src/styles.scss"
             ]
           }
