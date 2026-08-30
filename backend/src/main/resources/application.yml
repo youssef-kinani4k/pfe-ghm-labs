@@ -91,7 +91,9 @@ leadflow:
     max-payload-bytes: 65536
     # Plafond de volume, par cle publique. La signature protege l'authenticite d'une
     # soumission, pas leur nombre. Le compteur ne consulte jamais la base : il cle sur le
-    # segment brut de l'URL, sans quoi le 429 dirait quelles cles publiques existent.
+    # dernier segment de l'URL, decode, sans quoi le 429 dirait quelles cles publiques
+    # existent. Le plafond protege le quota d'une boutique et la file, pas l'instance : une
+    # cle qui varie a chaque appel obtient sa pleine rafale a chaque fois.
     rate-limit:
       actif: true
       requetes-par-minute: 60

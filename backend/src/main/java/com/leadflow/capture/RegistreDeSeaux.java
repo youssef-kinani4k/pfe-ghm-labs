@@ -23,6 +23,13 @@ import java.util.function.LongSupplier;
  * l'eviction du moins recemment vu demande un ordre, que la seconde n'offre pas. Le prix est
  * une synchronisation globale, acceptable ici — le travail sous le verrou est une
  * soustraction, sans entree-sortie ni acces base.
+ *
+ * <p><b>Ce que ce plafond protege, et ce qu'il ne protege pas.</b> Il protege le quota d'une
+ * boutique et la file d'un formulaire qui s'emballe. Il ne protege pas l'instance d'une
+ * inondation qui varie la cle a chaque appel : chaque cle inventee obtient sa pleine rafale,
+ * coute une consultation client au bout de la chaine, et peut faire tourner ce registre. La
+ * memoire reste bornee par {@code clesSuiviesMax} ; le volume de requetes ne l'est pas. Une
+ * parade demanderait une cle sur l'IP, ou un plafond pose au niveau du reverse-proxy.
  */
 public class RegistreDeSeaux {
 

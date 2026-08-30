@@ -161,4 +161,21 @@ class PolitiqueDeDestinationTest {
         assertThatCode(() -> politique.verifie(URI.create("http://DOLIBARR/api/index.php")))
                 .doesNotThrowAnyException();
     }
+
+    /**
+     * <b>La seule verification sur le chemin de production, {@code resout()} non surchargee.</b>
+     * Tous les autres tests passent par le stub DNS de {@link #politique}, qui n'exerce jamais
+     * {@link PolitiqueDeDestination#resout(String)} tel qu'il est reellement ecrit —
+     * {@code InetAddress.getAllByName}. Une adresse litterale n'a besoin d'aucune resolution
+     * DNS : le JDK la parse directement, donc ce test n'est pas tributaire du reseau, et il
+     * exerce enfin le vrai chemin plutot que le double de test.
+     */
+    @Test
+    void refuseUneAdresseIpLitteraleSansSurcharge() {
+        PolitiqueDeDestination politique =
+                new PolitiqueDeDestination(new SsrfProperties(true, List.of()));
+
+        assertThatThrownBy(() -> politique.verifie(URI.create("http://169.254.169.254/")))
+                .isInstanceOf(DestinationRefuseeException.class);
+    }
 }

@@ -368,12 +368,15 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Cinq migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
-`V4__dead_letter.sql` (journal des messages morts) et `V5__intent_setting.sql` (cle d'API de
-l'analyse d'intention, ligne unique, chiffree au repos).
+`V4__dead_letter.sql` (journal des messages morts), `V5__intent_setting.sql` (cle d'API de
+l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
+(quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
+lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
+en silence).
 
 `V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
 messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le
@@ -456,10 +459,16 @@ de tout refuser : aucun `CorsFilter` n'est enregistre, et un test le verrouille.
 **`LimiteurDeDebit` plafonne le volume du webhook, hors de la chaine Spring Security.**
 L'authentification de `/api/webhooks/**` reste la signature HMAC, verifiee dans `capture` ;
 le limiteur ne l'authentifie pas, il compte. Il ne consulte jamais la base — la cle est le
-segment brut de l'URL, sans savoir si une boutique lui correspond — ce qui garde intacte la
-regle des cinq `401` uniformes : un `429` dit « trop d'appels », jamais « cette cle existe ».
-Il est **mono-instance**, comme `PendingEventRelay` : deux exemplaires de l'application
-offriraient deux fois le plafond, et le lever demanderait un compteur partage.
+dernier segment de l'URL, **decode** (sans quoi `abc`, `%61bc` et `a%62c` ouvriraient trois
+seaux pour une seule boutique), sans savoir si une boutique lui correspond — ce qui garde
+intacte la regle des cinq `401` uniformes : un `429` dit « trop d'appels », jamais « cette cle
+existe ». Il est **mono-instance**, comme `PendingEventRelay` : deux exemplaires de
+l'application offriraient deux fois le plafond, et le lever demanderait un compteur partage.
+Le plafond protege le quota d'une boutique et la file d'un formulaire qui s'emballe ; il ne
+protege pas l'instance d'une inondation qui varie la cle a chaque appel — chaque cle inventee
+coute quand meme une consultation client, et peut faire tourner les 10 000 entrees du registre
+LRU. Une parade a cette inondation demanderait une cle sur l'IP, ou un plafond pose au niveau
+du reverse-proxy.
 
 **`CrmHttpConfig` ancre un garde de destination sur chaque appel sortant vers un ERP.**
 `PolitiqueDeDestination` refuse les adresses internes (boucle locale, plages privees,

@@ -232,7 +232,11 @@ complète**. Ce qui existe porte des limites connues, et deux manques restent en
   généré par requête, un chantier à part.
 - **Le plafond de débit du webhook est mono-instance.** `LimiteurDeDebit` compte en mémoire ;
   deux exemplaires de l'application offriraient deux fois le plafond. Le lever demanderait un
-  compteur partagé, comme le filet de republication.
+  compteur partagé, comme le filet de republication. Il protège aussi une seule chose : le
+  quota d'une boutique et la file, contre un formulaire qui s'emballe. Il ne protège pas
+  l'instance d'une inondation qui varie la clé à chaque appel — chaque clé inventée obtient sa
+  pleine rafale et coûte une consultation client ; une parade demanderait une clé sur l'IP, ou
+  un plafond posé au niveau du reverse-proxy.
 - **Le garde SSRF sur les appels ERP porte une liste d'exceptions par profil**
   (`leadflow.security.crm.hotes-autorises`) et ne ferme pas la fenêtre de DNS-rebinding : il
   résout le nom, puis le client HTTP le résout à son tour, et un serveur DNS hostile peut

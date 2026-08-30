@@ -80,7 +80,27 @@ etape "3b. Les en-tetes de securite sont poses"
 # Sur / ET sur index.html : un add_header dans un location annule ceux du server, et
 # index.html en pose un pour le cache. Eprouver la seule racine laisserait passer
 # precisement le defaut le plus probable de ce fichier.
-for chemin in "/" "/index.html"; do
+#
+# Mais / et /index.html servent tous deux la MEME copie des en-tetes : / y arrive par
+# try_files -> /index.html, donc les deux exercent le bloc « = /index.html » et rien
+# d'autre. La copie du bloc des ressources hachees restait entierement non eprouvee. On
+# derive un chemin qui y tombe en extrayant le premier script .js de la page rendue,
+# plutot que de figer un nom de fichier hache qui change a chaque build.
+INDEX_HTML=$(curl -fsS "$BASE/index.html")
+HACHE=$(printf '%s' "$INDEX_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed -E 's/^src="//; s/"$//')
+
+CHEMINS=("/" "/index.html")
+if [ -n "$HACHE" ]; then
+  case "$HACHE" in
+    /*) ;;
+    *) HACHE="/$HACHE" ;;
+  esac
+  CHEMINS+=("$HACHE")
+else
+  printf 'aucun script .js trouve dans /index.html — bloc des ressources hachees non eprouve\n'
+fi
+
+for chemin in "${CHEMINS[@]}"; do
   ENTETES=$(curl -sSI "$BASE$chemin")
   printf '%s' "$ENTETES" | grep -qi '^x-content-type-options: *nosniff' \
     || echoue "X-Content-Type-Options absent sur $chemin"
@@ -90,6 +110,8 @@ for chemin in "/" "/index.html"; do
     || echoue "frame-ancestors absent de la CSP sur $chemin"
   printf '%s' "$ENTETES" | grep -qi '^referrer-policy:' \
     || echoue "Referrer-Policy absent sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^x-frame-options: *deny' \
+    || echoue "X-Frame-Options absent sur $chemin"
 done
 
 etape "4. L'API est atteinte, et fermee"

@@ -134,4 +134,33 @@ class LimiteurDeDebitTest {
 
         assertThat(soumetChemin("/api/webhooks/leads/" + cleEncodee)).isEqualTo(429);
     }
+
+    /**
+     * <b>Verification d'une hypothese de contournement, pas d'un comportement voulu du
+     * limiteur.</b> Un parametre de matrice ({@code ;n=1}) colle au dernier segment de
+     * {@link jakarta.servlet.http.HttpServletRequest#getRequestURI()}, et {@code
+     * derniereSection} ne le retire pas : verifie en debogage, la requete decoree obtient bien
+     * un seau neuf (le seau de la cle nue est epuise, celui-ci ne l'est pas), donc {@code
+     * verdict.accepte()} vaut {@code true} et le filtre laisse passer.
+     *
+     * <p>Mais le filtre n'est pas le dernier mot : {@code LimiteurDeDebit} s'enregistre a
+     * {@code Ordered.HIGHEST_PRECEDENCE}, avant la chaine Spring Security, et le {@code
+     * StrictHttpFirewall} par defaut de celle-ci rejette toute URI contenant un point-virgule
+     * avant meme le routage — {@code Handler} reste nul, aucune exception applicative n'est
+     * resolue, seulement 400. La cle mal derivee n'atteint donc jamais le controleur : il n'y
+     * a pas de fuite de seau exploitable sur cette pile, meme si {@code derniereSection} reste
+     * naive face aux parametres de matrice. Ce test verrouille cette conclusion — si le
+     * pare-feu changeait de politique ({@code setAllowSemicolon(true)}), il faudrait revisiter
+     * {@code derniereSection}.
+     */
+    @Test
+    void unParametreDeMatriceNAtteintJamaisLeControleur() throws Exception {
+        String cle = "cle-" + UUID.randomUUID();
+
+        soumet(cle);
+        soumet(cle);
+        soumet(cle);
+
+        assertThat(soumetChemin("/api/webhooks/leads/" + cle + ";n=1")).isEqualTo(400);
+    }
 }
