@@ -33,6 +33,7 @@
               }
             ],
             "styles": [
+              "src/fonts.css",
               "src/styles.scss"
             ]
           },
@@ -50,7 +51,15 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
             },
             "development": {
               "optimization": false,
@@ -100,6 +109,7 @@
               }
             ],
             "styles": [
+              "src/fonts.css",
               "src/styles.scss"
             ]
           }
