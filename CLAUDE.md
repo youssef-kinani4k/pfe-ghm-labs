@@ -464,7 +464,7 @@ offriraient deux fois le plafond, et le lever demanderait un compteur partage.
 **`CrmHttpConfig` ancre un garde de destination sur chaque appel sortant vers un ERP.**
 `PolitiqueDeDestination` refuse les adresses internes (boucle locale, plages privees,
 lien-local dont les metadonnees d'instance cloud) et n'autorise que les hotes d'une liste
-d'exceptions **par profil** (`leadflow.crm.ssrf.hotes-autorises` — conteneurs `dolibarr`/
+d'exceptions **par profil** (`leadflow.security.crm.hotes-autorises` — conteneurs `dolibarr`/
 `odoo` en prod, `localhost`/`host.docker.internal` en dev). `CrmHttpConfig` construit son
 `HttpClient` avec `Redirect.NEVER` : le garde ne voit la requete qu'une fois, et une
 redirection suivie a l'interieur d'un `send()` y echapperait sinon. Le garde ne ferme pas

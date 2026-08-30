@@ -161,6 +161,15 @@ Ce que ses étapes établissent :
 | 10    | le flux SSE traverse le proxy                                                    |
 | 11    | `proxy_buffering off` est bien actif sur le flux                                 |
 
+L'étape 3b teste `/` en plus de `/index.html` parce que les deux passent en réalité par le
+même bloc `location = /index.html` de `frontend/nginx.conf` — `try_files` y redirige toute
+route côté client en interne. Le bloc `add_header` posé au niveau `server` ne protège donc
+pas le corps du dashboard ; il ne couvre que les pages d'erreur, `/actuator/health`, et les
+fichiers statiques qui échapperaient à la regex des ressources hachées. Ce qui protège
+réellement les pages chargées par un navigateur, c'est la répétition des en-têtes à
+l'intérieur de `= /index.html` et du bloc des ressources hachées — la retirer en la croyant
+redondante supprimerait la CSP de tout le dashboard.
+
 Les étapes 10 et 11 sont distinctes à dessein. La 10 seule ne prouverait pas la 11 :
 éprouvée contre une configuration où `proxy_buffering off` était retiré, elle restait verte,
 Nginx transmettant un flux lent de toute façon. Le défaut ne se serait vu qu'à la première
@@ -225,7 +234,7 @@ complète**. Ce qui existe porte des limites connues, et deux manques restent en
   deux exemplaires de l'application offriraient deux fois le plafond. Le lever demanderait un
   compteur partagé, comme le filet de republication.
 - **Le garde SSRF sur les appels ERP porte une liste d'exceptions par profil**
-  (`leadflow.crm.ssrf.hotes-autorises`) et ne ferme pas la fenêtre de DNS-rebinding : il
+  (`leadflow.security.crm.hotes-autorises`) et ne ferme pas la fenêtre de DNS-rebinding : il
   résout le nom, puis le client HTTP le résout à son tour, et un serveur DNS hostile peut
   répondre différemment aux deux.
 - **Pas d'intégration continue.** Rien ne construit ni n'éprouve automatiquement à chaque
