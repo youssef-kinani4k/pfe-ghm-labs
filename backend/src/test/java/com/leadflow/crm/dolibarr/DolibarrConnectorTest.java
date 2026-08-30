@@ -2,6 +2,7 @@ package com.leadflow.crm.dolibarr;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.throwable;
 
 import com.leadflow.crm.model.CrmAssignee;
 import com.leadflow.crm.model.CrmLead;
@@ -31,6 +32,7 @@ class DolibarrConnectorTest {
         private String refCherchee;
         private String opportuniteExistante;
         private boolean echoueSurOpportunite;
+        private boolean echoueSurResponsable;
 
         private TransportFactice() {
             super(RestClient.builder());
@@ -70,6 +72,9 @@ class DolibarrConnectorTest {
         @Override
         public void lieResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
             appels.add("responsable");
+            if (echoueSurResponsable) {
+                throw new CrmSyncException("dolibarr", "affectation refusee", null);
+            }
             responsableLie = utilisateurRef;
         }
 
@@ -137,7 +142,8 @@ class DolibarrConnectorTest {
     /**
      * Le cas que la reference stable rend traitable : la reponse de Dolibarr s'est perdue
      * apres la creation, l'etat anterieur ignore donc l'opportunite, et le rejeu la
-     * retrouve au lieu de se heurter a {@code uk_projet_ref}.
+     * retrouve au lieu de se heurter a {@code uk_projet_ref}. L'attribution reste une etape
+     * a part entiere : la trouver par recherche ne la dispense pas.
      */
     @Test
     void adopteLOpportuniteExistanteAuLieuDenCreerUneSeconde() {
@@ -145,8 +151,9 @@ class DolibarrConnectorTest {
 
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
-        assertThat(transport.appels).containsExactly("tiers", "contact", "recherche");
+        assertThat(transport.appels).containsExactly("tiers", "contact", "recherche", "responsable");
         assertThat(resultat.opportunityRef()).isEqualTo("42");
+        assertThat(resultat.assigneeRef()).isEqualTo("9");
     }
 
     @Test
@@ -176,10 +183,11 @@ class DolibarrConnectorTest {
     @Test
     void neFaitAucunAppelQuandToutExisteDeja() {
         CrmSyncResult resultat =
-                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", "99", null));
+                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", "99", "9"));
 
         assertThat(transport.appels).isEmpty();
         assertThat(resultat.opportunityRef()).isEqualTo("99");
+        assertThat(resultat.assigneeRef()).isEqualTo("9");
     }
 
     @Test
@@ -193,6 +201,48 @@ class DolibarrConnectorTest {
                     assertThat(partiel.accountRef()).isEqualTo("42");
                     assertThat(partiel.contactRef()).isEqualTo("77");
                     assertThat(partiel.opportunityRef()).isNull();
+                });
+    }
+
+    /**
+     * Le defaut que cette tache corrige. L'attribution echoue apres une creation reussie ;
+     * l'etat partiel porte alors l'opportunite mais pas le responsable, et le rejeu doit
+     * attribuer SANS recreer.
+     */
+    @Test
+    void leRejeuAttribueSansRecreerLOpportunite() {
+        CrmSyncState apresEchec = new CrmSyncState("42", "77", "99", null);
+
+        CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, apresEchec);
+
+        assertThat(transport.appels).containsExactly("responsable");
+        assertThat(resultat.opportunityRef()).isEqualTo("99");
+        assertThat(resultat.assigneeRef()).isEqualTo("9");
+    }
+
+    /** Une fois l'attribution faite, un rejeu ne la refait pas : aucun appel n'est attendu. */
+    @Test
+    void uneAttributionDejaFaiteNEstPasRefaite() {
+        CrmSyncState complet = new CrmSyncState("42", "77", "99", "9");
+
+        CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, complet);
+
+        assertThat(transport.appels).isEmpty();
+        assertThat(resultat.assigneeRef()).isEqualTo("9");
+    }
+
+    /** L'echec de l'attribution rend un etat partiel qui porte l'opportunite mais pas le responsable. */
+    @Test
+    void lEchecDeLAttributionRendUnEtatPartielSansResponsable() {
+        transport.echoueSurResponsable = true;
+        CrmSyncState apresEchec = new CrmSyncState("42", "77", "99", null);
+
+        assertThatThrownBy(() -> connecteur.sync(lead("Acme"), CIBLE, apresEchec))
+                .isInstanceOf(CrmSyncException.class)
+                .asInstanceOf(throwable(CrmSyncException.class))
+                .satisfies(echec -> {
+                    assertThat(echec.partialState().opportunityRef()).isEqualTo("99");
+                    assertThat(echec.partialState().assigneeRef()).isNull();
                 });
     }
 
