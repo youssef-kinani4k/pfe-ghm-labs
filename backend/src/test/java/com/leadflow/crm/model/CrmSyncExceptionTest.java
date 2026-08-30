@@ -18,7 +18,7 @@ class CrmSyncExceptionTest {
         Throwable cause = new IllegalStateException("socket fermee");
         CrmSyncException initiale = new CrmSyncException("dolibarr", "echec sur l'opportunite", cause);
 
-        CrmSyncException enrichie = initiale.avecEtat(new CrmSyncState("42", "77", null));
+        CrmSyncException enrichie = initiale.avecEtat(new CrmSyncState("42", "77", null, null));
 
         assertThat(enrichie.providerId()).isEqualTo("dolibarr");
         assertThat(enrichie.getMessage()).isEqualTo("echec sur l'opportunite");

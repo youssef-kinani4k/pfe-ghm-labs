@@ -100,12 +100,14 @@ public class CrmSyncService {
         String compte = null;
         String contact = null;
         String opportunite = null;
+        String responsable = null;
         for (CrmSyncAttempt tentative : tentatives) {
             compte = compte != null ? compte : tentative.getAccountRef();
             contact = contact != null ? contact : tentative.getContactRef();
             opportunite = opportunite != null ? opportunite : tentative.getOpportunityRef();
+            responsable = responsable != null ? responsable : tentative.getAssigneeRef();
         }
-        return new CrmSyncState(compte, contact, opportunite);
+        return new CrmSyncState(compte, contact, opportunite, responsable);
     }
 
     /** L'etat partiel de l'echec prime, mais ne doit rien perdre de ce qu'on savait deja. */
@@ -115,7 +117,8 @@ public class CrmSyncService {
                 partiel.contactRef() != null ? partiel.contactRef() : anterieur.contactRef(),
                 partiel.opportunityRef() != null
                         ? partiel.opportunityRef()
-                        : anterieur.opportunityRef());
+                        : anterieur.opportunityRef(),
+                partiel.assigneeRef() != null ? partiel.assigneeRef() : anterieur.assigneeRef());
     }
 
     /** Resolu une seule fois par commercial et par instance : le resultat est memorise. */

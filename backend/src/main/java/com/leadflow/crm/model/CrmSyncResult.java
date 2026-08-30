@@ -11,6 +11,7 @@ public record CrmSyncResult(
         String accountRef,
         String contactRef,
         String opportunityRef,
+        String assigneeRef,
         String taskRef,
         Instant syncedAt) {
 }

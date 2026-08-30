@@ -59,13 +59,15 @@ connue. C'est la, et nulle part ailleurs, que se joue l'absence de doublon au re
 d'echec partiel, il leve une `CrmSyncException` enrichie de ce qu'il avait obtenu, sans
 quoi le rejeu recreerait ce qui existe deja.
 
-Deux limitations connues vivent dans cette modelisation, documentees dans le Javadoc de
-`DolibarrConnector` : le rattachement du responsable Dolibarr n'a pas de logement dans
-`CrmSyncState` — s'il echoue apres la creation de l'opportunite, le rejeu saute l'etape sans
-le signaler — et la `ref` d'opportunite est tiree au hasard faute de reference de lead dans
-le pivot. Les deux appellent la meme decision : elargir le pivot, ou passer d'un triplet de
-references a une carte par etape. Elle se prendra avec F3, quand le consommateur de file
-dira ce qu'il peut fournir comme identifiant.
+Le rattachement du responsable Dolibarr est une limitation connue, documentee dans le
+Javadoc de `DolibarrConnector` : Dolibarr ignore `fk_user_resp` a la creation comme en
+modification, ce qui impose un second appel. Jusqu'a F11.2, ce second appel etait imbrique
+dans la garde de creation de l'opportunite ; un echec y laissait une opportunite sans chef
+de projet que le rejeu sautait, sans rien signaler. Depuis F11.2, `CrmSyncState.assigneeRef`
+porte cette quatrieme reference au meme titre que les trois autres, l'attribution est une
+etape a part entiere tentee tant qu'elle n'est pas deja faite, et le rejeu repare. Une carte
+de references par etape, plutot qu'un quatrieme champ, ne redeviendra la bonne reponse que
+si un ERP apporte un jour une cinquieme etape.
 
 Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
 `docs/erp-integration-setup.md`.

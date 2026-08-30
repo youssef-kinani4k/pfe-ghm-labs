@@ -40,21 +40,40 @@ public class DolibarrConnector implements CrmConnector {
     }
 
     /**
-     * <b>Limitation connue.</b> Si {@code lieResponsable} echoue apres la creation de
-     * l'opportunite, l'etat partiel porte deja la reference de celle-ci : au rejeu, tout le
-     * bloc est saute et l'opportunite reste sans chef de projet, sans que rien ne le signale.
-     * {@link CrmSyncState} n'a pas de logement pour cette quatrieme etape. Le jour ou un ERP
-     * en apportera une cinquieme, la bonne reponse sera une carte de references par etape
-     * plutot qu'un champ de plus.
+     * <p>L'attribution du responsable est une <b>etape a part entiere</b>, et non un geste
+     * imbrique dans la creation de l'opportunite. Dolibarr ignore {@code fk_user_resp} a la
+     * creation comme en modification — la sonde de F5 l'a verifie dans les deux sens —, ce
+     * qui impose un second appel. Imbrique dans la garde de creation, son echec laissait une
+     * opportunite sans chef de projet que le rejeu sautait, puisque la reference de
+     * l'opportunite etait deja connue. Depuis F11.2, {@code CrmSyncState.assigneeRef} porte
+     * cette quatrieme reference et le rejeu repare.
      *
-     * <p>La limitation sur la {@code ref} d'opportunite, elle, est levee depuis F3 : elle est
+     * <p>Le jour ou un ERP apportera une cinquieme etape, la bonne reponse restera une carte
+     * de references par etape plutot qu'un champ de plus.
+     *
+     * <p>La limitation sur la {@code ref} d'opportunite est levee depuis F3 : elle est
      * derivee du lead et donc stable, et la recherche prealable rend le rejeu inoffensif.
+     *
+     * <p><b>Fenetre residuelle, honnetement : le rejeu repare une attribution absente, pas
+     * une attribution dont la confirmation s'est perdue.</b> {@code chercheOpportuniteParRef}
+     * offre a la creation d'opportunite un moyen de retrouver ce qui existe deja ; l'appel a
+     * {@code lieResponsable} n'a pas d'equivalent — aucune sonde ne permet de demander a
+     * Dolibarr « ce responsable est-il deja lie ? ». Si le lien reussit cote ERP mais que la
+     * trace de {@code assigneeRef} n'est pas ecrite, le rejeu retente {@code lieResponsable}
+     * avec le meme utilisateur ; si Dolibarr refuse ce doublon, un lead par ailleurs
+     * entierement synchronise part en DLQ apres trois tentatives — recuperable par rejeu
+     * depuis le journal des morts, pas perdu. C'est un echec bruyant plutot que silencieux, ce
+     * qui reste une amelioration stricte par rapport a l'etat pre-F11.2, ou l'attribution
+     * manquante ne se signalait pas du tout. Tolerer une reponse de doublon comme un succes
+     * sera la reparation naturelle le jour ou ce comportement sera eprouvable contre une
+     * vraie instance Dolibarr plutot que suppose.
      */
     @Override
     public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {
         String compte = previous.accountRef();
         String contact = previous.contactRef();
         String opportunite = previous.opportunityRef();
+        String responsable = previous.assigneeRef();
         try {
             if (compte == null) {
                 compte = client.creeTiers(target, corpsTiers(lead));
@@ -70,14 +89,19 @@ public class DolibarrConnector implements CrmConnector {
             }
             if (opportunite == null) {
                 opportunite = client.creeOpportunite(target, corpsOpportunite(lead, compte));
-                if (lead.assigneeRef() != null) {
-                    client.lieResponsable(target, opportunite, lead.assigneeRef());
-                }
+            }
+            // Etape a part entiere, et non imbriquee dans la creation : c'est ce qui rend
+            // l'attribution rejouable. Imbriquee, un echec ici laissait une opportunite sans
+            // chef de projet que le rejeu sautait, puisque sa reference etait deja connue.
+            if (responsable == null && lead.assigneeRef() != null) {
+                client.lieResponsable(target, opportunite, lead.assigneeRef());
+                responsable = lead.assigneeRef();
             }
         } catch (CrmSyncException echec) {
-            throw echec.avecEtat(new CrmSyncState(compte, contact, opportunite));
+            throw echec.avecEtat(new CrmSyncState(compte, contact, opportunite, responsable));
         }
-        return new CrmSyncResult(providerId(), compte, contact, opportunite, null, Instant.now());
+        return new CrmSyncResult(
+                providerId(), compte, contact, opportunite, responsable, null, Instant.now());
     }
 
     @Override

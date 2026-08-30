@@ -1,6 +1,7 @@
 package com.leadflow.crm.dolibarr;
 
 import com.leadflow.crm.CrmHttpConfig;
+import com.leadflow.crm.DestinationRefuseeException;
 import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmCheckCause;
 import com.leadflow.crm.model.CrmSyncException;
@@ -159,6 +160,11 @@ public class DolibarrClient {
             return CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, e.getMessage());
         } catch (HttpClientErrorException.NotFound e) {
             return CrmCheck.echec(CrmCheckCause.CIBLE_INCONNUE, e.getMessage());
+        } catch (DestinationRefuseeException e) {
+            // Le garde a refuse la destination avant meme le depart de la requete : son
+            // message est deja ecrit pour un humain, contrairement au filet generique plus
+            // bas qui recopierait String.valueOf(e).
+            return CrmCheck.echec(CrmCheckCause.DESTINATION_REFUSEE, e.getMessage());
         } catch (ResourceAccessException e) {
             return CrmCheck.echec(CrmCheckCause.INJOIGNABLE, e.getMessage());
         } catch (RestClientException e) {

@@ -25,3 +25,11 @@ management:
   endpoint:
     health:
       show-details: never
+
+leadflow:
+  security:
+    crm:
+      # Les noms de service de docker-compose.prod.yml : ils resolvent en adresses privees
+      # du reseau Docker, et la recette doit continuer de les joindre. Une instance
+      # reellement exposee a Internet vide cette liste.
+      hotes-autorises: [dolibarr, odoo]

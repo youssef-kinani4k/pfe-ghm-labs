@@ -368,12 +368,15 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Cinq migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
-`V4__dead_letter.sql` (journal des messages morts) et `V5__intent_setting.sql` (cle d'API de
-l'analyse d'intention, ligne unique, chiffree au repos).
+`V4__dead_letter.sql` (journal des messages morts), `V5__intent_setting.sql` (cle d'API de
+l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
+(quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
+lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
+en silence).
 
 `V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
 messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le
@@ -452,6 +455,30 @@ vide en production** : Nginx sert le dashboard et relaie l'API sous une origine 
 donc il n'y a aucune requete cross-origin a autoriser. Seul le profil `dev` la peuple, ou
 `ng serve` tient le `:4200` face au backend sur `:8090`. Une liste vide ne se contente pas
 de tout refuser : aucun `CorsFilter` n'est enregistre, et un test le verrouille.
+
+**`LimiteurDeDebit` plafonne le volume du webhook, hors de la chaine Spring Security.**
+L'authentification de `/api/webhooks/**` reste la signature HMAC, verifiee dans `capture` ;
+le limiteur ne l'authentifie pas, il compte. Il ne consulte jamais la base — la cle est le
+dernier segment de l'URL, **decode** (sans quoi `abc`, `%61bc` et `a%62c` ouvriraient trois
+seaux pour une seule boutique), sans savoir si une boutique lui correspond — ce qui garde
+intacte la regle des cinq `401` uniformes : un `429` dit « trop d'appels », jamais « cette cle
+existe ». Il est **mono-instance**, comme `PendingEventRelay` : deux exemplaires de
+l'application offriraient deux fois le plafond, et le lever demanderait un compteur partage.
+Le plafond protege le quota d'une boutique et la file d'un formulaire qui s'emballe ; il ne
+protege pas l'instance d'une inondation qui varie la cle a chaque appel — chaque cle inventee
+coute quand meme une consultation client, et peut faire tourner les 10 000 entrees du registre
+LRU. Une parade a cette inondation demanderait une cle sur l'IP, ou un plafond pose au niveau
+du reverse-proxy.
+
+**`CrmHttpConfig` ancre un garde de destination sur chaque appel sortant vers un ERP.**
+`PolitiqueDeDestination` refuse les adresses internes (boucle locale, plages privees,
+lien-local dont les metadonnees d'instance cloud) et n'autorise que les hotes d'une liste
+d'exceptions **par profil** (`leadflow.security.crm.hotes-autorises` — conteneurs `dolibarr`/
+`odoo` en prod, `localhost`/`host.docker.internal` en dev). `CrmHttpConfig` construit son
+`HttpClient` avec `Redirect.NEVER` : le garde ne voit la requete qu'une fois, et une
+redirection suivie a l'interieur d'un `send()` y echapperait sinon. Le garde ne ferme pas
+la fenetre de DNS-rebinding : il resout le nom, puis le client HTTP le resout a son tour, et
+un serveur DNS hostile peut repondre differemment aux deux.
 
 ## Frontend — conventions
 
@@ -532,11 +559,11 @@ Ce qui n'existe pas :
 - **Le deploiement existe, mais il n'est pas une mise en service** : depuis F11.1, deux
   images multi-etages, une pile de production a quatre services derriere un Nginx qui ne
   publie qu'un port, un profil `prod`, et un script de fumee qui traverse le pipeline
-  entier — `docs/deploiement.md`. Manquent encore le TLS, les en-tetes de securite, la
-  limitation de debit du webhook et la restriction SSRF (**F11.2**), ainsi que
-  l'integration continue (**F11.3**).
-- **Aucune restriction sur les destinations de `POST /api/admin/crm/test`** : le serveur
-  appelle l'URL que l'operateur lui donne. Acceptable sur une console interne a compte
-  unique ; a restreindre si le dashboard s'ouvre a des utilisateurs moins fiables.
+  entier — `docs/deploiement.md`. Depuis F11.2, Nginx pose les en-tetes de securite (CSP,
+  HSTS inerte, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`), le webhook
+  porte un plafond de debit mono-instance et chaque appel sortant vers un ERP passe par un
+  garde de destination. Manquent encore le TLS, le nonce CSP (donc `'unsafe-inline'` reste
+  sur `style-src`), un limiteur partage entre instances et l'integration continue
+  (**F11.3**).
 
 Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.

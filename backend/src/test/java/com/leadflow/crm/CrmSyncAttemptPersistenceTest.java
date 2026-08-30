@@ -115,4 +115,30 @@ class CrmSyncAttemptPersistenceTest {
 
         assertThat(attemptRepository.findByLeadIdOrderByAttemptedAtDesc(leadId)).hasSize(2);
     }
+
+    /**
+     * La reference du responsable traverse l'ecriture et la relecture. Sans cette colonne,
+     * l'etat reconstruit au rejeu ne saurait jamais que l'attribution reste a faire.
+     */
+    @Test
+    void laReferenceDuResponsableEstPersistee() {
+        UUID leadId = leadEnregistre("cle-sync-4");
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("dolibarr");
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setAccountRef("11");
+        tentative.setContactRef("22");
+        tentative.setOpportunityRef("33");
+        tentative.setAssigneeRef("44");
+        tentative.setAttemptedAt(Instant.now());
+
+        UUID id = attemptRepository.saveAndFlush(tentative).getId();
+        attemptRepository.flush();
+
+        assertThat(attemptRepository.findById(id))
+                .get()
+                .extracting(CrmSyncAttempt::getAssigneeRef)
+                .isEqualTo("44");
+    }
 }

@@ -76,6 +76,45 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/leads/42")
 [ "$code" = "200" ] || echoue "GET /leads/42 rend $code, attendu 200 (try_files absent ?)"
 
+etape "3b. Les en-tetes de securite sont poses"
+# Sur / ET sur index.html : un add_header dans un location annule ceux du server, et
+# index.html en pose un pour le cache. Eprouver la seule racine laisserait passer
+# precisement le defaut le plus probable de ce fichier.
+#
+# Mais / et /index.html servent tous deux la MEME copie des en-tetes : / y arrive par
+# try_files -> /index.html, donc les deux exercent le bloc « = /index.html » et rien
+# d'autre. La copie du bloc des ressources hachees restait entierement non eprouvee. On
+# derive un chemin qui y tombe en extrayant le premier script .js de la page rendue,
+# plutot que de figer un nom de fichier hache qui change a chaque build.
+INDEX_HTML=$(curl -fsS "$BASE/index.html")
+# Ajouter || true evite que l'absence de .js ne tue le script sous set -euo pipefail.
+HACHE=$(printf '%s' "$INDEX_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed -E 's/^src="//; s/"$//' || true)
+
+CHEMINS=("/" "/index.html")
+if [ -n "$HACHE" ]; then
+  case "$HACHE" in
+    /*) ;;
+    *) HACHE="/$HACHE" ;;
+  esac
+  CHEMINS+=("$HACHE")
+else
+  printf 'aucun script .js trouve dans /index.html — bloc des ressources hachees non eprouve\n'
+fi
+
+for chemin in "${CHEMINS[@]}"; do
+  ENTETES=$(curl -sSI "$BASE$chemin")
+  printf '%s' "$ENTETES" | grep -qi '^x-content-type-options: *nosniff' \
+    || echoue "X-Content-Type-Options absent sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^content-security-policy:.*default-src' \
+    || echoue "Content-Security-Policy absente sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi "^content-security-policy:.*frame-ancestors 'none'" \
+    || echoue "frame-ancestors absent de la CSP sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^referrer-policy:' \
+    || echoue "Referrer-Policy absent sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^x-frame-options: *deny' \
+    || echoue "X-Frame-Options absent sur $chemin"
+done
+
 etape "4. L'API est atteinte, et fermee"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/leads")
 [ "$code" = "401" ] || echoue "GET /api/leads sans jeton rend $code, attendu 401"

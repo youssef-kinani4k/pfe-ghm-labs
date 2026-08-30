@@ -73,7 +73,7 @@ class ErpIntegrationTest {
         // l'assertion serait vraie sans conteneur. Ici Dolibarr doit accepter le socid
         // reutilise et rendre un contact et une opportunite neufs.
         CrmSyncResult rejeu = connecteur.sync(lead, cibleDolibarr(),
-                new CrmSyncState(premier.accountRef(), null, null));
+                new CrmSyncState(premier.accountRef(), null, null, null));
 
         assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
         assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());
@@ -95,7 +95,7 @@ class ErpIntegrationTest {
         // Meme raisonnement que pour Dolibarr : le rejeu part de la seule societe connue, et
         // Odoo doit accepter le parent_id d'une res.partner existante.
         CrmSyncResult rejeu = connecteur.sync(lead, cibleOdoo(),
-                new CrmSyncState(premier.accountRef(), null, null));
+                new CrmSyncState(premier.accountRef(), null, null, null));
 
         assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
         assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());

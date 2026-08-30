@@ -118,7 +118,7 @@ class OdooConnectorTest {
     @Test
     void neRecreeRienDeCeQuiExisteDeja() {
         CrmSyncResult resultat =
-                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("31", "32", null));
+                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("31", "32", null, null));
 
         assertThat(transport.appels).containsExactly("crm.lead");
         assertThat(resultat.accountRef()).isEqualTo("31");
@@ -126,7 +126,7 @@ class OdooConnectorTest {
 
     @Test
     void neSAuthentifieMemePasQuandToutExisteDeja() {
-        connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("31", "32", "99"));
+        connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("31", "32", "99", null));
 
         assertThat(transport.appels).isEmpty();
         assertThat(transport.authentifications).isZero();
