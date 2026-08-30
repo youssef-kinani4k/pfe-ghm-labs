@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * consigne du projet est de ne pas superposer un mecanisme Spring a cette route. Un limiteur
  * n'authentifie pas — il compte. Le tenir devant la chaine garde la frontiere lisible.
  *
- * <p><b>Il ne consulte jamais la base.</b> La cle est le segment brut de l'URL, sans savoir
+ * <p><b>Il ne consulte jamais la base.</b> La cle est le dernier segment de l'URL, decode, sans savoir
  * si une boutique lui correspond. C'est ce qui permet d'ajouter une sixieme reponse possible
  * sans rouvrir l'oracle que les cinq {@code 401} uniformes ferment : un {@code 429} dit
  * « trop d'appels », jamais « cette cle existe ».

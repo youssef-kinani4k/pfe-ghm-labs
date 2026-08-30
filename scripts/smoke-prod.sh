@@ -87,7 +87,8 @@ etape "3b. Les en-tetes de securite sont poses"
 # derive un chemin qui y tombe en extrayant le premier script .js de la page rendue,
 # plutot que de figer un nom de fichier hache qui change a chaque build.
 INDEX_HTML=$(curl -fsS "$BASE/index.html")
-HACHE=$(printf '%s' "$INDEX_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed -E 's/^src="//; s/"$//')
+# Ajouter || true evite que l'absence de .js ne tue le script sous set -euo pipefail.
+HACHE=$(printf '%s' "$INDEX_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed -E 's/^src="//; s/"$//' || true)
 
 CHEMINS=("/" "/index.html")
 if [ -n "$HACHE" ]; then
