@@ -48,6 +48,9 @@ class CrmProviderControllerTest {
 
     @Test
     void unTestQuiEchoueRend200AvecSaCause() throws Exception {
+        // 127.0.0.1 est une adresse de boucle locale : GardeDeDestination la refuse avant
+        // meme la tentative de connexion. Ce n'est donc pas l'ERP qui est injoignable, c'est
+        // nous qui avons refuse de l'appeler — la cause doit le dire.
         String corps = mockMvc.perform(post("/api/admin/crm/test")
                         .header("Authorization", "Bearer " + jeton())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -62,7 +65,31 @@ class CrmProviderControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(mapper.readTree(corps).get("ok").asBoolean()).isFalse();
-        assertThat(mapper.readTree(corps).get("cause").asText()).isEqualTo("INJOIGNABLE");
+        assertThat(mapper.readTree(corps).get("cause").asText()).isEqualTo("DESTINATION_REFUSEE");
+    }
+
+    @Test
+    void unHoteIntrouvableEstAussiUneDestinationRefusee() throws Exception {
+        // Un nom en .invalid est reserve par la RFC 2606 et ne resout jamais : la sonde
+        // echoue vite, sans attendre un delai reseau. Ce test devait a l'origine prouver
+        // qu'INJOIGNABLE reste atteignable pour une adresse publique injoignable, mais
+        // GardeDeDestination refuse aussi les hotes qu'il ne sait pas resoudre (voir
+        // PolitiqueDeDestination#verifie, le catch UnknownHostException) : ce chemin rend
+        // donc DESTINATION_REFUSEE, pas INJOIGNABLE. Constat garde et assume — voir le
+        // rapport pour ce que cela signifie pour la couverture d'INJOIGNABLE.
+        String corps = mockMvc.perform(post("/api/admin/crm/test")
+                        .header("Authorization", "Bearer " + jeton())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"crmProviderId":"dolibarr",
+                                 "crmSettings":{"baseUrl":"http://nom-inexistant.invalid",
+                                                "apiKey":"peu-importe"}}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(mapper.readTree(corps).get("ok").asBoolean()).isFalse();
+        assertThat(mapper.readTree(corps).get("cause").asText()).isEqualTo("DESTINATION_REFUSEE");
     }
 
     @Test

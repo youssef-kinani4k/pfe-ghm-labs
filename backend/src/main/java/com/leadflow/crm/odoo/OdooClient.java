@@ -1,6 +1,7 @@
 package com.leadflow.crm.odoo;
 
 import com.leadflow.crm.CrmHttpConfig;
+import com.leadflow.crm.DestinationRefuseeException;
 import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmCheckCause;
 import com.leadflow.crm.model.CrmSyncException;
@@ -119,6 +120,12 @@ public class OdooClient {
                 return CrmCheck.echec(CrmCheckCause.CIBLE_INCONNUE, echec.getMessage());
             }
             return CrmCheck.echec(CrmCheckCause.IDENTIFIANTS_REFUSES, echec.getMessage());
+        } catch (DestinationRefuseeException e) {
+            // Contrairement a une RestClientException, le garde n'est pas enveloppe par
+            // `appelle` : il n'est pas une RestClientException, donc il traverse jusqu'ici
+            // tel quel. Son message est deja ecrit pour un humain, contrairement au filet
+            // generique plus bas qui recopierait String.valueOf(e).
+            return CrmCheck.echec(CrmCheckCause.DESTINATION_REFUSEE, e.getMessage());
         } catch (RuntimeException e) {
             // Meme filet que la sonde Dolibarr : une adresse fournie par l'operateur peut
             // faire echouer la pile HTTP avant Spring, et la sonde promet de ne jamais lever.

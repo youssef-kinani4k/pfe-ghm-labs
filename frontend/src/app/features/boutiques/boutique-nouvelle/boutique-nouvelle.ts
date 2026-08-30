@@ -194,6 +194,8 @@ export class BoutiqueNouvelle implements OnInit {
     INJOIGNABLE: 'Aucun serveur ne repond a cette adresse.',
     IDENTIFIANTS_REFUSES: 'Le serveur repond mais refuse la cle ou le compte.',
     CIBLE_INCONNUE: 'Le serveur repond mais ne connait pas cette base ou cette adresse.',
+    DESTINATION_REFUSEE:
+      'Ce serveur refuse d\'appeler une adresse de son propre reseau interne. L\'ERP doit etre joignable a une adresse publique.',
     REPONSE_INATTENDUE: 'Reponse illisible : cette adresse pointe probablement ailleurs.',
   };
 
