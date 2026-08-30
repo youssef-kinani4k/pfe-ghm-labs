@@ -25,6 +25,9 @@ leadflow:
       # ng serve et le backend sont deux origines distinctes tant qu'on developpe.
       allowed-origins:
         - http://localhost:4200
+    crm:
+      # Le Dolibarr et l'Odoo du developpement tournent sur la machine.
+      hotes-autorises: [localhost, 127.0.0.1, host.docker.internal]
   dashboard:
     # Meme regle que la cle maitre ci-dessus : repli de developpement seulement, pour que
     # `spring-boot:run -Pdev` demarre sans preparer d'environnement. Les variables restent

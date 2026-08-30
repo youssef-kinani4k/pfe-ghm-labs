@@ -26,19 +26,32 @@ import org.springframework.web.client.RestClient;
  * builder nu branche sur {@code MockRestServiceServer} sans que la fabrique de requetes de
  * production interfere. L'URL de l'instance n'est pas connue a ce stade — elle vient de la
  * ligne client — donc aucun {@code baseUrl} n'est fixe ici.
+ *
+ * <p>La fabrique pose aussi {@link GardeDeDestination}. C'est le seul endroit ou le poser :
+ * tous les adaptateurs passent par elle, donc celui qui ajoutera le prochain ERP est protege
+ * sans rien avoir a savoir du garde. Une verification recopiee dans chaque adaptateur aurait
+ * ajoute un quatrieme geste a l'invariant des trois, et aurait fini par etre oubliee.
+ *
+ * <p>Les constructeurs de test des adaptateurs recoivent un builder nu branche sur
+ * MockRestServiceServer : ils eprouvent des corps de requete, pas une politique de
+ * destination, qui a ses propres tests.
  */
 @Component
 public class CrmHttpConfig {
 
     private final CrmProperties properties;
+    private final GardeDeDestination garde;
 
-    public CrmHttpConfig(CrmProperties properties) {
+    public CrmHttpConfig(CrmProperties properties, GardeDeDestination garde) {
         this.properties = properties;
+        this.garde = garde;
     }
 
     /** @throws IllegalStateException si le fournisseur n'a aucune entree de configuration. */
     public RestClient.Builder builderPour(String providerId) {
-        return RestClient.builder().requestFactory(requestFactory(providerId));
+        return RestClient.builder()
+                .requestFactory(requestFactory(providerId))
+                .requestInterceptor(garde);
     }
 
     private ClientHttpRequestFactory requestFactory(String providerId) {
