@@ -121,4 +121,44 @@ class PolitiqueDeDestinationTest {
         assertThatCode(() -> politique.verifie(URI.create("http://interne/api")))
                 .doesNotThrowAnyException();
     }
+
+    /** IPv6 unique-local fc00::/7 est refuse comme son equivalent IPv4. */
+    @Test
+    void refuseLesUniqueLocaleIpv6() {
+        PolitiqueDeDestination politique =
+                politique(List.of(), Map.of("ipv6local", "fc00::1"));
+
+        assertThatThrownBy(() -> politique.verifie(URI.create("http://ipv6local/api")))
+                .isInstanceOf(DestinationRefuseeException.class);
+    }
+
+    /** Le NAT d operateur RFC 6598 (100.64.0.0/10) est refuse. */
+    @Test
+    void refuseLeNatDOperateur() {
+        PolitiqueDeDestination politique =
+                politique(List.of(), Map.of("carrier", "100.64.0.1"));
+
+        assertThatThrownBy(() -> politique.verifie(URI.create("http://carrier/api")))
+                .isInstanceOf(DestinationRefuseeException.class);
+    }
+
+    /** IPv4-mapped IPv6 169.254.169.254 est refuse — le JDK l unwrappe en Inet4Address. */
+    @Test
+    void refuseAdresseIpv4MappeeEnIpv6() {
+        PolitiqueDeDestination politique =
+                politique(List.of(), Map.of("ipv4mapped", "::ffff:169.254.169.254"));
+
+        assertThatThrownBy(() -> politique.verifie(URI.create("http://ipv4mapped/api")))
+                .isInstanceOf(DestinationRefuseeException.class);
+    }
+
+    /** L autorisation est case-insensitive pour les noms DNS, qui ne le sont pas. */
+    @Test
+    void lAutorisationEstCaseInsensitive() {
+        PolitiqueDeDestination politique =
+                politique(List.of("DoLiBaRr"), Map.of("dolibarr", "172.20.0.4"));
+
+        assertThatCode(() -> politique.verifie(URI.create("http://DOLIBARR/api/index.php")))
+                .doesNotThrowAnyException();
+    }
 }

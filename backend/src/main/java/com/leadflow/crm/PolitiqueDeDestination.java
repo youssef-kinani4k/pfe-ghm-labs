@@ -52,8 +52,11 @@ public class PolitiqueDeDestination {
         }
 
         List<String> autorises = reglages.hotesAutorises();
-        if (autorises != null && autorises.contains(hote)) {
-            return;
+        if (autorises != null) {
+            String hoteLowercase = hote.toLowerCase(Locale.ROOT);
+            if (autorises.stream().anyMatch(h -> h.toLowerCase(Locale.ROOT).equals(hoteLowercase))) {
+                return;
+            }
         }
 
         InetAddress[] adresses;
@@ -81,12 +84,34 @@ public class PolitiqueDeDestination {
      * {@code isSiteLocalAddress} couvre 10/8, 172.16/12 et 192.168/16 ;
      * {@code isLinkLocalAddress} couvre 169.254/16, dont 169.254.169.254 — les metadonnees
      * d'instance des fournisseurs cloud, la cible SSRF la plus rentable qui soit.
+     * Les methodes complementaires traitent les plages qu aucun predicat du JDK ne couvre :
+     * fc00::/7 pour IPv6 et 100.64.0.0/10 pour les operateurs.
      */
     private boolean interne(InetAddress adresse) {
         return adresse.isLoopbackAddress()
                 || adresse.isLinkLocalAddress()
                 || adresse.isSiteLocalAddress()
                 || adresse.isAnyLocalAddress()
-                || adresse.isMulticastAddress();
+                || adresse.isMulticastAddress()
+                || uniqueLocaleIpv6(adresse)
+                || natDOperateur(adresse);
+    }
+
+    /**
+     * fc00::/7 — l equivalent IPv6 des plages privees. isSiteLocalAddress ne le couvre pas :
+     * sur une Inet6Address, ce predicat ne connait que fec0::/10, deprecie depuis.
+     */
+    private boolean uniqueLocaleIpv6(InetAddress adresse) {
+        byte[] octets = adresse.getAddress();
+        return octets.length == 16 && (octets[0] & 0xFE) == 0xFC;
+    }
+
+    /** 100.64.0.0/10 — le NAT d operateur de la RFC 6598, qu aucun predicat du JDK ne couvre. */
+    private boolean natDOperateur(InetAddress adresse) {
+        byte[] octets = adresse.getAddress();
+        return octets.length == 4
+                && (octets[0] & 0xFF) == 100
+                && (octets[1] & 0xFF) >= 64
+                && (octets[1] & 0xFF) <= 127;
     }
 }
