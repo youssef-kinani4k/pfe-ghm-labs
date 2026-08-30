@@ -5,6 +5,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -68,8 +70,29 @@ public class LimiteurDeDebit extends OncePerRequestFilter {
         json.writeValue(reponse.getOutputStream(), corps);
     }
 
+    /**
+     * Le segment est decode avant usage : {@link HttpServletRequest#getRequestURI()} rend
+     * l'URI encodee au sens du protocole, alors que le controleur recoit une cle decodee
+     * ({@code @PathVariable}). Sans ce decodage, {@code abc}, {@code %61bc} et {@code a%62c}
+     * ouvriraient trois seaux pour une seule et meme boutique, qui echapperait ainsi a son
+     * propre plafond en variant l'encodage.
+     *
+     * <p>Un {@code %} malforme fait lever {@link IllegalArgumentException} : la cle brute sert
+     * alors de repli. Une cle malformee ne peut de toute facon correspondre a aucune boutique
+     * reelle, la faire chuter sous sa forme brute est donc sans consequence sur une cle valide.
+     */
     private String derniereSection(String uri) {
         int barre = uri.lastIndexOf('/');
-        return barre < 0 ? uri : uri.substring(barre + 1);
+        String brut = barre < 0 ? uri : uri.substring(barre + 1);
+        // Un segment vide (URI terminee par '/') retomberait sur l'URI entiere plutot que de
+        // faire partager un seul seau a toutes les boutiques qui subissent ce slash final.
+        if (brut.isEmpty()) {
+            brut = uri;
+        }
+        try {
+            return URLDecoder.decode(brut, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return brut;
+        }
     }
 }

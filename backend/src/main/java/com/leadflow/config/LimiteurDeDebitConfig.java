@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.scheduling.annotation.Scheduled;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,9 +36,11 @@ public class LimiteurDeDebitConfig {
         FilterRegistrationBean<LimiteurDeDebit> enregistrement = new FilterRegistrationBean<>();
         enregistrement.setFilter(new LimiteurDeDebit(registre, json));
         enregistrement.addUrlPatterns("/api/webhooks/*");
-        // Devant la chaine Spring Security, dont l'ordre par defaut est 0 : un refus de
-        // volume ne doit pas couter le travail des filtres d'authentification.
-        enregistrement.setOrder(-100);
+        // La chaine Spring Security s'enregistre elle-meme a l'ordre -100 : lui donner la
+        // meme valeur laisserait leur ordre relatif a la merci de l'accident de decouverte
+        // des beans. La precedence maximale garantit que le limiteur passe en premier, pour
+        // qu'un refus de volume ne coute jamais le travail des filtres d'authentification.
+        enregistrement.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return enregistrement;
     }
 

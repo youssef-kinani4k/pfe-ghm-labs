@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.leadflow.TestcontainersConfiguration;
+import java.net.URI;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 /**
  * La rafale est ramenee a 3 pour que le test soit court. Aucun client n'est cree en base :
- * c'est deliberé — le filtre doit refuser AVANT toute consultation.
+ * c'est delibere — le filtre doit refuser AVANT toute consultation.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,6 +36,21 @@ class LimiteurDeDebitTest {
 
     private int soumet(String cle) throws Exception {
         return mockMvc.perform(post("/api/webhooks/leads/" + cle)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPS))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+    }
+
+    /**
+     * Comme {@link #soumet}, mais a partir d'un chemin deja forme via {@link URI#create}, qui
+     * ne re-encode pas ce qu'on lui donne — contrairement a {@code post(String, Object...)},
+     * qui traite l'argument comme un gabarit et encoderait un {@code %63} deja present en
+     * {@code %2563}, faussant le test d'une cle volontairement percent-encodee.
+     */
+    private int soumetChemin(String chemin) throws Exception {
+        return mockMvc.perform(post(URI.create(chemin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CORPS))
                 .andReturn()
@@ -99,5 +115,23 @@ class LimiteurDeDebitTest {
         }
 
         assertThat(soumet(seconde)).isEqualTo(401);
+    }
+
+    /**
+     * Deux ecritures de la meme cle partagent un seul seau : {@code %63} decode en {@code c}.
+     * Sans decodage, chaque orthographe ouvrirait son propre seau et la boutique echapperait
+     * a son plafond en variant l'encodage de l'URL.
+     */
+    @Test
+    void deuxEncodagesDeLaMemeCleNePartagentQuUnSeau() throws Exception {
+        String suffixe = UUID.randomUUID().toString();
+        String cle = "cle-" + suffixe;
+        String cleEncodee = "%63le-" + suffixe;
+
+        soumet(cle);
+        soumet(cle);
+        soumet(cle);
+
+        assertThat(soumetChemin("/api/webhooks/leads/" + cleEncodee)).isEqualTo(429);
     }
 }
