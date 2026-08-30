@@ -59,6 +59,18 @@ docker compose --profile odoo up -d       # ajoute Odoo sur :8069 + sa Postgres 
 docker compose down -v                    # remet la base a zero (rejoue les migrations Flyway)
 ```
 
+Ce `docker-compose.yml` est celui du **developpement**. La pile complete — dashboard,
+API, base et broker derriere un Nginx, un seul port publie — vit dans un fichier a part :
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+SMOKE_PASSWORD='...' ./scripts/smoke-prod.sh   # eprouve cette pile de bout en bout
+```
+
+Le `--env-file` n'est pas facultatif : `env_file:` alimente les variables du conteneur,
+tandis que les `${...}` du fichier compose sont interpoles a sa lecture. Le geste complet,
+les secrets a fabriquer et ce que ce deploiement n'est pas : `docs/deploiement.md`.
+
 ### Backend
 
 ```bash
@@ -435,7 +447,11 @@ authentification, c'est la signature HMAC, verifiee dans la couche `capture` et 
 chaine de filtres Spring Security. Ne pas « securiser » cette route avec un mecanisme Spring
 sans retirer la verification HMAC, et inversement.
 
-CORS n'autorise que `http://localhost:4200` : a elargir avant tout deploiement.
+Les origines CORS viennent de `leadflow.security.cors.allowed-origins`, et **la liste est
+vide en production** : Nginx sert le dashboard et relaie l'API sous une origine unique,
+donc il n'y a aucune requete cross-origin a autoriser. Seul le profil `dev` la peuple, ou
+`ng serve` tient le `:4200` face au backend sur `:8090`. Une liste vide ne se contente pas
+de tout refuser : aucun `CorsFilter` n'est enregistre, et un test le verrouille.
 
 ## Frontend — conventions
 
@@ -513,9 +529,12 @@ Ce qui n'existe pas :
   `leadflow.intent.gemini.model` pour que ce retrait se repare sans toucher au code. La
   forme du corps de requete, elle, se verrouille par un test contractuel — `thinkingBudget`
   a ete remplace par `thinkingLevel`, l'ancienne forme faisant rendre un `400` muet.
-- **Aucun deploiement** : pas d'integration continue, pas d'image de production, et CORS
-  n'autorise toujours que `http://localhost:4200`. C'est desormais le dernier chantier avant
-  une mise en service.
+- **Le deploiement existe, mais il n'est pas une mise en service** : depuis F11.1, deux
+  images multi-etages, une pile de production a quatre services derriere un Nginx qui ne
+  publie qu'un port, un profil `prod`, et un script de fumee qui traverse le pipeline
+  entier — `docs/deploiement.md`. Manquent encore le TLS, les en-tetes de securite, la
+  limitation de debit du webhook et la restriction SSRF (**F11.2**), ainsi que
+  l'integration continue (**F11.3**).
 - **Aucune restriction sur les destinations de `POST /api/admin/crm/test`** : le serveur
   appelle l'URL que l'operateur lui donne. Acceptable sur une console interne a compte
   unique ; a restreindre si le dashboard s'ouvre a des utilisateurs moins fiables.

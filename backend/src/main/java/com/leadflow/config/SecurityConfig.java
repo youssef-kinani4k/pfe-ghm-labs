@@ -37,16 +37,31 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  *
  * <p>Ne pas « securiser » {@code /api/webhooks/**} par un mecanisme Spring sans retirer la
  * verification HMAC, et inversement.
+ *
+ * <p>Les origines CORS viennent de {@code leadflow.security.cors.allowed-origins}. La liste
+ * vide est le cas de production : derriere Nginx, le dashboard et l'API partagent une
+ * origine unique et il n'y a plus de requete cross-origin a autoriser.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain filterChain(HttpSecurity http, CorsProperties cors) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(configurateur -> {
+                    List<String> origines = cors.origines();
+                    if (origines.isEmpty()) {
+                        // Liste vide = origine unique derriere Nginx. On ne desactive pas
+                        // une protection : il n'y a rien a autoriser, donc rien a
+                        // configurer, et un CORS configure a vide resterait un mecanisme
+                        // actif dont il faudrait se demander ce qu'il fait des preflights.
+                        configurateur.disable();
+                    } else {
+                        configurateur.configurationSource(source(origines));
+                    }
+                })
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/webhooks/**").permitAll()
@@ -103,11 +118,9 @@ public class SecurityConfig {
         return NimbusJwtDecoder.withSecretKey(cle(properties)).build();
     }
 
-    @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    private CorsConfigurationSource source(List<String> origines) {
         CorsConfiguration config = new CorsConfiguration();
-        // A elargir avant tout deploiement : F7.
-        config.setAllowedOrigins(List.of("http://localhost:4200"));
+        config.setAllowedOrigins(origines);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

@@ -1,5 +1,9 @@
 # Secrets et config locale
-.env
+# Le motif est elargi a .env* : « .env » seul est un motif EXACT et ne couvrait pas
+# .env.prod, le fichier de secrets de production. L'exemple, lui, doit rester suivi —
+# c'est le seul fichier .env* qui ne contienne aucune vraie valeur.
+.env*
+!.env.prod.example
 *.local
 
 # Backend (Maven / Java)
