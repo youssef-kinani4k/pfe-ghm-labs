@@ -61,8 +61,15 @@ public class CrmHttpConfig {
             throw new IllegalStateException(
                     "leadflow.crm.providers." + providerId + " est absente de la configuration");
         }
-        HttpClient httpClient =
-                HttpClient.newBuilder().connectTimeout(provider.connectTimeout()).build();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(provider.connectTimeout())
+                // Explicite, et non laisse au defaut : une redirection suivie a l'interieur
+                // d'un send() echapperait a GardeDeDestination, qui ne voit la requete qu'une
+                // fois, a la frontiere de la fabrique. Un ERP qui repond 302 vers
+                // 169.254.169.254 contournerait donc le garde en silence. On refuse de suivre
+                // plutot que de faire confiance a un defaut que personne ne relit.
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
         factory.setReadTimeout(provider.readTimeout());
         return factory;
