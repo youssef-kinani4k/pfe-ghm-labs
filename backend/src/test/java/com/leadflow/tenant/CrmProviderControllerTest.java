@@ -101,6 +101,29 @@ class CrmProviderControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void odooAvecDestinationRefuseeRend200AvecSaCause() throws Exception {
+        // La garde de destination est partagee entre tous les adaptateurs : le chemin
+        // de capture est code-par-code, mais Odoo l'enveloppe differemment (appelle, puis
+        // resultat). La sonde ne doit pas supposer, et ce chemin ne doit pas rester couvert
+        // seulement par inference depuis le test Dolibarr.
+        String corps = mockMvc.perform(post("/api/admin/crm/test")
+                        .header("Authorization", "Bearer " + jeton())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"crmProviderId":"odoo",
+                                 "crmSettings":{"baseUrl":"http://127.0.0.1:9",
+                                                "database":"demo",
+                                                "username":"admin",
+                                                "apiKey":"peu-importe"}}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(mapper.readTree(corps).get("ok").asBoolean()).isFalse();
+        assertThat(mapper.readTree(corps).get("cause").asText()).isEqualTo("DESTINATION_REFUSEE");
+    }
+
     private String jeton() throws Exception {
         String corps = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
