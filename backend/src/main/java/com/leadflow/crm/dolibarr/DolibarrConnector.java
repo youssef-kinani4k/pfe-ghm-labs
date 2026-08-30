@@ -75,9 +75,9 @@ public class DolibarrConnector implements CrmConnector {
                 }
             }
         } catch (CrmSyncException echec) {
-            throw echec.avecEtat(new CrmSyncState(compte, contact, opportunite));
+            throw echec.avecEtat(new CrmSyncState(compte, contact, opportunite, null));
         }
-        return new CrmSyncResult(providerId(), compte, contact, opportunite, null, Instant.now());
+        return new CrmSyncResult(providerId(), compte, contact, opportunite, null, null, Instant.now());
     }
 
     @Override

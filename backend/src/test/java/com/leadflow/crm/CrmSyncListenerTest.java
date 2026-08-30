@@ -67,7 +67,7 @@ class CrmSyncListenerTest {
 
                 @Override
                 public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {
-                    return new CrmSyncResult("espion", "A-1", "C-1", "O-1", null, Instant.now());
+                    return new CrmSyncResult("espion", "A-1", "C-1", "O-1", null, null, Instant.now());
                 }
 
                 @Override

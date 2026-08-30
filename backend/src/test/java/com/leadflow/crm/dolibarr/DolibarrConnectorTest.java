@@ -166,7 +166,7 @@ class DolibarrConnectorTest {
     @Test
     void neRecreeRienDeCeQuiExisteDeja() {
         CrmSyncResult resultat =
-                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", null));
+                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", null, null));
 
         assertThat(transport.appels).containsExactly("recherche", "opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
@@ -176,7 +176,7 @@ class DolibarrConnectorTest {
     @Test
     void neFaitAucunAppelQuandToutExisteDeja() {
         CrmSyncResult resultat =
-                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", "99"));
+                connecteur.sync(lead("Acme"), CIBLE, new CrmSyncState("42", "77", "99", null));
 
         assertThat(transport.appels).isEmpty();
         assertThat(resultat.opportunityRef()).isEqualTo("99");

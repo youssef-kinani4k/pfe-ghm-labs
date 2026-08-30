@@ -51,7 +51,7 @@ public class OdooConnector implements CrmConnector {
                 && (!societeAttendue || societe != null);
         if (toutExiste) {
             return new CrmSyncResult(
-                    providerId(), societe, contact, opportunite, null, Instant.now());
+                    providerId(), societe, contact, opportunite, null, null, Instant.now());
         }
 
         int uid = client.authentifie(target);
@@ -67,9 +67,9 @@ public class OdooConnector implements CrmConnector {
                         target, uid, OPPORTUNITE, champsOpportunite(lead, societe, contact));
             }
         } catch (CrmSyncException echec) {
-            throw echec.avecEtat(new CrmSyncState(societe, contact, opportunite));
+            throw echec.avecEtat(new CrmSyncState(societe, contact, opportunite, null));
         }
-        return new CrmSyncResult(providerId(), societe, contact, opportunite, null, Instant.now());
+        return new CrmSyncResult(providerId(), societe, contact, opportunite, null, null, Instant.now());
     }
 
     @Override

@@ -40,6 +40,7 @@ public class CrmSyncTraceWriter {
         tentative.setAccountRef(resultat.accountRef());
         tentative.setContactRef(resultat.contactRef());
         tentative.setOpportunityRef(resultat.opportunityRef());
+        tentative.setAssigneeRef(resultat.assigneeRef());
         tentative.setTaskRef(resultat.taskRef());
         tentative.setAttemptedAt(Instant.now());
         attemptRepository.save(tentative);
@@ -55,6 +56,7 @@ public class CrmSyncTraceWriter {
         tentative.setAccountRef(partiel.accountRef());
         tentative.setContactRef(partiel.contactRef());
         tentative.setOpportunityRef(partiel.opportunityRef());
+        tentative.setAssigneeRef(partiel.assigneeRef());
         tentative.setErrorMessage(message);
         tentative.setAttemptedAt(Instant.now());
         attemptRepository.save(tentative);

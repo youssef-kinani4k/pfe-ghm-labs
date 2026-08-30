@@ -8,8 +8,9 @@ package com.leadflow.crm.model;
  * nul dispense l'adaptateur de recreer l'objet correspondant — c'est tout le mecanisme
  * d'idempotence au rejeu.
  */
-public record CrmSyncState(String accountRef, String contactRef, String opportunityRef) {
+public record CrmSyncState(
+        String accountRef, String contactRef, String opportunityRef, String assigneeRef) {
 
     /** Aucune tentative anterieure exploitable : tout est a creer. */
-    public static final CrmSyncState VIERGE = new CrmSyncState(null, null, null);
+    public static final CrmSyncState VIERGE = new CrmSyncState(null, null, null, null);
 }

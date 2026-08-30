@@ -68,9 +68,9 @@ class CrmSyncServiceTest {
             this.etatRecu = previous;
             if (echoue) {
                 throw new CrmSyncException("espion", "opportunite refusee", null)
-                        .avecEtat(new CrmSyncState("A-1", "C-1", null));
+                        .avecEtat(new CrmSyncState("A-1", "C-1", null, null));
             }
-            return new CrmSyncResult("espion", "A-1", "C-1", "O-1", null, Instant.now());
+            return new CrmSyncResult("espion", "A-1", "C-1", "O-1", null, null, Instant.now());
         }
 
         @Override

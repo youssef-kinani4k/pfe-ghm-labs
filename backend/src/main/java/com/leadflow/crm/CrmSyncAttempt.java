@@ -54,6 +54,9 @@ public class CrmSyncAttempt {
     @Column(name = "opportunity_ref", length = 64)
     private String opportunityRef;
 
+    @Column(name = "assignee_ref", length = 64)
+    private String assigneeRef;
+
     @Column(name = "task_ref", length = 64)
     private String taskRef;
 

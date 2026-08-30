@@ -42,7 +42,7 @@ class CrmConnectorRegistryTest {
             this.leadRecu = lead;
             this.cibleRecue = target;
             this.etatRecu = previous;
-            return new CrmSyncResult(providerId, "1", "2", "3", null, Instant.now());
+            return new CrmSyncResult(providerId, "1", "2", "3", null, null, Instant.now());
         }
 
         @Override
@@ -120,7 +120,7 @@ class CrmConnectorRegistryTest {
         CrmTarget cible = new CrmTarget("dolibarr", Map.of("baseUrl", "http://client-a:8081"));
         CrmLead lead = new CrmLead("LF-000000000001", "Acme", "Amina", "Bensalem", "amina@exemple.test",
                 "+212600000000", "Demande de devis", "DEMANDE_DEVIS", 72, "MA", "industrie", "7");
-        CrmSyncState etat = new CrmSyncState("42", null, null);
+        CrmSyncState etat = new CrmSyncState("42", null, null, null);
 
         registry.forProvider("dolibarr").sync(lead, cible, etat);
 
