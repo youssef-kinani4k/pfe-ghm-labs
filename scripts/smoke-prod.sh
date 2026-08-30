@@ -76,6 +76,22 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/leads/42")
 [ "$code" = "200" ] || echoue "GET /leads/42 rend $code, attendu 200 (try_files absent ?)"
 
+etape "3b. Les en-tetes de securite sont poses"
+# Sur / ET sur index.html : un add_header dans un location annule ceux du server, et
+# index.html en pose un pour le cache. Eprouver la seule racine laisserait passer
+# precisement le defaut le plus probable de ce fichier.
+for chemin in "/" "/index.html"; do
+  ENTETES=$(curl -sSI "$BASE$chemin")
+  printf '%s' "$ENTETES" | grep -qi '^x-content-type-options: *nosniff' \
+    || echoue "X-Content-Type-Options absent sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^content-security-policy:.*default-src' \
+    || echoue "Content-Security-Policy absente sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi "^content-security-policy:.*frame-ancestors 'none'" \
+    || echoue "frame-ancestors absent de la CSP sur $chemin"
+  printf '%s' "$ENTETES" | grep -qi '^referrer-policy:' \
+    || echoue "Referrer-Policy absent sur $chemin"
+done
+
 etape "4. L'API est atteinte, et fermee"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/leads")
 [ "$code" = "401" ] || echoue "GET /api/leads sans jeton rend $code, attendu 401"

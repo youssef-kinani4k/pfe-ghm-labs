@@ -453,6 +453,24 @@ donc il n'y a aucune requete cross-origin a autoriser. Seul le profil `dev` la p
 `ng serve` tient le `:4200` face au backend sur `:8090`. Une liste vide ne se contente pas
 de tout refuser : aucun `CorsFilter` n'est enregistre, et un test le verrouille.
 
+**`LimiteurDeDebit` plafonne le volume du webhook, hors de la chaine Spring Security.**
+L'authentification de `/api/webhooks/**` reste la signature HMAC, verifiee dans `capture` ;
+le limiteur ne l'authentifie pas, il compte. Il ne consulte jamais la base — la cle est le
+segment brut de l'URL, sans savoir si une boutique lui correspond — ce qui garde intacte la
+regle des cinq `401` uniformes : un `429` dit « trop d'appels », jamais « cette cle existe ».
+Il est **mono-instance**, comme `PendingEventRelay` : deux exemplaires de l'application
+offriraient deux fois le plafond, et le lever demanderait un compteur partage.
+
+**`CrmHttpConfig` ancre un garde de destination sur chaque appel sortant vers un ERP.**
+`PolitiqueDeDestination` refuse les adresses internes (boucle locale, plages privees,
+lien-local dont les metadonnees d'instance cloud) et n'autorise que les hotes d'une liste
+d'exceptions **par profil** (`leadflow.crm.ssrf.hotes-autorises` — conteneurs `dolibarr`/
+`odoo` en prod, `localhost`/`host.docker.internal` en dev). `CrmHttpConfig` construit son
+`HttpClient` avec `Redirect.NEVER` : le garde ne voit la requete qu'une fois, et une
+redirection suivie a l'interieur d'un `send()` y echapperait sinon. Le garde ne ferme pas
+la fenetre de DNS-rebinding : il resout le nom, puis le client HTTP le resout a son tour, et
+un serveur DNS hostile peut repondre differemment aux deux.
+
 ## Frontend — conventions
 
 ### Le visuel passe par le plugin `ui-ux-pro-max`
@@ -532,11 +550,11 @@ Ce qui n'existe pas :
 - **Le deploiement existe, mais il n'est pas une mise en service** : depuis F11.1, deux
   images multi-etages, une pile de production a quatre services derriere un Nginx qui ne
   publie qu'un port, un profil `prod`, et un script de fumee qui traverse le pipeline
-  entier — `docs/deploiement.md`. Manquent encore le TLS, les en-tetes de securite, la
-  limitation de debit du webhook et la restriction SSRF (**F11.2**), ainsi que
-  l'integration continue (**F11.3**).
-- **Aucune restriction sur les destinations de `POST /api/admin/crm/test`** : le serveur
-  appelle l'URL que l'operateur lui donne. Acceptable sur une console interne a compte
-  unique ; a restreindre si le dashboard s'ouvre a des utilisateurs moins fiables.
+  entier — `docs/deploiement.md`. Depuis F11.2, Nginx pose les en-tetes de securite (CSP,
+  HSTS inerte, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`), le webhook
+  porte un plafond de debit mono-instance et chaque appel sortant vers un ERP passe par un
+  garde de destination. Manquent encore le TLS, le nonce CSP (donc `'unsafe-inline'` reste
+  sur `style-src`), un limiteur partage entre instances et l'integration continue
+  (**F11.3**).
 
 Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.

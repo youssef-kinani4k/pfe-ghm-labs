@@ -144,13 +144,14 @@ Le script monte la pile, la traverse de bout en bout, puis la démonte. Il rend 
 passe, et un code non nul en nommant l'étape échouée. `--keep` la laisse debout pour
 inspection.
 
-Ce que ses onze étapes établissent :
+Ce que ses étapes établissent :
 
 | Étape | Ce qu'elle prouve                                                                |
 | ----- | -------------------------------------------------------------------------------- |
 | 0–1   | `.env.prod` est là, la pile monte                                                |
 | 2     | les services deviennent sains — l'attente porte sur un état, jamais sur une durée |
 | 3     | Nginx sert le dashboard, et `/leads/42` rend l'index : le routage client marche   |
+| 3b    | les en-têtes de sécurité sont posés sur `/` **et** sur `/index.html` — un `add_header` local en annule d'autres |
 | 4     | l'API est atteinte **et** fermée — `401` sans jeton                              |
 | 5     | le compte opérateur fonctionne : c'est ce qui attrape un hash mal saisi           |
 | 6     | une boutique se crée par l'API sur une base vide                                 |
@@ -210,17 +211,25 @@ base : ne l'utiliser que pour repartir de zéro délibérément.
 ## Ce que ce déploiement n'est pas
 
 Cette pile est reproductible et cohérente, mais **elle n'est pas une mise en service
-complète**. Quatre manques, tous connus et tous planifiés :
+complète**. Ce qui existe porte des limites connues, et deux manques restent entiers :
 
 - **Pas de TLS.** Tout circule en clair, jeton de session compris. Hors périmètre tant que
-  la pile reste locale ; indispensable dès qu'elle est exposée.
-- **Pas d'en-têtes de sécurité** — ni HSTS, ni CSP, ni `X-Content-Type-Options`. Leur place
-  est dans `frontend/nginx.conf`, et c'est **F11.2** qui les y met.
-- **Pas de limitation de débit sur le webhook.** Une adresse peut soumettre autant qu'elle
-  veut ; la signature protège l'authenticité, pas le volume. **F11.2** également, avec la
-  restriction des destinations de `POST /api/admin/crm/test`, aujourd'hui libres.
+  la pile reste locale ; indispensable dès qu'elle est exposée. HSTS est déjà posé dans
+  `frontend/nginx.conf`, mais il est inerte tant que la pile parle HTTP : c'est le jour du
+  TLS qu'il prendra effet, sans rien à changer d'autre.
+- **La CSP est posée avec `'unsafe-inline'` sur `style-src`.** Angular injecte les styles de
+  composants dans des balises `<style>` à l'exécution, que la CSP refuserait sinon —
+  `script-src`, lui, reste strict. Retirer cette exception demande `ngCspNonce` et un nonce
+  généré par requête, un chantier à part.
+- **Le plafond de débit du webhook est mono-instance.** `LimiteurDeDebit` compte en mémoire ;
+  deux exemplaires de l'application offriraient deux fois le plafond. Le lever demanderait un
+  compteur partagé, comme le filet de republication.
+- **Le garde SSRF sur les appels ERP porte une liste d'exceptions par profil**
+  (`leadflow.crm.ssrf.hotes-autorises`) et ne ferme pas la fenêtre de DNS-rebinding : il
+  résout le nom, puis le client HTTP le résout à son tour, et un serveur DNS hostile peut
+  répondre différemment aux deux.
 - **Pas d'intégration continue.** Rien ne construit ni n'éprouve automatiquement à chaque
   commit ; `./mvnw test` et ce script de fumée se lancent à la main. C'est **F11.3**.
 
-Tant que ces quatre points ne sont pas traités, cette pile a sa place sur un poste ou un
-réseau de confiance, pas sur une adresse publique.
+Tant que le TLS et l'intégration continue ne sont pas traités, cette pile a sa place sur un
+poste ou un réseau de confiance, pas sur une adresse publique.
