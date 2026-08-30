@@ -81,6 +81,17 @@ leadflow:
     # Applique apres lecture du corps : protege la base et la file, pas la memoire du
     # serveur. Un vrai garde-fou memoire releve du reverse-proxy (F7).
     max-payload-bytes: 65536
+    # Plafond de volume, par cle publique. La signature protege l'authenticite d'une
+    # soumission, pas leur nombre. Le compteur ne consulte jamais la base : il cle sur le
+    # segment brut de l'URL, sans quoi le 429 dirait quelles cles publiques existent.
+    rate-limit:
+      actif: true
+      requetes-par-minute: 60
+      rafale: 120
+      # Une cle inconnue consomme une entree : sans plafond, marteler des cles aleatoires
+      # ferait enfler la memoire — soit l'attaque que ce filtre existe pour arreter.
+      cles-suivies-max: 10000
+      fenetre-inactivite: 10m
     # Filet de republication : age minimal d'une ligne non publiee, et periode de balayage.
     relay-after: 2m
     relay-interval: 30s
