@@ -539,6 +539,14 @@ Les polices sont sous `src/` et non `public/` **pour que le build les hache**. L
 des ressources statiques pose `Cache-Control: immutable` sur un an ; sous `public/` les noms
 seraient stables, et une police regeneree resterait figee un an dans les navigateurs.
 
+**`inlineCritical` est desactive dans la configuration `production`**, et ce n'est pas un
+reglage de performance. Pour differer la feuille principale, l'inlining du CSS critique emet
+`<link rel="stylesheet" media="print" onload="this.media='all'">`. Sous `script-src 'self'`,
+la CSP refuse les gestionnaires d'evenements en attribut : le `onload` ne part jamais, le
+`media` reste `print`, et **toute la feuille n'est jamais appliquee a l'ecran**. L'echec est
+muet — la page rend `200`, le CSS rend `200`, et la classe des icones ne s'applique pas.
+L'etape `3d` du script de fumee refuse desormais tout attribut `on*=` dans `index.html`.
+
 L'etape `3c` de `scripts/smoke-prod.sh` verrouille l'ensemble : aucune reference a Google dans
 la page ni dans sa feuille, et la police d'icones servie en `font/woff2`.
 

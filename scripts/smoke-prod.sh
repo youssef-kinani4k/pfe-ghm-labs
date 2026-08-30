@@ -149,6 +149,23 @@ case "$TYPE" in
   *) echoue "la police d icones est servie en '$TYPE', attendu font/woff2" ;;
 esac
 
+etape "3d. La feuille de style s applique vraiment a l ecran"
+# Sous `script-src 'self'`, la CSP refuse les gestionnaires d'evenements en attribut. Le
+# build Angular en posait un : l'inlining du CSS critique emet
+#   <link rel="stylesheet" media="print" onload="this.media='all'">
+# pour differer la feuille. Le onload etant bloque, le media restait « print » et la
+# feuille n'etait JAMAIS appliquee a l'ecran — la classe des icones avec elle. C'est un
+# echec muet : la page rend 200, le CSS rend 200, et rien ne s'affiche.
+#
+# On l'eprouve sur la forme, seule chose que curl puisse voir : aucun attribut on*= dans
+# la page, et aucune feuille laissee en media="print".
+if printf '%s' "$INDEX_HTML" | grep -qE '<[^>]+ on[a-z]+='; then
+  echoue "index.html porte un gestionnaire inline : la CSP le bloquera en silence"
+fi
+if printf '%s' "$INDEX_HTML" | grep -qE '<link[^>]+rel="stylesheet"[^>]+media="print"'; then
+  echoue "une feuille de style reste en media=print : elle ne s appliquera pas a l ecran"
+fi
+
 etape "4. L'API est atteinte, et fermee"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/leads")
 [ "$code" = "401" ] || echoue "GET /api/leads sans jeton rend $code, attendu 401"
