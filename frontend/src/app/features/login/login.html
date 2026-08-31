@@ -13,7 +13,7 @@
       <form class="login__formulaire" [formGroup]="formulaire" (ngSubmit)="soumet()">
         <mat-form-field appearance="outline">
           <mat-label>Identifiant</mat-label>
-          <input matInput formControlName="username" autocomplete="username" autofocus />
+          <input matInput formControlName="username" autocomplete="username" />
           @if (formulaire.controls.username.touched && formulaire.controls.username.invalid) {
             <mat-error>Identifiant requis</mat-error>
           }

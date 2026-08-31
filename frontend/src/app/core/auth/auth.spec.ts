@@ -65,7 +65,12 @@ describe('Auth', () => {
   it('vide le jeton et renvoie a la connexion sur 401', () => {
     auth.applique('jeton-expire', '2026-08-24T00:00:00Z');
 
-    http.get('/api/leads').subscribe({ error: () => {} });
+    http.get('/api/leads').subscribe({
+      error: () => {
+        // Le 401 est attendu : c'est l'intercepteur qu'on eprouve, pas l'appelant.
+        // Sans ce gestionnaire, RxJS releverait l'erreur et ferait echouer le test.
+      },
+    });
     httpMock.expectOne('/api/leads').flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(auth.token()).toBeNull();
