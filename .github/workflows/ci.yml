@@ -67,3 +67,32 @@ jobs:
       - name: Build de production
         working-directory: frontend
         run: npm run build
+
+  qualite:
+    name: Frontend — lint et format
+    runs-on: ubuntu-latest
+    # Non bloquant, et delibere : dix ecrans ont ete ecrits sans linter, la dette se
+    # compte en dizaines de constats. La rendre bloquante d'un coup ferait deraper la
+    # feature. Cette etape rend un compte, pas un verdict ; elle deviendra bloquante
+    # une fois la dette videe, en retirant cette ligne.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Prettier
+        working-directory: frontend
+        run: npm run format:check
