@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { LeadDetail, LeadSummary } from '../models/lead';
+import { LeadDetail, LeadSummary, TimelineEntry } from '../models/lead';
 import { PageResponse } from '../models/page-response';
 import { IntentSource, LeadStatus } from '../models/monitoring';
 
@@ -66,5 +66,13 @@ export class LeadApi {
 
   detail(id: string) {
     return this.http.get<LeadDetail>(`/api/leads/${id}`);
+  }
+
+  /**
+   * Endpoint separe du detail : F10 devra rafraichir la seule chronologie apres une
+   * reattribution, sans refaire tout le detail.
+   */
+  timeline(id: string) {
+    return this.http.get<TimelineEntry[]>(`/api/leads/${id}/timeline`);
   }
 }

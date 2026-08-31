@@ -1,5 +1,6 @@
 package com.leadflow.monitoring.deadletter;
 
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -18,4 +19,7 @@ public interface DeadLetterRepository
     boolean existsByLeadIdAndStatus(UUID leadId, DeadLetterStatus status);
 
     long countByStatus(DeadLetterStatus status);
+
+    /** Les morts d'un lead, du plus ancien au plus recent : la timeline les lit dans l'ordre. */
+    List<DeadLetter> findByLeadIdOrderByDeadAtAsc(UUID leadId);
 }

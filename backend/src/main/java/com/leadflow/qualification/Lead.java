@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -66,6 +67,14 @@ public class Lead extends BaseEntity {
 
     @Column(name = "assigned_sales_rep_id")
     private UUID assignedSalesRepId;
+
+    /**
+     * Date d'attribution, posee par le routage en meme temps que le statut et le
+     * commercial. Nulle pour les leads attribues avant la migration V7 : la timeline
+     * affiche alors « date inconnue » plutot qu'une date deduite, qui serait fausse.
+     */
+    @Column(name = "routed_at")
+    private Instant routedAt;
 
     @Column(name = "country_code", length = 2)
     private String countryCode;

@@ -1,0 +1,122 @@
+// Densite : l'ecran de diagnostic doit montrer les huit faits d'un lead en echec — capture,
+// qualification, attribution, trois tentatives ERP, mort, rejeu — sans defilement. D'ou une
+// ligne compacte (--lf-space-1) et des details tenus sur une seule ligne.
+.chrono {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &__entree {
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    gap: var(--lf-space-2);
+    padding: var(--lf-space-1) 0;
+    position: relative;
+
+    // Le filet qui relie les faits : il porte la lecture chronologique a lui seul, sans
+    // ajouter de bordure a chaque ligne.
+    &:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 0.8125rem;
+      top: 1.75rem;
+      bottom: 0;
+      width: 1px;
+      background: var(--mat-sys-outline-variant);
+    }
+  }
+
+  &__icone {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    border-radius: 999px;
+    text-align: center;
+    background: var(--lf-neutre-fond);
+    color: var(--lf-neutre);
+  }
+
+  &__corps {
+    min-width: 0;
+  }
+
+  &__entete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--lf-space-1);
+    margin: 0;
+  }
+
+  &__type {
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-weight: 500;
+  }
+
+  // Le mot de l'issue, jamais la couleur seule : l'ecran s'imprime aussi en noir et blanc
+  // dans les rapports d'exploitation, et rouge et vert ne se distinguent pas pour tous.
+  &__issue {
+    padding: 0.0625rem var(--lf-space-1);
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    background: var(--lf-neutre-fond);
+    color: var(--lf-neutre);
+  }
+
+  &__date {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+
+    // L'absence de date se lit comme une absence assumee : meme ton que les autres dates,
+    // en italique, et surtout pas la couleur d'un echec.
+    &--inconnue {
+      font-style: italic;
+    }
+  }
+
+  &__details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--lf-space-2);
+    margin: 0.125rem 0 0;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.75rem;
+  }
+
+  &__detail .lf-mono {
+    color: var(--mat-sys-on-surface);
+  }
+
+  // #b91c1c sur #fee2e2 : 6,4:1, au-dela des 4,5:1 exiges. Le dashboard n'a pas de theme
+  // sombre — `color-scheme: light` est impose dans styles.scss — donc un seul jeu suffit.
+  &__entree[data-issue='ECHEC'] {
+    .chrono__icone,
+    .chrono__issue {
+      background: var(--lf-echec-fond);
+      color: var(--lf-echec);
+    }
+  }
+
+  &__entree[data-issue='SUCCES'] {
+    .chrono__icone,
+    .chrono__issue {
+      background: var(--lf-succes-fond);
+      color: var(--lf-succes);
+    }
+  }
+
+  &__attente,
+  &__vide {
+    margin: 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  &__erreur {
+    margin: 0;
+    color: var(--lf-echec);
+  }
+}

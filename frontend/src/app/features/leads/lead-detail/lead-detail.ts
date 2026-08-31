@@ -9,6 +9,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { LeadApi } from '../../../core/api/lead-api';
 import { LeadDetail as LeadDetailModel } from '../../../core/models/lead';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
+import { LeadTimeline } from './lead-timeline/lead-timeline';
 
 /**
  * Detail d'un lead, sur une route et non dans une modale.
@@ -16,8 +17,9 @@ import { StatusBadge } from '../../../shared/status-badge/status-badge';
  * Une URL partageable vaut mieux qu'une fenetre : en exploitation, le lien d'un lead en
  * echec se colle dans un ticket, et en demonstration il s'ouvre directement.
  *
- * Trois blocs, dans l'ordre ou on les lit quand on diagnostique : le lead et son commercial,
- * l'historique des synchronisations du plus recent au plus ancien, puis l'evenement brut
+ * Quatre blocs, dans l'ordre ou on les lit quand on diagnostique : le lead et son commercial,
+ * la chronologie de ce qu'il a vecu, l'historique des synchronisations du plus recent au plus
+ * ancien, puis l'evenement brut
  * avec sa charge utile. C'est ce dernier bloc qui repond a « pourquoi ce lead n'a pas de
  * telephone » sans ouvrir psql.
  */
@@ -32,6 +34,7 @@ import { StatusBadge } from '../../../shared/status-badge/status-badge';
     MatDividerModule,
     MatProgressBarModule,
     StatusBadge,
+    LeadTimeline,
   ],
   templateUrl: './lead-detail.html',
   styleUrl: './lead-detail.scss',

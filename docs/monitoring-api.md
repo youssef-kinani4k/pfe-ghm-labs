@@ -188,6 +188,84 @@ curl -s "http://localhost:8090/api/leads/6f1c..." -H "Authorization: Bearer $JET
 
 Un identifiant inconnu rend `404` en `ProblemDetail` (RFC 7807).
 
+### Chronologie d'un lead
+
+```
+GET /api/leads/{id}/timeline
+```
+
+Rend la liste ordonnée de tout ce que le lead a vécu, **dérivée en lecture seule** de quatre
+tables : `raw_lead_event` (la capture), `lead` (la qualification et l'attribution),
+`crm_sync_attempt` (chaque tentative de synchronisation) et `dead_letter` (la mort et son
+éventuel rejeu). Rien n'est stocké : il n'existe pas de table d'événements.
+
+Chaque entrée porte quatre champs — `type` parmi `CAPTURE`, `QUALIFICATION`, `ATTRIBUTION`,
+`SYNC_ERP`, `MORT`, `REJEU` ; `at` ; `outcome` parmi `SUCCES`, `ECHEC`, `NEUTRE` ; et un
+`details` de chaînes. **Aucune phrase n'est composée côté serveur** : l'API rend des faits
+typés, le dashboard les met en français.
+
+**`at` peut être `null`, et l'absence est une information.** Une attribution antérieure à la
+migration `V7` n'a pas de date : `lead.routed_at` n'existait pas, et `updated_at` ne la
+remplace pas — il vaut la date d'attribution pour un lead resté `ROUTED` mais celle de la
+synchronisation pour un lead `SYNCED`. Aucun remplissage rétroactif n'a été fait, parce qu'il
+aurait inventé une date. Une entrée non datée garde malgré tout **sa place dans le pipeline**
+plutôt que d'être rejetée en tête ou en queue de liste, l'ordre des étapes étant connu même
+quand leur date ne l'est pas.
+
+Il n'y a pas de pagination : le volume est borné par construction — une capture, une
+qualification, une attribution, au plus trois tentatives avant la DLQ, une mort et un rejeu.
+
+```bash
+curl -s "http://localhost:8090/api/leads/6f1c.../timeline" -H "Authorization: Bearer $JETON" | jq
+```
+
+```json
+[
+  {
+    "type": "CAPTURE",
+    "at": "2026-08-31T09:12:04.118Z",
+    "outcome": "NEUTRE",
+    "details": { "source": "formulaire-devis", "statut": "PUBLISHED" }
+  },
+  {
+    "type": "QUALIFICATION",
+    "at": "2026-08-31T09:12:04.402Z",
+    "outcome": "NEUTRE",
+    "details": { "score": "80", "intention": "DEVIS", "sourceIntention": "GEMINI" }
+  },
+  {
+    "type": "ATTRIBUTION",
+    "at": null,
+    "outcome": "NEUTRE",
+    "details": { "commercialId": "3f2a..." }
+  },
+  {
+    "type": "SYNC_ERP",
+    "at": "2026-08-31T09:12:06.771Z",
+    "outcome": "ECHEC",
+    "details": {
+      "connecteur": "dolibarr",
+      "statut": "FAILED",
+      "erreur": "Connection refused"
+    }
+  },
+  {
+    "type": "MORT",
+    "at": "2026-08-31T09:12:14.900Z",
+    "outcome": "ECHEC",
+    "details": { "file": "leadflow.leads.routed", "erreur": "Connection refused" }
+  },
+  {
+    "type": "REJEU",
+    "at": "2026-08-31T10:03:41.002Z",
+    "outcome": "NEUTRE",
+    "details": { "par": "admin" }
+  }
+]
+```
+
+Un identifiant inconnu rend `404` en `ProblemDetail`, comme le détail.
+
 ---
 
 ## 4. Annuaire

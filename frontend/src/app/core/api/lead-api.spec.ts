@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { LeadApi } from './lead-api';
+import { TimelineEntry } from '../models/lead';
 
 describe('LeadApi', () => {
   let api: LeadApi;
@@ -84,5 +85,20 @@ describe('LeadApi', () => {
     // laisserait le serveur construire un predicat `status in ()` qui ne rend rien.
     expect(requete.request.params.has('status')).toBeFalse();
     requete.flush({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 });
+  });
+
+  it('appelle la timeline sur le chemin relatif du lead', () => {
+    let recu: TimelineEntry[] | undefined;
+    api.timeline('abc').subscribe((entrees) => (recu = entrees));
+
+    const requete = httpMock.expectOne('/api/leads/abc/timeline');
+    expect(requete.request.method).toBe('GET');
+    requete.flush([
+      { type: 'CAPTURE', at: '2026-08-31T10:00:00Z', outcome: 'NEUTRE', details: {} },
+      { type: 'ATTRIBUTION', at: null, outcome: 'NEUTRE', details: {} },
+    ]);
+
+    expect(recu?.length).toBe(2);
+    expect(recu?.[1].at).toBeNull();
   });
 });

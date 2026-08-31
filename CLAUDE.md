@@ -130,7 +130,8 @@ Ce que la CI couvre, ce qu'elle ne couvre pas et comment lire un echec :
 ./mvnw test -Dtest=HmacSignatureVerifierTest            # une classe
 ./mvnw test -Dtest=HmacSignatureVerifierTest#rejectsExpiredTimestamp   # une methode
 ./mvnw verify                                           # tests + package
-./mvnw spring-boot:test-run                             # lance l'app avec Testcontainers
+./mvnw spring-boot:test-run                             # Testcontainers, mais profil default
+                                                        # et pipeline eteint : lire plus bas
 ```
 
 **Le backend ecoute sur `:8090`, pas sur `:8080`.** Le port par defaut de Tomcat est occupe
@@ -144,9 +145,36 @@ l'echec est `Could not find a valid Docker environment` — c'est un probleme d'
 pas de code. `./mvnw package -DskipTests` reste utilisable dans ce cas.
 
 `spring-boot:test-run` demarre `TestBackendApplication` sur la meme configuration
-Testcontainers : c'est le moyen le plus rapide de lancer le backend sans avoir a monter
-l'infrastructure via `docker compose`. Les images des conteneurs de test sont epinglees sur
-les memes versions que `docker-compose.yml` — les garder alignees.
+Testcontainers : il evite d'avoir a monter l'infrastructure via `docker compose`. Les images
+des conteneurs de test sont epinglees sur les memes versions que `docker-compose.yml` — les
+garder alignees.
+
+**Mais il ne convient pas pour faire tourner le produit, et deux pieges le rendent
+trompeur.** `TestBackendApplication` vit dans `src/test`, donc le lancement embarque tout le
+classpath de test :
+
+- **Il demarre en profil `default`, pas `dev`.** Le compte operateur et la cle de signature
+  n'ont alors aucun repli — `password-hash` retombe sur la chaine vide — et **toute
+  connexion au dashboard echoue par « Identifiants invalides »**. `R__demo_data.sql` n'est
+  pas charge non plus, donc la base est vide. Ajouter `-Dspring-boot.run.profiles=dev`
+  repare ces deux points.
+- **`src/test/resources/application.properties` eteint les cinq consommateurs** —
+  qualification, routage, CRM, journal des morts, flux temps reel. Le profil n'y change
+  rien, et **le pipeline reste inerte** : un lead capture reste dans la file, aucune ligne
+  `lead` n'est ecrite. Le symptome est un webhook qui rend `202` et un dashboard qui reste
+  a zero.
+
+**Pour lancer le produit — recette a l'ecran, verification manuelle du pipeline — c'est donc
+`docker compose up -d` puis `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`**, qui ne
+voit que le classpath principal. `test-run` reste utile pour eprouver le demarrage lui-meme
+sans preparer d'infrastructure. Le controle qui tranche en une commande, une fois le backend
+leve : `docker exec leadflow-rabbitmq rabbitmqctl list_queues name messages consumers` doit
+montrer **cinq files avec un consommateur chacune**.
+
+Corollaire : la base de `docker compose` est **persistante d'une session a l'autre**, la
+qu'un lancement Testcontainers repart d'une base vierge. Une clef publique ou un secret HMAC
+tourne depuis le dashboard y survit donc, et prend le pas sur les valeurs de
+`R__demo_data.sql` — cette migration repetable ne se rejoue que si son contenu change.
 
 Les tests des adaptateurs ERP ont deux etages. L'etage contractuel tourne a chaque
 `./mvnw test` contre `MockRestServiceServer` — il asserte les corps envoyes, pas seulement
@@ -347,6 +375,16 @@ est chiffre au repos, illisible par Postgres, et `Lead` ne porte aucune associat
 drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur nom. Le filtre
 n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
+**La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
+recompose en lecture seule ce que le lead a vecu depuis quatre tables existantes —
+`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` — sans qu'aucune table
+d'evenements n'existe. Deux consequences a ne pas casser. **L'endpoint est separe du
+detail** parce que F10 devra rafraichir la seule chronologie apres une reattribution, sans
+refaire tout le detail. Et **une entree non datee garde sa place dans le pipeline** au lieu
+d'etre rejetee en tete ou en queue : c'est le cas de toute attribution anterieure a `V7`, et
+l'ordre des etapes est connu meme quand leur date ne l'est pas. Le service rend des faits
+typés, jamais des phrases — la mise en francais appartient au template Angular.
+
 **Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
 service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
 
@@ -419,7 +457,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Sept migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -427,7 +465,16 @@ Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
 (quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
-en silence).
+en silence) et `V7__lead_routed_at.sql` (date d'attribution au commercial).
+
+**`V7` est nullable et sans remplissage retroactif**, deliberement. L'attribution n'etait
+datee nulle part avant F9, et `updated_at` ne la remplace pas : il vaut la date
+d'attribution pour un lead reste `ROUTED`, mais celle de la synchronisation pour un lead
+`SYNCED`. Remplir l'historique depuis cette colonne aurait donc invente une date pour tout
+lead deja synchronise. La chronologie affiche « date inconnue » pour les leads attribues
+avant la migration, et c'est la seule chose vraie qu'on puisse en dire. La date est posee
+par `RoutedLeadWriter` dans la meme transaction que le statut et le commercial : les trois
+sont un seul fait, et un `routed_at` sans commercial serait un etat incoherent.
 
 `V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
 messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le

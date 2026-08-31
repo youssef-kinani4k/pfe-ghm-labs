@@ -89,14 +89,24 @@ Le secret ne doit jamais partir dans un navigateur : la signature se calcule cô
 
 ### Vérifier en local avec curl
 
-Backend démarré sur `:8090` et données de démonstration chargées (profil `dev`). Les
-valeurs ci-dessous sont celles du client de démonstration de
-`backend/src/main/resources/db/dev/R__demo_data.sql`, dont le secret HMAC est donné en clair
-en commentaire de ce fichier :
+Backend démarré sur `:8090` et données de démonstration chargées (profil `dev`).
+
+> **Les deux valeurs ci-dessous ne sont pas fiables sur une base déjà utilisée.** Elles sont
+> celles que `backend/src/main/resources/db/dev/R__demo_data.sql` pose sur une base neuve,
+> mais la base de `docker compose` est persistante : dès qu'on a tourné la clé publique ou le
+> secret depuis l'écran des boutiques, ce sont les valeurs tournées qui font foi, et cet
+> exemple rend `401`. La migration répétable ne les restaure pas, puisqu'elle ne se rejoue
+> que si son contenu change. Le secret HMAC écrit en commentaire de ce fichier est de plus
+> **faux depuis F7.2** : il ne correspond pas à la valeur chiffrée posée juste en dessous.
+>
+> **Les valeurs qui font foi se lisent et se refont depuis le dashboard**, écran
+> « Boutiques » : la fiche affiche le chemin de webhook, donc la clé publique, et le bouton
+> de rotation du secret le rend **une seule fois**, à la rotation. C'est le geste à faire
+> avant de rejouer cet exemple.
 
 ```bash
-CLE="demo-cd253966049ebd76243248e8"
-SECRET="c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19"
+CLE="demo-cd253966049ebd76243248e8"          # sur base neuve ; sinon, lire la fiche boutique
+SECRET="c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19"   # voir l'encadré
 CORPS='{"source":"formulaire-devis","email":"karim@acme.test"}'
 T=$(date +%s)
 SIG=$(printf '%s' "$T.$CORPS" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
