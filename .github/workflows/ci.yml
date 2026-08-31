@@ -71,11 +71,10 @@ jobs:
   qualite:
     name: Frontend — lint et format
     runs-on: ubuntu-latest
-    # Non bloquant, et delibere : dix ecrans ont ete ecrits sans linter, la dette se
-    # compte en dizaines de constats. La rendre bloquante d'un coup ferait deraper la
-    # feature. Cette etape rend un compte, pas un verdict ; elle deviendra bloquante
-    # une fois la dette videe, en retirant cette ligne.
-    continue-on-error: true
+    # Bloquant depuis que la dette est videe. Il ne l'etait pas a la creation de ce
+    # fichier : dix ecrans avaient ete ecrits sans linter. Les deux constats ESLint
+    # sont corriges et le frontend entier est passe sous Prettier, donc ce job rend
+    # desormais un verdict et non plus un compte.
     steps:
       - uses: actions/checkout@v7
 
@@ -89,13 +88,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # continue-on-error ici AUSSI, et pas seulement sur le job : le drapeau du job
-      # dit ce que son echec fait a l'execution, pas ce qu'un pas rate fait aux pas
-      # suivants. Sans cette ligne, un ESLint rouge saute l'etape Prettier et le job
-      # ne rend qu'un compte sur les deux.
+      # Un ESLint rouge arrete maintenant le job, et Prettier ne tourne pas. Tant que
+      # l'etape ne rendait qu'un compte, elle portait son propre continue-on-error
+      # pour ne pas priver Prettier de son tour ; ce n'est plus utile des lors qu'un
+      # seul constat suffit a refuser la fusion.
       - name: ESLint
         working-directory: frontend
-        continue-on-error: true
         run: npm run lint
 
       - name: Prettier
@@ -108,7 +106,8 @@ jobs:
     # needs, et pas un job independant : ce job reconstruit les images depuis les
     # sources, donc il recompile le backend de toute facon. Le faire dependre des tests
     # evite de payer dix minutes pour apprendre ce qu un test unitaire vient de dire.
-    # « qualite » n'y figure pas : non bloquant, il ne doit rien conditionner.
+    # « qualite » n'y figure pas, meme bloquant : un defaut de format ne dit rien de
+    # la sante de la pile, et le faire attendre allongerait le retour pour rien.
     needs: [backend, frontend]
     # Sur main, sur les pull requests, et sur les branches de travail. Les fusions se
     # font localement en --no-ff : sans la condition sur feature/** et fix/**, ce job
