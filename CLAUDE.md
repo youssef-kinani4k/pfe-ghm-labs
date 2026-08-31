@@ -130,7 +130,8 @@ Ce que la CI couvre, ce qu'elle ne couvre pas et comment lire un echec :
 ./mvnw test -Dtest=HmacSignatureVerifierTest            # une classe
 ./mvnw test -Dtest=HmacSignatureVerifierTest#rejectsExpiredTimestamp   # une methode
 ./mvnw verify                                           # tests + package
-./mvnw spring-boot:test-run                             # lance l'app avec Testcontainers
+./mvnw spring-boot:test-run                             # Testcontainers, mais profil default
+                                                        # et pipeline eteint : lire plus bas
 ```
 
 **Le backend ecoute sur `:8090`, pas sur `:8080`.** Le port par defaut de Tomcat est occupe
@@ -144,9 +145,36 @@ l'echec est `Could not find a valid Docker environment` — c'est un probleme d'
 pas de code. `./mvnw package -DskipTests` reste utilisable dans ce cas.
 
 `spring-boot:test-run` demarre `TestBackendApplication` sur la meme configuration
-Testcontainers : c'est le moyen le plus rapide de lancer le backend sans avoir a monter
-l'infrastructure via `docker compose`. Les images des conteneurs de test sont epinglees sur
-les memes versions que `docker-compose.yml` — les garder alignees.
+Testcontainers : il evite d'avoir a monter l'infrastructure via `docker compose`. Les images
+des conteneurs de test sont epinglees sur les memes versions que `docker-compose.yml` — les
+garder alignees.
+
+**Mais il ne convient pas pour faire tourner le produit, et deux pieges le rendent
+trompeur.** `TestBackendApplication` vit dans `src/test`, donc le lancement embarque tout le
+classpath de test :
+
+- **Il demarre en profil `default`, pas `dev`.** Le compte operateur et la cle de signature
+  n'ont alors aucun repli — `password-hash` retombe sur la chaine vide — et **toute
+  connexion au dashboard echoue par « Identifiants invalides »**. `R__demo_data.sql` n'est
+  pas charge non plus, donc la base est vide. Ajouter `-Dspring-boot.run.profiles=dev`
+  repare ces deux points.
+- **`src/test/resources/application.properties` eteint les cinq consommateurs** —
+  qualification, routage, CRM, journal des morts, flux temps reel. Le profil n'y change
+  rien, et **le pipeline reste inerte** : un lead capture reste dans la file, aucune ligne
+  `lead` n'est ecrite. Le symptome est un webhook qui rend `202` et un dashboard qui reste
+  a zero.
+
+**Pour lancer le produit — recette a l'ecran, verification manuelle du pipeline — c'est donc
+`docker compose up -d` puis `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`**, qui ne
+voit que le classpath principal. `test-run` reste utile pour eprouver le demarrage lui-meme
+sans preparer d'infrastructure. Le controle qui tranche en une commande, une fois le backend
+leve : `docker exec leadflow-rabbitmq rabbitmqctl list_queues name messages consumers` doit
+montrer **cinq files avec un consommateur chacune**.
+
+Corollaire : la base de `docker compose` est **persistante d'une session a l'autre**, la
+qu'un lancement Testcontainers repart d'une base vierge. Une clef publique ou un secret HMAC
+tourne depuis le dashboard y survit donc, et prend le pas sur les valeurs de
+`R__demo_data.sql` — cette migration repetable ne se rejoue que si son contenu change.
 
 Les tests des adaptateurs ERP ont deux etages. L'etage contractuel tourne a chaque
 `./mvnw test` contre `MockRestServiceServer` — il asserte les corps envoyes, pas seulement

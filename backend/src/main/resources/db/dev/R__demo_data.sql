@@ -11,6 +11,18 @@
 -- Secret HMAC en clair, pour signer les requetes de test en F2 :
 --   c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19
 --
+-- ATTENTION — cette valeur en clair est FAUSSE depuis F7.2 : elle ne correspond pas au
+-- chiffre pose plus bas dans hmac_secret. Signer avec elle rend 401. Verifie le 31 aout
+-- 2026 sur une base neuve. La corriger demande de rechiffrer une valeur choisie avec la
+-- cle maitre de dev, ce qui n'a pas ete fait ici ; en attendant, le geste qui marche est
+-- de faire tourner le secret depuis l'ecran « Boutiques » du dashboard, qui le rend une
+-- seule fois, a la rotation.
+--
+-- Meme reserve pour public_key, pour une raison differente : cette migration est repetable,
+-- donc elle ne se rejoue que si son contenu change. Sur une base docker compose deja
+-- utilisee — elle est persistante d'une session a l'autre —, une clef publique tournee
+-- depuis le dashboard reste en place et c'est elle qui fait foi, pas la valeur ci-dessous.
+--
 -- Contenu en clair de crm_config, pour la verification manuelle du pipeline en F4 :
 --   {"baseUrl":"http://localhost:8081/api/index.php","apiKey":"cle-dolibarr-de-demo"}
 -- La cle d'API doit etre celle posee sur l'utilisateur admin de Dolibarr (voir la
