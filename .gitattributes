@@ -24,3 +24,10 @@ nginx.conf text eol=lf
 # Detection binaire explicite plutot que devinee, pour les seuls binaires du depot.
 *.woff2 binary
 *.ico binary
+
+# Exception a la regle ci-dessus : les scripts de commandes Windows gardent des CRLF.
+# cmd.exe tolere le plus souvent des LF, mais pas partout — un « goto » vers une etiquette
+# en fin de fichier en est le cas connu. mvnw.cmd est le seul fichier concerne, et il n'est
+# jamais lu ailleurs que sur ce poste.
+*.cmd text eol=crlf
+*.bat text eol=crlf
