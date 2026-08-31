@@ -71,6 +71,35 @@ Le `--env-file` n'est pas facultatif : `env_file:` alimente les variables du con
 tandis que les `${...}` du fichier compose sont interpoles a sa lecture. Le geste complet,
 les secrets a fabriquer et ce que ce deploiement n'est pas : `docs/deploiement.md`.
 
+### Integration continue
+
+Un seul fichier, `.github/workflows/ci.yml`, quatre jobs. `backend` (`./mvnw verify` en
+Temurin 21), `frontend` (tests Karma puis `npm run build`) et `qualite` (ESLint puis
+Prettier) partent sur **chaque push**, en parallele. `fumee` monte la pile de production
+entiere et la traverse par `scripts/smoke-prod.sh`, et il depend des deux premiers.
+
+**`fumee` ecoute `main`, les pull requests, et les branches `feature/**` et `fix/**`.**
+Cette derniere condition n'est pas de la generosite : les fusions de ce projet se font
+localement en `--no-ff`, donc une CI declenchee sur les seules pull requests ne parlerait
+jamais. Le job fabrique son propre `.env.prod` a chaque execution — **aucun secret GitHub
+n'est configure ni requis**.
+
+**`qualite` ne bloque pas** (`continue-on-error`) : dix ecrans ont ete ecrits sans linter,
+et l'etape rend un compte, pas un verdict. Le pas ESLint porte le meme drapeau en propre,
+sans quoi son echec sauterait l'etape Prettier.
+
+Deux invariants qu'une modification casserait sans qu'on le voie :
+
+- **`./mvnw verify` s'execute sans `-Perp-it`.** Ajouter le profil ferait echouer la CI sur
+  des conteneurs Dolibarr et Odoo qu'elle ne sait pas preparer — leur mise en route est
+  manuelle (`docs/erp-integration-setup.md`).
+- **Les mots de passe fabriques par le job sont hexadecimaux**, pas base64. `docker compose`
+  interpole les `${...}` a la lecture de `.env.prod` ; passer a base64 marcherait presque
+  toujours et casserait le jour ou un `$` sortirait du tirage.
+
+Ce que la CI couvre, ce qu'elle ne couvre pas et comment lire un echec :
+`docs/integration-continue.md`.
+
 ### Backend
 
 ```bash
@@ -594,8 +623,8 @@ Ce qui n'existe pas :
   entier — `docs/deploiement.md`. Depuis F11.2, Nginx pose les en-tetes de securite (CSP,
   HSTS inerte, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`), le webhook
   porte un plafond de debit mono-instance et chaque appel sortant vers un ERP passe par un
-  garde de destination. Manquent encore le TLS, le nonce CSP (donc `'unsafe-inline'` reste
-  sur `style-src`), un limiteur partage entre instances et l'integration continue
-  (**F11.3**).
+  garde de destination. Depuis F11.3, une CI GitHub Actions eprouve les deux etages de test
+  et la pile de production entiere a chaque push. Manquent encore le TLS, le nonce CSP
+  (donc `'unsafe-inline'` reste sur `style-src`) et un limiteur partage entre instances.
 
 Ne pas supposer l'existence d'un service ou d'un endpoint : verifier avant de referencer.
