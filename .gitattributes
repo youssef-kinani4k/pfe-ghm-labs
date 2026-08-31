@@ -9,3 +9,18 @@
 Dockerfile text eol=lf
 *.dockerignore text eol=lf
 nginx.conf text eol=lf
+
+# Tout le reste en LF dans la copie de travail, y compris sur Windows. La raison n'est
+# pas cosmetique : Prettier compare avec « endOfLine: lf » par defaut, donc une copie de
+# travail en CRLF lui fait signaler des fichiers que la CI, qui extrait en LF, voit
+# parfaitement formates. Avant cette ligne, « prettier --check » rendait 85 fichiers ici
+# et 11 sur le runner — un compte local qui ne veut rien dire.
+#
+# Les blobs du depot etaient deja en LF (core.autocrlf=true convertissait a l'ecriture) :
+# cette ligne ne change donc aucun contenu versionne, seulement ce qui est pose sur le
+# disque.
+* text=auto eol=lf
+
+# Detection binaire explicite plutot que devinee, pour les seuls binaires du depot.
+*.woff2 binary
+*.ico binary
