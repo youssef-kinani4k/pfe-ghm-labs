@@ -120,6 +120,35 @@ formulaire seul à l'écran.
 vise Angular 22 et émet un avertissement de décalage à chaque exécution ; le workspace est en
 Angular 20, les deux vont ensemble.
 
+## Le crochet `pre-push`, à la place de la protection de branche
+
+`.githooks/pre-push` refuse un push vers `main` que la CI rejetterait. Il est versionné,
+mais git ne le regarde qu'une fois le chemin des crochets déclaré — **à refaire après chaque
+clone** :
+
+```bash
+git config core.hooksPath .githooks
+```
+
+**Il s'interpose plus tôt qu'une protection de branche ne le ferait.** Les fusions de ce
+projet sont locales et en `--no-ff` : au moment où GitHub verrait quoi que ce soit, `main` a
+déjà bougé sur le poste. Le crochet, lui, parle avant que le push ne parte.
+
+Il joue les trois contrôles frontend de la CI — ESLint, Prettier, les 44 tests — **et les
+trois même si le premier tombe** : un seul passage doit dire tout ce qu'il y a à corriger. Il
+ne joue ni `./mvnw verify` ni le script de fumée, et c'est délibéré : ils demandent Docker,
+prennent des minutes, et un crochet qui échoue pour une raison d'environnement est désactivé
+en une semaine. La CI les couvre, sur un runner qui a Docker.
+
+Ses limites, nommées : `git push --no-verify` passe outre, et le crochet ne protège que les
+copies de travail où `core.hooksPath` a été posé. Il protège de l'étourderie, pas de la
+volonté — ce qui, sur un dépôt à un seul auteur, est exactement le besoin.
+
+Les quatre chemins ont été éprouvés un par un : push vers une autre branche (ignoré),
+suppression de `main` (ignorée), arbre propre (les trois contrôles passent), et un arbre
+portant une faute de format **et** une faute de lint — le crochet rend `1` après avoir
+rapporté les deux.
+
 ## Ce que la CI ne couvre pas
 
 Cinq manques, nommés plutôt que dissimulés.
@@ -132,9 +161,11 @@ Cinq manques, nommés plutôt que dissimulés.
 - **Aucune publication d'image.** Les images de `docker-compose.prod.yml` sont construites
   par le job de fumée puis jetées ; rien n'est poussé vers un registre.
 - **Aucun déploiement.** La CI éprouve la pile, elle ne la met nulle part en service.
-- **Aucune protection de branche.** Exiger que `backend` et `frontend` soient verts avant
-  une fusion est un réglage GitHub, que seul le propriétaire du dépôt peut activer. En
-  l'état, rien n'empêche de fusionner sur du rouge.
+- **Aucune protection de branche, et elle n'est pas configurable.** Le dépôt est privé sur
+  un compte gratuit : l'API GitHub rend `403 — Upgrade to GitHub Pro or make this repository
+  public` sur les règles de protection **comme** sur les rulesets. Les rendre accessibles
+  demanderait de passer le dépôt en public ou de payer GitHub Pro. Un crochet `pre-push`
+  local tient ce rôle à sa place — voir ci-dessous.
 - **Aucune vérification du rendu visuel.** Le script de fumée éprouve que la feuille de
   style s'applique et que la police d'icônes est servie par l'origine (étapes `3c` et `3d`),
   ce qui aurait suffi à voir les deux pannes de F11.2. Il ne regarde aucune capture d'écran :

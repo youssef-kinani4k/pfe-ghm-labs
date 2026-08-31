@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# Refuse un push vers « main » que la CI rejetterait.
+#
+# Pourquoi ici plutot qu'une protection de branche GitHub : le depot est prive sur un
+# compte gratuit, ou ni les regles de protection ni les rulesets ne sont accessibles
+# (HTTP 403). Et surtout, les fusions de ce projet se font localement en --no-ff, jamais
+# par pull request : une protection cote serveur n'aurait de toute facon parle qu'apres
+# le push. Ce crochet s'interpose la ou la faute se commet.
+#
+# Installation, une fois par copie de travail :
+#
+#     git config core.hooksPath .githooks
+#
+# Ce que le crochet NE couvre PAS, et c'est delibere :
+#
+#   - « ./mvnw verify ». Il demande le daemon Docker pour Testcontainers, prend cinq
+#     minutes, et la suite backend complete n'a jamais tenu d'un bloc sur ce poste. Un
+#     crochet qui echoue pour une raison d'environnement serait desactive en une semaine.
+#     Le job « backend » de la CI le fait, sur un runner qui a Docker.
+#   - Le script de fumee, pour la meme raison : il monte la pile de production entiere.
+#   - Un contributeur decide. « git push --no-verify » passe outre, et le crochet ne suit
+#     pas le depot tant que « core.hooksPath » n'est pas pose. Il protege de l'etourderie,
+#     pas de la volonte.
+#
+# Ce qu'il couvre : les trois controles rapides et deterministes que la CI applique au
+# frontend, et qui echouent pour une raison de code, jamais d'environnement.
+
+set -uo pipefail
+
+BRANCHE_GARDEE='refs/heads/main'
+VIDE='0000000000000000000000000000000000000000'
+
+# git passe « <ref locale> <sha local> <ref distante> <sha distant> » par ligne, une par
+# reference poussee. On ne s'interesse qu'a main, et pas a sa suppression.
+concerne=0
+while read -r _ref_locale sha_local ref_distante _sha_distant; do
+  [ "$ref_distante" = "$BRANCHE_GARDEE" ] || continue
+  [ "$sha_local" = "$VIDE" ] && continue
+  concerne=1
+done
+
+if [ "$concerne" -eq 0 ]; then
+  exit 0
+fi
+
+racine="$(git rev-parse --show-toplevel)"
+cd "$racine/frontend" || exit 1
+
+if [ ! -d node_modules ]; then
+  echo "pre-push : frontend/node_modules est absent, « npm ci » d'abord." >&2
+  exit 1
+fi
+
+echec=0
+lance() {
+  local libelle="$1"
+  shift
+  printf 'pre-push : %s... ' "$libelle"
+  if sortie="$("$@" 2>&1)"; then
+    printf 'ok\n'
+  else
+    printf 'ECHEC\n'
+    printf '%s\n' "$sortie" | tail -25
+    echec=1
+  fi
+}
+
+# Les trois dans l'ordre de la CI, et tous les trois meme si le premier tombe : un seul
+# passage doit dire tout ce qu'il y a a corriger.
+lance 'ESLint' npm run lint
+lance 'Prettier' npm run format:check
+lance 'tests' npm test -- --watch=false --browsers=ChromeHeadless
+
+if [ "$echec" -ne 0 ]; then
+  cat >&2 <<'FIN'
+
+pre-push : push vers main refuse — la CI le refuserait aussi.
+
+  npm run format --prefix frontend   corrige le formatage
+  git push --no-verify               passe outre, en connaissance de cause
+FIN
+  exit 1
+fi
+
+exit 0
