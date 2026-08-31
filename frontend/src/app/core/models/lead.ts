@@ -87,3 +87,19 @@ export interface LeadDetail {
   rawEvent: RawEventView | null;
   chaud: boolean;
 }
+
+export type TimelineEventType =
+  'CAPTURE' | 'QUALIFICATION' | 'ATTRIBUTION' | 'SYNC_ERP' | 'MORT' | 'REJEU';
+
+export type TimelineOutcome = 'SUCCES' | 'ECHEC' | 'NEUTRE';
+
+export interface TimelineEntry {
+  type: TimelineEventType;
+  /**
+   * `null` pour une attribution anterieure a la migration V7. L'absence est une
+   * information : l'ecran affiche « date inconnue » plutot qu'une date deduite.
+   */
+  at: string | null;
+  outcome: TimelineOutcome;
+  details: Record<string, string>;
+}
