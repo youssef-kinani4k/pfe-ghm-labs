@@ -51,8 +51,8 @@
 
 @if (filesMuettes().length > 0) {
   <p class="attente__alerte" role="alert">
-    {{ filesMuettes().length }} file(s) sans consommateur : un listener est probablement
-    tombe, et rien ne depile ce qui arrive.
+    {{ filesMuettes().length }} file(s) sans consommateur : un listener est probablement tombe, et
+    rien ne depile ce qui arrive.
   </p>
 }
 
@@ -182,8 +182,8 @@
 
     @if (!enCours() && morts().length === 0 && !erreur()) {
       <p class="vide">
-        Aucun message mort avec ce filtre. C'est l'etat normal : la DLQ est vidée au fil de
-        l'eau vers ce journal.
+        Aucun message mort avec ce filtre. C'est l'etat normal : la DLQ est vidée au fil de l'eau
+        vers ce journal.
       </p>
     }
 

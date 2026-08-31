@@ -26,8 +26,9 @@ n'apprendrait la panne qu'**après** la fusion.
 
 Il dépend de `backend` et `frontend` (`needs`) : il reconstruit les images depuis les
 sources, donc il recompile le backend de toute façon, et il serait absurde de payer ces
-minutes pour apprendre ce qu'un test unitaire vient de dire. **`qualite` n'y figure pas** :
-non bloquant, il ne doit rien conditionner.
+minutes pour apprendre ce qu'un test unitaire vient de dire. **`qualite` n'y figure pas**,
+meme depuis qu'il bloque : un defaut de format ne dit rien de la sante de la pile, et le
+faire attendre allongerait le retour pour rien.
 
 Une exécution est annulée si une seconde poussée arrive sur la même branche
 (`concurrency` + `cancel-in-progress`).
@@ -86,10 +87,10 @@ Les quatre causes d'échec les plus probables de `fumee`, dans l'ordre :
 depuis Google : la CSP la bloquera »*, et l'artefact a été téléversé. Le commit de preuve a
 été annulé aussitôt.
 
-## `qualite` ne bloque pas, et c'est délibéré
+## `qualite` bloque, depuis que la dette est vidée
 
-Le job porte `continue-on-error: true` : il rend un **compte**, pas un verdict. Au moment de
-son installation, la dette valait :
+Le job a porté `continue-on-error: true` le temps d'une feature : il rendait un **compte**,
+pas un verdict. Au moment de son installation, la dette valait :
 
 - **ESLint : 2 constats** — un `no-empty-function` dans `auth.spec.ts`, un `no-autofocus`
   dans `login.html`.
@@ -97,14 +98,23 @@ son installation, la dette valait :
   Prettier vivant dans `package.json` depuis F1 sans avoir jamais eu d'outil pour
   l'appliquer.
 
-Aucune correction automatique n'a été appliquée : ni `eslint --fix`, ni `prettier --write`.
-Le jour où la dette est vidée, le job devient bloquant **en retirant la ligne
-`continue-on-error` du job**.
+**Le compte Prettier était faux, et il l'était pour une raison qui vaut d'être retenue.** Il
+avait été relevé sur le poste de développement, en Windows, où la copie de travail est en
+CRLF ; Prettier compare avec `endOfLine: lf`, donc il signalait aussi les fichiers dont seule
+la fin de ligne différait. Le vrai compte — celui que la CI voyait, en extrayant en LF —
+était de **11 fichiers**. La règle `* text=auto eol=lf` de `.gitattributes` aligne désormais
+les deux, et un `format:check` local dit la même chose qu'un `format:check` distant.
 
-**Le pas ESLint porte son propre `continue-on-error`, en plus de celui du job.** Le drapeau
-du job dit ce que son échec fait à l'exécution ; il ne dit pas ce qu'un pas raté fait aux pas
-suivants. Sans cette seconde ligne, un ESLint rouge saute l'étape Prettier et le job ne rend
-qu'un compte sur les deux — c'est ce qui s'est produit à la première exécution.
+Les 11 fichiers sont formatés, les 2 constats ESLint corrigés, et **les deux
+`continue-on-error` — celui du job et celui du pas ESLint — sont tombés ensemble**. Le second
+n'existait que pour que le compte porte sur les deux outils : le drapeau du job dit ce que son
+échec fait à l'exécution, il ne dit pas ce qu'un pas raté fait aux pas suivants, si bien qu'un
+ESLint rouge sautait l'étape Prettier. Maintenant qu'un seul constat suffit à refuser la
+fusion, arrêter le job au premier est le comportement voulu.
+
+L'`autofocus` de l'écran de connexion a été **retiré**, pas désactivé par annotation : la
+règle dit qu'un focus volé désoriente qui ne voit pas la page, et l'argument tient même sur un
+formulaire seul à l'écran.
 
 `angular-eslint` est **épinglé en `^20`**. `ng add` résout la dernière version publiée, qui
 vise Angular 22 et émet un avertissement de décalage à chaque exécution ; le workspace est en

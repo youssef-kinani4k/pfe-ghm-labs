@@ -84,9 +84,16 @@ localement en `--no-ff`, donc une CI declenchee sur les seules pull requests ne 
 jamais. Le job fabrique son propre `.env.prod` a chaque execution — **aucun secret GitHub
 n'est configure ni requis**.
 
-**`qualite` ne bloque pas** (`continue-on-error`) : dix ecrans ont ete ecrits sans linter,
-et l'etape rend un compte, pas un verdict. Le pas ESLint porte le meme drapeau en propre,
-sans quoi son echec sauterait l'etape Prettier.
+**`qualite` bloque** depuis que la dette de lint et de format est videe : un constat ESLint
+ou un fichier mal formate fait echouer l'execution. Il ne bloquait pas a sa creation — dix
+ecrans avaient ete ecrits sans linter — et les deux `continue-on-error`, celui du job et
+celui du pas ESLint, sont tombes ensemble avec la dette.
+
+**La copie de travail est en LF, y compris sur Windows** (`* text=auto eol=lf` dans
+`.gitattributes`). Ce n'est pas un detail de confort : Prettier compare avec
+`endOfLine: lf`, donc une copie de travail en CRLF fait signaler des dizaines de fichiers
+que la CI, qui extrait en LF, voit parfaitement formates. Sans cette regle, `npm run
+format:check` ne veut rien dire sur un poste Windows.
 
 Deux invariants qu'une modification casserait sans qu'on le voie :
 
