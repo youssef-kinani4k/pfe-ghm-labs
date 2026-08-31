@@ -375,6 +375,16 @@ est chiffre au repos, illisible par Postgres, et `Lead` ne porte aucune associat
 drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur nom. Le filtre
 n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
+**La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
+recompose en lecture seule ce que le lead a vecu depuis quatre tables existantes —
+`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` — sans qu'aucune table
+d'evenements n'existe. Deux consequences a ne pas casser. **L'endpoint est separe du
+detail** parce que F10 devra rafraichir la seule chronologie apres une reattribution, sans
+refaire tout le detail. Et **une entree non datee garde sa place dans le pipeline** au lieu
+d'etre rejetee en tete ou en queue : c'est le cas de toute attribution anterieure a `V7`, et
+l'ordre des etapes est connu meme quand leur date ne l'est pas. Le service rend des faits
+typés, jamais des phrases — la mise en francais appartient au template Angular.
+
 **Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
 service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
 
@@ -447,7 +457,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Sept migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -455,7 +465,16 @@ Six migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
 (quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
-en silence).
+en silence) et `V7__lead_routed_at.sql` (date d'attribution au commercial).
+
+**`V7` est nullable et sans remplissage retroactif**, deliberement. L'attribution n'etait
+datee nulle part avant F9, et `updated_at` ne la remplace pas : il vaut la date
+d'attribution pour un lead reste `ROUTED`, mais celle de la synchronisation pour un lead
+`SYNCED`. Remplir l'historique depuis cette colonne aurait donc invente une date pour tout
+lead deja synchronise. La chronologie affiche « date inconnue » pour les leads attribues
+avant la migration, et c'est la seule chose vraie qu'on puisse en dire. La date est posee
+par `RoutedLeadWriter` dans la meme transaction que le statut et le commercial : les trois
+sont un seul fait, et un `routed_at` sans commercial serait un etat incoherent.
 
 `V4` est la seule table que F6 ait ajoutee, et la raison tient en une phrase : **une file de
 messages ne sait pas etre une liste paginee et filtrable**, ni retenir qui a rejoue quoi. Le
