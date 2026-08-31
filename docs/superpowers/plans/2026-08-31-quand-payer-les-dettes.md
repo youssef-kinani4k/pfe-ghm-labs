@@ -13,7 +13,14 @@ cher qu'aujourd'hui.
 
 Trois choses, et la même raison pour les trois : elles grossissent si on attend.
 
-**1. Les 83 fichiers Prettier et les 2 constats ESLint.** Le plus urgent, et le seul qui soit
+**1. ~~Les 83 fichiers Prettier~~ et les 2 constats ESLint. Payé le 31 août.** Le compte de
+83 était faux : relevé sur un poste Windows en CRLF, quand Prettier compare avec
+`endOfLine: lf`. La CI, qui extrait en LF, n'en voyait que **11**. `* text=auto eol=lf` dans
+`.gitattributes` aligne désormais les deux mesures. Les 11 fichiers sont formatés, les 2
+constats corrigés, et le job `qualite` a perdu ses deux `continue-on-error` : il bloque.
+
+Ce que ce paragraphe disait avant d'être payé — l'argument du « maintenant » reste juste,
+c'est seulement le chiffre qui était faux : le plus urgent, et le seul qui soit
 réellement chronométré. F9, F10 et F12 vont créer des écrans ; chaque écran écrit avant le
 reformatage est un fichier de plus à reformater, et un diff futur pollué. Fait maintenant,
 c'est **un commit isolé, mécanique, relisible d'un coup d'œil** — `prettier --write .`, plus
@@ -22,10 +29,17 @@ deux lignes pour `no-empty-function` dans `auth.spec.ts:68` et `no-autofocus` da
 job** dans `.github/workflows/ci.yml` ; celui du pas ESLint peut partir en même temps. Fait
 après F12, c'est environ 130 fichiers et un diff que personne ne relit.
 
-**2. La protection de branche.** Deux minutes dans *Settings → Branches* du dépôt GitHub, et
-c'est ce qui donne son sens à la CI de F11.3. Tant qu'elle n'est pas posée, la CI est un
-avis, pas une barrière : rien n'empêche de fusionner sur du rouge. Seul le propriétaire du
-dépôt peut la poser.
+**2. ~~La protection de branche.~~ Corrigé le 31 août : elle n'est pas configurable.** Le
+dépôt est privé sur un compte gratuit, et l'API GitHub rend `403 — Upgrade to GitHub Pro or
+make this repository public` sur les règles de protection **comme** sur les rulesets. Les
+« deux minutes dans *Settings → Branches* » annoncées ici n'existaient pas ; cela ne pouvait
+se découvrir qu'en essayant.
+
+Un crochet `pre-push` versionné (`.githooks/pre-push`) tient ce rôle, et le tient mieux :
+les fusions de ce projet étant locales et en `--no-ff`, une protection côté serveur n'aurait
+parlé qu'après que `main` a bougé. Il reste deux façons d'obtenir la vraie protection —
+passer le dépôt en public, ou payer GitHub Pro — et aucune n'est requise pour la soutenance.
+Voir `docs/integration-continue.md`.
 
 **3. La recette de F8.** Due depuis quatre sessions, cinq minutes, et le seul point de la
 liste que l'assistant ne peut pas faire : baisser le seuil d'une boutique, recharger la

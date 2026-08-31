@@ -104,6 +104,21 @@ Deux invariants qu'une modification casserait sans qu'on le voie :
   interpole les `${...}` a la lecture de `.env.prod` ; passer a base64 marcherait presque
   toujours et casserait le jour ou un `$` sortirait du tirage.
 
+**Un crochet `pre-push` refuse un push vers `main` que la CI rejetterait.** Il vit dans
+`.githooks/pre-push`, donc il est versionne, mais git ne le voit qu'une fois par copie de
+travail :
+
+```bash
+git config core.hooksPath .githooks   # a faire apres chaque clone
+```
+
+Il ne joue que les trois controles frontend — ESLint, Prettier, les 44 tests — et jamais
+`./mvnw verify` ni le script de fumee : ceux-la demandent Docker, prennent des minutes, et
+un crochet qui echoue pour une raison d'environnement finit desactive. Il remplace une
+protection de branche, **impossible ici** : le depot est prive sur un compte gratuit, ou
+l'API rend `403` sur les regles de protection comme sur les rulesets. Et il s'interpose plus
+tot qu'elle ne le ferait, puisque les fusions sont locales.
+
 Ce que la CI couvre, ce qu'elle ne couvre pas et comment lire un echec :
 `docs/integration-continue.md`.
 
