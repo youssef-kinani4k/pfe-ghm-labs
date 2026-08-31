@@ -10,6 +10,9 @@ import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
+import com.leadflow.monitoring.deadletter.DeadLetter;
+import com.leadflow.monitoring.deadletter.DeadLetterRepository;
+import com.leadflow.monitoring.deadletter.DeadLetterStatus;
 import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
@@ -47,6 +50,7 @@ class LeadTimelineServiceTest {
     @Autowired private CrmSyncAttemptRepository tentatives;
     @Autowired private ClientRepository clients;
     @Autowired private SalesRepRepository commerciaux;
+    @Autowired private DeadLetterRepository morts;
 
     private UUID clientId;
     private UUID commercialId;
@@ -193,5 +197,60 @@ class LeadTimelineServiceTest {
                 .hasSize(3)
                 .allMatch(e -> e.outcome() == TimelineOutcome.ECHEC)
                 .allMatch(e -> "Connection refused".equals(e.details().get("erreur")));
+    }
+
+    @Test
+    void uneMortEtSonRejeuDonnentDeuxEntrees() {
+        UUID leadId = leadAvec(
+                base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.MINUTES),
+                LeadStatus.ROUTED);
+
+        DeadLetter mort = new DeadLetter();
+        mort.setOriginQueue("leadflow.leads.routed");
+        mort.setRoutingKey("lead.routed");
+        mort.setPayload("{}");
+        mort.setClientId(clientId);
+        mort.setLeadId(leadId);
+        mort.setFailureReason("Connection refused");
+        mort.setDeadAt(base.plus(10, ChronoUnit.MINUTES));
+        mort.setStatus(DeadLetterStatus.REPLAYED);
+        mort.setReplayedAt(base.plus(60, ChronoUnit.MINUTES));
+        mort.setReplayedBy("admin");
+        morts.saveAndFlush(mort);
+
+        List<TimelineEntry> timeline = service.timeline(leadId);
+
+        assertThat(timeline).extracting(TimelineEntry::type).containsExactly(
+                TimelineEventType.CAPTURE,
+                TimelineEventType.QUALIFICATION,
+                TimelineEventType.ATTRIBUTION,
+                TimelineEventType.MORT,
+                TimelineEventType.REJEU);
+        assertThat(timeline.get(3).outcome()).isEqualTo(TimelineOutcome.ECHEC);
+        assertThat(timeline.get(3).details().get("file")).isEqualTo("leadflow.leads.routed");
+        assertThat(timeline.get(4).details().get("par")).isEqualTo("admin");
+    }
+
+    @Test
+    void uneMortNonRejoueeNeDonneQuUneEntree() {
+        UUID leadId = leadAvec(
+                base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.MINUTES),
+                LeadStatus.ROUTED);
+
+        DeadLetter mort = new DeadLetter();
+        mort.setOriginQueue("leadflow.leads.routed");
+        mort.setRoutingKey("lead.routed");
+        mort.setPayload("{}");
+        mort.setClientId(clientId);
+        mort.setLeadId(leadId);
+        mort.setFailureReason("Connection refused");
+        mort.setDeadAt(base.plus(10, ChronoUnit.MINUTES));
+        mort.setStatus(DeadLetterStatus.PENDING);
+        morts.saveAndFlush(mort);
+
+        List<TimelineEntry> timeline = service.timeline(leadId);
+
+        assertThat(timeline).filteredOn(e -> e.type() == TimelineEventType.REJEU).isEmpty();
+        assertThat(timeline).filteredOn(e -> e.type() == TimelineEventType.MORT).hasSize(1);
     }
 }

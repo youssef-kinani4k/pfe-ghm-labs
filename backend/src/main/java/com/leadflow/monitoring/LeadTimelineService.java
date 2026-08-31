@@ -6,6 +6,8 @@ import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
+import com.leadflow.monitoring.deadletter.DeadLetter;
+import com.leadflow.monitoring.deadletter.DeadLetterRepository;
 import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
@@ -31,14 +33,17 @@ public class LeadTimelineService {
     private final LeadQueryRepository leads;
     private final RawLeadEventRepository evenements;
     private final CrmSyncAttemptRepository tentatives;
+    private final DeadLetterRepository morts;
 
     public LeadTimelineService(
             LeadQueryRepository leads,
             RawLeadEventRepository evenements,
-            CrmSyncAttemptRepository tentatives) {
+            CrmSyncAttemptRepository tentatives,
+            DeadLetterRepository morts) {
         this.leads = leads;
         this.evenements = evenements;
         this.tentatives = tentatives;
+        this.morts = morts;
     }
 
     @Transactional(readOnly = true)
@@ -54,6 +59,13 @@ public class LeadTimelineService {
         }
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
                 .forEach(tentative -> entrees.add(synchronisation(tentative)));
+
+        morts.findByLeadIdOrderByDeadAtAsc(leadId).forEach(mort -> {
+            entrees.add(mort(mort));
+            if (mort.getReplayedAt() != null) {
+                entrees.add(rejeu(mort));
+            }
+        });
 
         return ordonne(entrees);
     }
@@ -131,6 +143,31 @@ public class LeadTimelineService {
                 lead.getRoutedAt(),
                 TimelineOutcome.NEUTRE,
                 Map.of("commercialId", String.valueOf(lead.getAssignedSalesRepId())));
+    }
+
+    private TimelineEntry mort(DeadLetter mort) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("file", mort.getOriginQueue());
+        if (mort.getFailureReason() != null) {
+            details.put("erreur", mort.getFailureReason());
+        }
+        return new TimelineEntry(
+                TimelineEventType.MORT, mort.getDeadAt(), TimelineOutcome.ECHEC,
+                Map.copyOf(details));
+    }
+
+    /**
+     * Le rejeu n'existe que si la date est posee : un message mort et non rejoue n'a pas
+     * d'entree de rejeu, meme si la colonne {@code replayed_by} porte une valeur.
+     */
+    private TimelineEntry rejeu(DeadLetter mort) {
+        Map<String, String> details = new LinkedHashMap<>();
+        if (mort.getReplayedBy() != null) {
+            details.put("par", mort.getReplayedBy());
+        }
+        return new TimelineEntry(
+                TimelineEventType.REJEU, mort.getReplayedAt(), TimelineOutcome.NEUTRE,
+                Map.copyOf(details));
     }
 
     private TimelineEntry synchronisation(CrmSyncAttempt tentative) {
