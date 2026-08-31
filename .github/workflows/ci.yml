@@ -1,0 +1,195 @@
+# Integration continue de LeadFlow.
+#
+# Quatre jobs. Les trois legers tournent sur chaque push, quelle que soit la branche ;
+# l'etage de fumee, qui monte la pile de production entiere, ne part que sur main, sur
+# une pull request, ou sur une branche feature/** ou fix/**. Le depot est prive et ses
+# minutes sont comptees : cette condition, le « needs » et la concurrence sont ce qui
+# garde le cout raisonnable.
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# Deux poussees qui se suivent sur la meme branche : la premiere execution est annulee.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — tests et paquet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Sans -Perp-it : les tests @Tag("erp") demandent de vrais Dolibarr et Odoo, dont
+      # la mise en route est manuelle (docs/erp-integration-setup.md). L'etage
+      # contractuel des adaptateurs, lui, tourne bien ici.
+      #
+      # Testcontainers n'a rien a configurer : le daemon Docker est present sur les
+      # runners ubuntu-latest.
+      - name: mvnw verify
+        working-directory: backend
+        run: ./mvnw --batch-mode verify
+
+  frontend:
+    name: Frontend — tests et build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      # Chrome est preinstalle sur le runner ; --browsers=ChromeHeadless et
+      # --watch=false font une passe unique.
+      - name: Tests
+        working-directory: frontend
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      # Le build compte autant que les tests : il porte les budgets de taille
+      # d'angular.json, qui echouent a 1,5 Mo.
+      - name: Build de production
+        working-directory: frontend
+        run: npm run build
+
+  qualite:
+    name: Frontend — lint et format
+    runs-on: ubuntu-latest
+    # Non bloquant, et delibere : dix ecrans ont ete ecrits sans linter, la dette se
+    # compte en dizaines de constats. La rendre bloquante d'un coup ferait deraper la
+    # feature. Cette etape rend un compte, pas un verdict ; elle deviendra bloquante
+    # une fois la dette videe, en retirant cette ligne.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+
+      # continue-on-error ici AUSSI, et pas seulement sur le job : le drapeau du job
+      # dit ce que son echec fait a l'execution, pas ce qu'un pas rate fait aux pas
+      # suivants. Sans cette ligne, un ESLint rouge saute l'etape Prettier et le job
+      # ne rend qu'un compte sur les deux.
+      - name: ESLint
+        working-directory: frontend
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Prettier
+        working-directory: frontend
+        run: npm run format:check
+
+  fumee:
+    name: Pile de production — script de fumee
+    runs-on: ubuntu-latest
+    # needs, et pas un job independant : ce job reconstruit les images depuis les
+    # sources, donc il recompile le backend de toute facon. Le faire dependre des tests
+    # evite de payer dix minutes pour apprendre ce qu un test unitaire vient de dire.
+    # « qualite » n'y figure pas : non bloquant, il ne doit rien conditionner.
+    needs: [backend, frontend]
+    # Sur main, sur les pull requests, et sur les branches de travail. Les fusions se
+    # font localement en --no-ff : sans la condition sur feature/** et fix/**, ce job
+    # n'apprendrait la panne qu'APRES la fusion.
+    if: >-
+      github.event_name == 'pull_request'
+      || github.ref == 'refs/heads/main'
+      || startsWith(github.ref, 'refs/heads/feature/')
+      || startsWith(github.ref, 'refs/heads/fix/')
+    steps:
+      - uses: actions/checkout@v7
+
+      # htpasswd n'est pas garanti present sur le runner. L'installation coute quelques
+      # secondes ; la verifier plutot que la supposer.
+      - name: Installer htpasswd
+        run: |
+          command -v htpasswd >/dev/null && exit 0
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apache2-utils
+
+      # Aucun secret GitHub n'est configure : chaque execution tire les siens. Ils sont
+      # masques AVANT tout usage, pour qu'aucun n'apparaisse dans le journal.
+      #
+      # Hexadecimal et non base64 pour les mots de passe de service : docker compose
+      # interpole les ${...} a la lecture de .env.prod, et un $ y serait lu comme un
+      # debut de nom de variable. Le hash BCrypt, lui, en est plein — d'ou le doublage,
+      # exactement comme le documente .env.prod.example.
+      - name: Fabriquer .env.prod
+        run: |
+          set -euo pipefail
+          PG=$(openssl rand -hex 24)
+          RMQ=$(openssl rand -hex 24)
+          MASTER=$(openssl rand -base64 32 | tr -d '\n')
+          JWT=$(openssl rand -base64 48 | tr -d '\n')
+          SMOKE=$(openssl rand -hex 16)
+          for secret in "$PG" "$RMQ" "$MASTER" "$JWT" "$SMOKE"; do
+            echo "::add-mask::$secret"
+          done
+          HASH=$(htpasswd -bnBC 10 "" "$SMOKE" | tr -d ':\n' | sed 's/[$]/$$/g')
+          echo "::add-mask::$HASH"
+          cat > .env.prod <<FICHIER
+          POSTGRES_PASSWORD=$PG
+          DB_URL=jdbc:postgresql://postgres:5432/leadflow
+          DB_USER=leadflow
+          DB_PASSWORD=$PG
+          RABBITMQ_DEFAULT_PASS=$RMQ
+          RABBITMQ_HOST=rabbitmq
+          RABBITMQ_PORT=5672
+          RABBITMQ_USER=leadflow
+          RABBITMQ_PASSWORD=$RMQ
+          LEADFLOW_MASTER_KEY=$MASTER
+          LEADFLOW_JWT_SECRET=$JWT
+          LEADFLOW_ADMIN_USER=admin
+          LEADFLOW_ADMIN_PASSWORD_HASH=$HASH
+          WEB_PORT=8088
+          GEMINI_API_KEY=
+          FICHIER
+          echo "SMOKE_PASSWORD=$SMOKE" >> "$GITHUB_ENV"
+
+      # --keep : sans lui, le trap du script demonterait la pile avant qu'on puisse
+      # lire le moindre journal. Une CI qui rougit sans dire pourquoi ne sert a rien.
+      - name: Script de fumee
+        run: ./scripts/smoke-prod.sh --keep
+
+      - name: Journaux Docker
+        if: failure()
+        run: |
+          docker compose --env-file .env.prod -f docker-compose.prod.yml logs --no-color \
+            > docker-logs.txt 2>&1 || true
+
+      - name: Televerser les journaux
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: journaux-docker
+          path: docker-logs.txt
+          retention-days: 7
+
+      # .env.prod n'est jamais televerse. Le demontage emporte les volumes.
+      - name: Demonter la pile
+        if: always()
+        run: |
+          docker compose --env-file .env.prod -f docker-compose.prod.yml down -v || true
+          rm -f .env.prod
