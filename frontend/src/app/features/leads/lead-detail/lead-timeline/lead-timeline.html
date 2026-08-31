@@ -1,0 +1,47 @@
+@if (enCours()) {
+  <p class="chrono__attente">Chargement de la chronologie…</p>
+} @else if (erreur(); as message) {
+  <p class="chrono__erreur" role="alert">{{ message }}</p>
+} @else if (entrees().length === 0) {
+  <p class="chrono__vide">Aucun fait enregistre pour ce lead.</p>
+} @else {
+  <ol class="chrono">
+    @for (entree of entrees(); track $index) {
+      <li class="chrono__entree" data-entree [attr.data-issue]="entree.outcome">
+        <!-- L'icone double le libelle ecrit juste a cote : elle est decorative, et un
+             lecteur d'ecran n'a pas a la lire deux fois. -->
+        <mat-icon class="chrono__icone" aria-hidden="true">{{ icone(entree.type) }}</mat-icon>
+
+        <div class="chrono__corps">
+          <p class="chrono__entete">
+            <span class="chrono__type">{{ libelle(entree.type) }}</span>
+            @if (motDeLIssue(entree.outcome); as mot) {
+              <span class="chrono__issue">{{ mot }}</span>
+            }
+            @if (entree.at) {
+              <span class="chrono__date">{{ entree.at | date: 'dd/MM/yyyy HH:mm:ss' }}</span>
+            } @else {
+              <!-- Une absence assumee, pas une erreur d'affichage : l'attribution est
+                   anterieure a la migration qui date les attributions, et une date deduite
+                   mentirait. Ton neutre, jamais la couleur d'echec. -->
+              <span class="chrono__date chrono__date--inconnue">date inconnue</span>
+            }
+          </p>
+
+          @if (entree.details | keyvalue; as details) {
+            @if (details.length > 0) {
+              <p class="chrono__details">
+                @for (detail of details; track detail.key) {
+                  <span class="chrono__detail">
+                    {{ libelleDetail(detail.key) }}
+                    <span class="lf-mono">{{ detail.value }}</span>
+                  </span>
+                }
+              </p>
+            }
+          }
+        </div>
+      </li>
+    }
+  </ol>
+}

@@ -88,6 +88,15 @@
 
     <mat-card appearance="outlined">
       <mat-card-header>
+        <mat-card-title class="detail__sous-titre">Chronologie</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <app-lead-timeline [leadId]="lead.id" />
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined">
+      <mat-card-header>
         <mat-card-title class="detail__sous-titre">Synchronisations ERP</mat-card-title>
       </mat-card-header>
       <mat-card-content>
