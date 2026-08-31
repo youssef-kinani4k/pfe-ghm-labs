@@ -50,9 +50,7 @@
     <p class="compteurs__libelle">Taux de conversion</p>
     <!-- Le backend rend un ratio dans [0,1], pas un pourcentage : la conversion en
          centiemes se fait ici, au seul endroit qui ajoute le signe %. -->
-    <p class="compteurs__valeur">
-      {{ ((stats()?.tauxDeConversion ?? 0) * 100 | number: '1.0-1') }}%
-    </p>
+    <p class="compteurs__valeur">{{ (stats()?.tauxDeConversion ?? 0) * 100 | number: '1.0-1' }}%</p>
     <p class="compteurs__note">Part des leads synchronises dans l'ERP</p>
   </mat-card>
 
@@ -179,8 +177,8 @@
           }
         } @empty {
           <p class="vide">
-            Rien n'est encore passe depuis l'ouverture de cet ecran. Les leads apparaissent
-            ici des qu'un formulaire est soumis.
+            Rien n'est encore passe depuis l'ouverture de cet ecran. Les leads apparaissent ici des
+            qu'un formulaire est soumis.
           </p>
         }
       </mat-card-content>
