@@ -3,6 +3,7 @@ package com.leadflow.routing;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -43,6 +44,9 @@ public class RoutedLeadWriter {
                 () -> new IllegalStateException("Lead disparu en cours d'attribution : " + leadId));
         lead.setAssignedSalesRepId(salesRepId);
         lead.setStatus(LeadStatus.ROUTED);
+        // Dans la meme transaction que les deux lignes ci-dessus : les trois sont un seul
+        // fait, et un routed_at sans commercial serait un etat incoherent.
+        lead.setRoutedAt(Instant.now());
         return leadRepository.saveAndFlush(lead);
     }
 }
