@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +63,22 @@ class LeadTimelineServiceTest {
      * apres — pour que l'ordre attendu ne depende pas de la vitesse du test.
      */
     private final Instant base = Instant.now();
+
+    /**
+     * La suite complete partage une seule base Testcontainers : un lead laisse derriere lui
+     * empeche {@code capture/} de vider {@code raw_lead_event}, dont il porte la cle
+     * etrangere. La suppression suit donc l'ordre des references, comme dans les autres
+     * classes de ce paquet.
+     */
+    @AfterEach
+    void nettoyage() {
+        morts.deleteAll();
+        tentatives.deleteAll();
+        leads.deleteAll();
+        evenements.deleteAll();
+        commerciaux.deleteAll();
+        clients.deleteAll();
+    }
 
     @BeforeEach
     void boutique() {
