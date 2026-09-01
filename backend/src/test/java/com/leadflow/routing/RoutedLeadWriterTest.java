@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +35,19 @@ class RoutedLeadWriterTest {
     @Autowired private RawLeadEventRepository evenements;
     @Autowired private ClientRepository clients;
     @Autowired private SalesRepRepository commerciaux;
+
+    /**
+     * Voir la meme methode dans {@code LeadTimelineServiceTest} : la base Testcontainers est
+     * partagee par toute la suite, et un lead survivant bloque le vidage de
+     * {@code raw_lead_event} par {@code capture/}.
+     */
+    @AfterEach
+    void nettoyage() {
+        leads.deleteAll();
+        evenements.deleteAll();
+        commerciaux.deleteAll();
+        clients.deleteAll();
+    }
 
     @Test
     void poseLaDateDAttributionEnMemeTempsQueLeStatut() {

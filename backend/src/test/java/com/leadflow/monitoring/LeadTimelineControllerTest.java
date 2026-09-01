@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,17 @@ class LeadTimelineControllerTest {
     @Autowired private ClientRepository clients;
 
     private UUID leadId;
+
+    /**
+     * Voir {@link LeadTimelineServiceTest} : ce que le test cree doit disparaitre, sans quoi
+     * {@code capture/} ne peut plus vider {@code raw_lead_event}.
+     */
+    @AfterEach
+    void nettoyage() {
+        leads.deleteAll();
+        evenements.deleteAll();
+        clients.deleteAll();
+    }
 
     @BeforeEach
     void jeuDeDonnees() {
