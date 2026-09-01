@@ -13,7 +13,7 @@ du plan jusqu'à la fusion dans `main`, avec la recette à l'écran faite par l'
 | Poussé ? | **oui** — `main` et `feature/f9-timeline-du-lead` |
 | Branche de la feature | **conservée**, comme toutes les précédentes |
 | Migrations | **sept** — `V7__lead_routed_at.sql` est appliquée en base de développement |
-| CI | déclenchée sur `main` par la poussée (run `33455680895`) |
+| CI | **en echec sur `main`** — run `33455680895`, job `Backend — tests et paquet` |
 
 ## Ce que F9 a livré
 
@@ -85,6 +85,57 @@ Rejoués **sur l'arbre fusionné** avant la poussée : le frontend en entier et 
 `monitoring/` et `routing/`. La suite backend se joue **par lots, jamais d'un bloc** — un run
 complet n'a jamais survécu sur ce poste.
 
+
+## ⚠️ La CI est rouge sur `main` — c'est la premiere chose a reprendre
+
+**Le job `Backend — tests et paquet` echoue depuis la fusion de F9** (run `33455680895`, et
+de nouveau sur le run du document d'etat : c'est le meme code). Les deux jobs frontend
+passent ; `fumee` n'est pas execute, puisqu'il depend des deux premiers.
+
+### La cause, identifiee et non corrigee
+
+```
+update or delete on table "raw_lead_event" violates foreign key constraint
+"lead_raw_event_id_fkey" on table "lead"
+```
+
+Les trois classes de test ajoutees par F9 — `LeadTimelineServiceTest`,
+`LeadTimelineControllerTest` et `RoutedLeadWriterTest` — **creent des lignes `lead` et ne les
+nettoient pas**. La suite complete partage une seule base Testcontainers : quand
+`LeadCaptureIntegrationTest` vide `raw_lead_event`, les leads laisses derriere referencent
+encore ces lignes, et Postgres refuse la suppression. Vingt-et-un tests de `capture/`
+tombent en cascade (`LeadCaptureIntegrationTest`, `PendingEventRelayTest`,
+`RawLeadEventIdempotenceTest`).
+
+### Pourquoi il n'a pas ete vu avant la poussee
+
+Deux filets avaient un trou, et c'est le meme trou :
+
+- **La suite backend a ete jouee par lots**, comme l'exige ce poste — un run complet n'y a
+  jamais survecu. Le defaut n'apparait que lorsque `capture/` tourne **dans le meme JVM** que
+  `monitoring/`, ce qu'aucun lot ne reproduit.
+- **Le crochet `pre-push` ne joue pas `./mvnw verify`**, par construction : il ne fait que les
+  trois controles frontend. Il ne pouvait donc pas l'arreter.
+
+C'est exactement le trou que la consigne « par lots » laisse ouvert, et la CI l'a rattrape.
+**A retenir pour toute feature qui ajoute des tests ecrivant en base : un lot vert ne dit
+rien de la suite complete.**
+
+### La correction a faire
+
+Une branche `fix/f9-nettoyage-des-tests`, et un `@AfterEach` dans chacune des trois classes
+qui supprime **dans l'ordre des cles etrangeres** ce que le test a cree : morts
+(`dead_letter`), tentatives (`crm_sync_attempt`), leads, evenements bruts, commercial,
+boutique. Les classes de test existantes le font deja — c'est leur modele qu'il faut suivre,
+pas un nettoyage global qui effacerait les donnees d'autres tests.
+
+Verification qui tranche, et qui n'a pas ete faite : `./mvnw verify` **en entier**. S'il ne
+survit pas sur ce poste, jouer au minimum `capture/` et `monitoring/` **dans la meme
+commande**, ce qui suffit a reproduire l'echec.
+
+**F9 elle-meme n'est pas en cause** : la fonctionnalite est recettee a l'ecran et le code de
+production est intact. Ce sont les tests qui ne rendent pas la base comme ils l'ont trouvee.
+
 ## L'état de cette machine à l'arrêt
 
 **Deux conteneurs tournent** — `leadflow-postgres` et `leadflow-rabbitmq`, sains. Pour les
@@ -99,7 +150,10 @@ processus sur ce poste ; sous Git Bash il faut doubler les slashs :
 
 ## Par quoi reprendre
 
-**F10**, la suite de la feuille de route. Deux points hérités à ne pas perdre :
+**D'abord la CI rouge**, voir la section dediee plus haut : le nettoyage des trois classes de
+test de F9. Rien d'autre ne devrait partir avant que `main` soit vert.
+
+**Ensuite F10**, la suite de la feuille de route. Deux points hérités à ne pas perdre :
 
 - **F10 prend `V8`**, pas `V7` — la feuille de route dit encore `V7`, et c'est la troisième
   fois que ce numéro glisse (`V6` avait été consommée par F11.2, `V7` l'est par F9).
