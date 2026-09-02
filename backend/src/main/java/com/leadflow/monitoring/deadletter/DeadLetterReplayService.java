@@ -2,6 +2,10 @@ package com.leadflow.monitoring.deadletter;
 
 import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.config.RabbitMQConfig;
+import com.leadflow.routing.LeadAction;
+import com.leadflow.routing.LeadActionJournal;
+import com.leadflow.routing.LeadActionOutcome;
+import com.leadflow.routing.LeadActionType;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
@@ -42,15 +46,18 @@ public class DeadLetterReplayService {
 
     private final DeadLetterRepository repository;
     private final RabbitTemplate rabbitTemplate;
+    private final LeadActionJournal journal;
 
     public DeadLetterReplayService(
-            DeadLetterRepository repository, RabbitTemplate rabbitTemplate) {
+            DeadLetterRepository repository, RabbitTemplate rabbitTemplate,
+            LeadActionJournal journal) {
         this.repository = repository;
         this.rabbitTemplate = rabbitTemplate;
+        this.journal = journal;
     }
 
     @Transactional
-    public void rejoue(UUID id, String operateur) {
+    public void rejoue(UUID id, String operateur, String motif) {
         DeadLetter mort = enAttente(id);
 
         MessageProperties proprietes = new MessageProperties();
@@ -73,6 +80,8 @@ public class DeadLetterReplayService {
             rabbitTemplate.send(
                     RabbitMQConfig.LEADS_EXCHANGE, mort.getRoutingKey(), message);
         } catch (AmqpException echec) {
+            journalise(mort, LeadActionType.REJEU, operateur, motif,
+                    LeadActionOutcome.ECHEC, echec.getMessage());
             throw new RejeuIndisponibleException(
                     "Broker injoignable, la mort reste en attente", echec);
         }
@@ -81,16 +90,46 @@ public class DeadLetterReplayService {
         mort.setReplayedAt(Instant.now());
         mort.setReplayedBy(operateur);
         repository.saveAndFlush(mort);
+        journalise(mort, LeadActionType.REJEU, operateur, motif,
+                LeadActionOutcome.SUCCES, null);
         log.info("Mort {} rejouee sur {} par {}", id, mort.getRoutingKey(), operateur);
     }
 
     @Transactional
-    public void ecarte(UUID id, String operateur) {
+    public void ecarte(UUID id, String operateur, String motif) {
         DeadLetter mort = enAttente(id);
         mort.setStatus(DeadLetterStatus.DISCARDED);
         mort.setReplayedAt(Instant.now());
         mort.setReplayedBy(operateur);
         repository.saveAndFlush(mort);
+        journalise(mort, LeadActionType.ECART, operateur, motif,
+                LeadActionOutcome.SUCCES, null);
+    }
+
+    /**
+     * Une mort dont on n'a pas su tirer de {@code leadId} n'est pas journalisee :
+     * {@code lead_action.lead_id} porte une cle etrangere non nulle, et inventer une
+     * reference ferait echouer l'ecriture exactement quand le message est le plus abime.
+     */
+    private void journalise(
+            DeadLetter mort,
+            LeadActionType type,
+            String operateur,
+            String motif,
+            LeadActionOutcome issue,
+            String detail) {
+        if (mort.getLeadId() == null) {
+            return;
+        }
+        LeadAction action = new LeadAction();
+        action.setLeadId(mort.getLeadId());
+        action.setAction(type);
+        action.setActor(operateur);
+        action.setReason(motif);
+        action.setDeadLetterId(mort.getId());
+        action.setOutcome(issue);
+        action.setDetail(detail);
+        journal.enregistre(action);
     }
 
     private DeadLetter enAttente(UUID id) {

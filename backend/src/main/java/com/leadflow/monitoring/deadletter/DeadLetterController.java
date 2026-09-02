@@ -2,6 +2,7 @@ package com.leadflow.monitoring.deadletter;
 
 import com.leadflow.monitoring.dto.DeadLetterView;
 import com.leadflow.monitoring.dto.PageResponse;
+import jakarta.validation.Valid;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,12 +44,16 @@ public class DeadLetterController {
     }
 
     @PostMapping("/{id}/replay")
-    public void rejoue(@PathVariable UUID id, Principal operateur) {
-        rejeu.rejoue(id, operateur.getName());
+    public void rejoue(
+            @PathVariable UUID id, @Valid @RequestBody MotifForm formulaire,
+            Principal operateur) {
+        rejeu.rejoue(id, operateur.getName(), formulaire.reason());
     }
 
     @PostMapping("/{id}/discard")
-    public void ecarte(@PathVariable UUID id, Principal operateur) {
-        rejeu.ecarte(id, operateur.getName());
+    public void ecarte(
+            @PathVariable UUID id, @Valid @RequestBody MotifForm formulaire,
+            Principal operateur) {
+        rejeu.ecarte(id, operateur.getName(), formulaire.reason());
     }
 }
