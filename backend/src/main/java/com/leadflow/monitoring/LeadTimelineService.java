@@ -12,12 +12,19 @@ import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
 import com.leadflow.qualification.Lead;
+import com.leadflow.routing.LeadAction;
+import com.leadflow.routing.LeadActionOutcome;
+import com.leadflow.routing.LeadActionRepository;
+import com.leadflow.routing.LeadActionType;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,16 +41,19 @@ public class LeadTimelineService {
     private final RawLeadEventRepository evenements;
     private final CrmSyncAttemptRepository tentatives;
     private final DeadLetterRepository morts;
+    private final LeadActionRepository actions;
 
     public LeadTimelineService(
             LeadQueryRepository leads,
             RawLeadEventRepository evenements,
             CrmSyncAttemptRepository tentatives,
-            DeadLetterRepository morts) {
+            DeadLetterRepository morts,
+            LeadActionRepository actions) {
         this.leads = leads;
         this.evenements = evenements;
         this.tentatives = tentatives;
         this.morts = morts;
+        this.actions = actions;
     }
 
     @Transactional(readOnly = true)
@@ -60,12 +70,24 @@ public class LeadTimelineService {
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
                 .forEach(tentative -> entrees.add(synchronisation(tentative)));
 
+        List<LeadAction> journal = actions.findByLeadIdOrderByCreatedAtAsc(leadId);
+        Set<UUID> mortsDejaJournalisees = journal.stream()
+                .map(LeadAction::getDeadLetterId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
         morts.findByLeadIdOrderByDeadAtAsc(leadId).forEach(mort -> {
             entrees.add(mort(mort));
-            if (mort.getReplayedAt() != null) {
+            // Le rejeu derive de dead_letter ne sert plus que l'historique anterieur a V8 :
+            // des qu'une ligne de journal reference cette mort, c'est elle qui parle, et
+            // elle en dit plus — le motif, et l'issue.
+            if (mort.getReplayedAt() != null
+                    && !mortsDejaJournalisees.contains(mort.getId())) {
                 entrees.add(rejeu(mort));
             }
         });
+
+        journal.forEach(action -> entrees.add(action(action)));
 
         return ordonne(entrees);
     }
@@ -168,6 +190,47 @@ public class LeadTimelineService {
         return new TimelineEntry(
                 TimelineEventType.REJEU, mort.getReplayedAt(), TimelineOutcome.NEUTRE,
                 Map.copyOf(details));
+    }
+
+    /**
+     * Un geste humain. Les cles de {@code details} sont des faits, jamais des phrases : la
+     * mise en francais appartient au template Angular.
+     */
+    private TimelineEntry action(LeadAction action) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("par", action.getActor());
+        details.put("motif", action.getReason());
+        if (action.getPreviousSalesRepId() != null) {
+            details.put("ancienCommercial", String.valueOf(action.getPreviousSalesRepId()));
+        }
+        if (action.getNewSalesRepId() != null) {
+            details.put("nouveauCommercial", String.valueOf(action.getNewSalesRepId()));
+        }
+        if (action.getDetail() != null) {
+            details.put("erreur", action.getDetail());
+        }
+        return new TimelineEntry(
+                typeDe(action.getAction()),
+                action.getCreatedAt(),
+                action.getOutcome() == LeadActionOutcome.SUCCES
+                        ? TimelineOutcome.NEUTRE
+                        : TimelineOutcome.ECHEC,
+                Map.copyOf(details));
+    }
+
+    /**
+     * Correspondance un pour un avec {@link TimelineEventType} : un ecart n'est pas un
+     * rejeu, meme s'il suit la meme mort — l'un abandonne le message, l'autre le republie,
+     * et confondre les deux a l'ecran dirait un succes la ou il y a un renoncement. Ecrit en
+     * expression, sans branche par defaut, pour qu'une valeur ajoutee a
+     * {@link LeadActionType} ne compile plus tant qu'elle n'a pas sa place ici.
+     */
+    private TimelineEventType typeDe(LeadActionType type) {
+        return switch (type) {
+            case REATTRIBUTION -> TimelineEventType.REATTRIBUTION;
+            case REJEU -> TimelineEventType.REJEU;
+            case ECART -> TimelineEventType.ECART;
+        };
     }
 
     private TimelineEntry synchronisation(CrmSyncAttempt tentative) {

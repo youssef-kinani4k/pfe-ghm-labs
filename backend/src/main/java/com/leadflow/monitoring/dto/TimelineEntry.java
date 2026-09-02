@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * Un fait de la vie d'un lead.
  *
- * <p>Un record plat et typé plutot qu'une hierarchie scellee : les six types partagent la
+ * <p>Un record plat et typé plutot qu'une hierarchie scellee : les huit types partagent la
  * meme forme, et une hierarchie couterait une deserialisation polymorphe cote Angular pour
  * aucun gain.
  *
