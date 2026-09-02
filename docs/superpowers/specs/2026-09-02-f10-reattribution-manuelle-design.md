@@ -94,9 +94,13 @@ qu'on vient de lire.
 effacer l'histoire ; le journal affiche l'identifiant tel quel.
 
 **`outcome` et `detail` existent pour le rejeu**, et c'est ce que `dead_letter` ne retient pas
-aujourd'hui. **`dead_letter_id`** est nul pour une reattribution ; sans lui, la timeline
-afficherait deux fois un meme rejeu — une fois derive de `dead_letter.replayed_at`, une fois
-lu dans le journal.
+aujourd'hui. Une reattribution vaut toujours `SUCCES` — la ligne n'est ecrite qu'apres le
+commit de l'ecriture, donc un echec ne produit aucune ligne ; `ECHEC` ne concerne que le
+rejeu d'un message mort, et `detail` porte alors le message d'erreur.
+
+**`dead_letter_id`** est nul pour une reattribution ; sans lui, la timeline afficherait deux
+fois un meme rejeu — une fois derive de `dead_letter.replayed_at`, une fois lu dans le
+journal.
 
 ### L'index unique de `dead_letter`, paye au passage
 
@@ -223,7 +227,7 @@ En TDD, comme le reste du projet.
 
 | Classe | Ce qui est verrouille |
 | --- | --- |
-| `ReattributionServiceTest` | les quatre refus et le cas passant |
+| `ReattributionServiceTest` | les quatre refus — lead sans commercial, commercial inconnu ou inactif, commercial d'une autre boutique, commercial deja en place — et le cas passant |
 | `RoutedLeadWriterTest` (etendu) | `reattribue` ne touche ni le statut ni `routed_at` |
 | `LeadActionJournalTest` | la ligne porte acteur, motif, les deux commerciaux |
 | `LeadReassignmentControllerTest` | 404 / 409 / 200, et l'acteur venant du `Principal` et non du corps |
