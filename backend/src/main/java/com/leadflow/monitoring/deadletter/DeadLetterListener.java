@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -35,12 +36,17 @@ public class DeadLetterListener {
     private static final Logger log = LoggerFactory.getLogger(DeadLetterListener.class);
 
     private final DeadLetterJournal journal;
+    private final DeadLetterRepository morts;
     private final ObjectMapper mapper;
     private final LeadStreamBroadcaster diffuseur;
 
     public DeadLetterListener(
-            DeadLetterJournal journal, ObjectMapper mapper, LeadStreamBroadcaster diffuseur) {
+            DeadLetterJournal journal,
+            DeadLetterRepository morts,
+            ObjectMapper mapper,
+            LeadStreamBroadcaster diffuseur) {
         this.journal = journal;
+        this.morts = morts;
         this.mapper = mapper;
         this.diffuseur = diffuseur;
     }
@@ -66,7 +72,24 @@ public class DeadLetterListener {
         motif.append(lisIdentifiants(corps, mort));
 
         mort.setFailureReason(motif.isEmpty() ? "Cause inconnue" : motif.toString());
-        DeadLetter ecrite = journal.enregistre(mort);
+        DeadLetter ecrite;
+        try {
+            ecrite = journal.enregistre(mort);
+        } catch (DataIntegrityViolationException doublon) {
+            // uq_dead_letter_lead_pending : la meme mort a deja ete journalisee. La
+            // livraison etant at-least-once, ce n'est pas une anomalie — on acquitte en
+            // rendant la ligne gagnante, sans rien rediffuser.
+            //
+            // Le rattrapage est ICI et non dans le journal : la violation remonte au flush,
+            // a l'interieur de la transaction REQUIRES_NEW, qui est alors marquee
+            // rollback-only — toute lecture faite dedans echouerait. Meme placement que
+            // LeadCaptureService autour de RawLeadEventWriter.insere.
+            log.info("Mort deja journalisee pour le lead {} : doublon acquitte",
+                    mort.getLeadId());
+            morts.findFirstByLeadIdAndStatus(mort.getLeadId(), DeadLetterStatus.PENDING)
+                    .orElseThrow(() -> doublon);
+            return;
+        }
         // Le flux ne repasse pas par le broker : c'est le meme processus.
         diffuseur.diffuseMort(vue(ecrite));
         log.info("Mort journalisee : file {}, cle {}", mort.getOriginQueue(), mort.getRoutingKey());
