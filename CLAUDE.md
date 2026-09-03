@@ -322,6 +322,29 @@ du client se voie.
 puis DLQ. C'est le seul echec du routage qui merite la DLQ, parce qu'un humain peut le
 reparer : activer un commercial, puis rejouer.
 
+**La reattribution manuelle vit ici, et elle ne publie aucun message.** `ReattributionService`
+ecrit directement — le tour de role n'etant pas idempotent, republier sur `lead.routed`
+decalerait la rotation et renverrait vers l'ERP un lead deja synchronise. Elle **ne touche ni
+le statut ni `routed_at`** : un lead `SYNCED` reattribue reste `SYNCED`, et la date d'origine
+de son attribution reste vraie. Elle **deplace en revanche le tour de role**, puisque celui-ci
+se lit dans `lead` et non dans un compteur — le nouveau titulaire vient d'etre servi.
+
+Quatre refus, tous en `409` (`ReattributionImpossibleException`) : lead sans commercial,
+commercial deja en place, commercial desactive, commercial d'une autre boutique. Le dernier
+n'est pas theorique — l'identifiant vient du client, et rien d'autre n'empecherait d'attribuer
+le lead d'une boutique au commercial d'une autre.
+
+Le service **n'est pas transactionnel**, comme `LeadRoutingService` : l'ecriture porte la
+sienne (`RoutedLeadWriter`) et le journal la sienne, ce qui permet de journaliser **apres** le
+commit. L'ordre inverse laisserait une ligne affirmant un changement qui n'a pas eu lieu ; le
+risque assume est symetrique et moindre — une panne entre les deux donne un lead reattribue
+sans trace.
+
+**`LeadActionJournal` est en `REQUIRES_NEW`**, et c'est ce qui fait qu'une ligne de journal
+survit au rollback de ce qu'elle raconte. C'est ce dont depend le rejeu en echec : il
+journalise **avant** de laisser partir l'exception, sans quoi la seule trace d'un rejeu rate
+disparaitrait avec lui.
+
 ### Monitoring — l'observateur
 
 Le contrat complet de l'API, avec exemples `curl` et reponses, vit dans
@@ -376,14 +399,20 @@ drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur no
 n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
 **La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
-recompose en lecture seule ce que le lead a vecu depuis quatre tables existantes —
-`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` — sans qu'aucune table
-d'evenements n'existe. Deux consequences a ne pas casser. **L'endpoint est separe du
-detail** parce que F10 devra rafraichir la seule chronologie apres une reattribution, sans
-refaire tout le detail. Et **une entree non datee garde sa place dans le pipeline** au lieu
-d'etre rejetee en tete ou en queue : c'est le cas de toute attribution anterieure a `V7`, et
-l'ordre des etapes est connu meme quand leur date ne l'est pas. Le service rend des faits
-typés, jamais des phrases — la mise en francais appartient au template Angular.
+recompose en lecture seule ce que le lead a vecu depuis cinq tables existantes —
+`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` et, depuis F10, `lead_action` —
+sans qu'aucune table d'evenements n'existe. Trois consequences a ne pas casser. **L'endpoint
+est separe du detail** parce que la fiche rafraichit la seule chronologie apres une
+reattribution, sans refaire tout le detail. **Une entree non datee garde sa place dans le
+pipeline** au lieu d'etre rejetee en tete ou en queue : c'est le cas de toute attribution
+anterieure a `V7`, et l'ordre des etapes est connu meme quand leur date ne l'est pas. Et **un
+rejeu n'est compte qu'une fois** : il est lisible dans `dead_letter.replayed_at` comme dans
+`lead_action`, et le service exclut la mort dont une action porte deja le `dead_letter_id`.
+
+Le service rend des faits typés, jamais des phrases — la mise en francais appartient au
+template Angular, qui tient la table des huit libelles dans `lead-timeline.ts`. Ajouter une
+valeur a `LeadActionType` ne compile plus tant qu'elle n'a pas sa place dans `typeDe(...)`,
+un `switch` d'expression sans branche par defaut.
 
 **Ajouter un endpoint de monitoring** = un `record` dans `monitoring/dto/`, une methode de
 service `@Transactional(readOnly = true)`, un controleur. Jamais d'entite en sortie.
@@ -457,7 +486,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Sept migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Huit migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -465,7 +494,20 @@ Sept migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
 (quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
-en silence) et `V7__lead_routed_at.sql` (date d'attribution au commercial).
+en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial) et
+`V8__lead_action.sql` (journal des gestes humains portes par un lead).
+
+**`V8` porte deux choses.** La table `lead_action` d'abord — qui a change quoi, quand, et
+**pourquoi** : `dead_letter` ne retenait d'un rejeu que `replayed_by` et `replayed_at`, jamais
+son motif ni son resultat. `lead_id` y est une vraie cle etrangere, contrairement a
+`dead_letter.lead_id`, parce qu'une action part toujours d'un lead qu'on vient de lire ;
+`previous_sales_rep_id` et `new_sales_rep_id` n'en sont pas, deliberement, pour qu'un
+commercial supprime n'efface pas l'histoire. Et l'index unique partiel
+`uq_dead_letter_lead_pending` ensuite — **la dette de F6, payee ici**. Il est partiel et non
+global : la livraison etant at-least-once, une meme mort livree deux fois ecrirait deux
+lignes, mais une seconde mort **apres** un rejeu qui a de nouveau echoue est un fait reel
+qu'il faut garder. Le restreindre aux lignes `PENDING` distingue ces deux cas, et aligne le
+schema sur le garde-fou deja ecrit en Java.
 
 **`V7` est nullable et sans remplissage retroactif**, deliberement. L'attribution n'etait
 datee nulle part avant F9, et `updated_at` ne la remplace pas : il vaut la date
@@ -665,9 +707,12 @@ adaptateurs de F5, le monitoring de F6 et la gestion des boutiques de F7.
 Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et dix ecrans Angular
 couvrent l'exploitation comme l'administration.
 
-Deux capacites meritent d'etre connues avant d'ouvrir le code, parce qu'elles ont ete des
+Trois capacites meritent d'etre connues avant d'ouvrir le code, parce qu'elles ont ete des
 manques longtemps : **ajouter une boutique ne demande plus la base** — c'est un formulaire, et
-le secret n'a jamais a etre chiffre a la main — et **regler un bareme non plus**.
+le secret n'a jamais a etre chiffre a la main —, **regler un bareme non plus**, et depuis F10
+**un lead se reattribue depuis sa fiche**, motif obligatoire, sans passer par un rejeu ni par
+`psql`. Le meme motif est desormais exige du rejeu et de l'ecart d'un message mort : les trois
+gestes humains laissent une trace dans `lead_action`, et la chronologie du lead les montre.
 
 Ce qui n'existe pas :
 
@@ -677,8 +722,11 @@ Ce qui n'existe pas :
   l'ecran, personne n'est prevenu.
 - **Aucun recalcul retroactif des scores** : changer un bareme ne touche pas les leads deja
   qualifies. Le badge se deplace, le score non — c'est voulu, mais cela surprend.
-- **Aucune reattribution manuelle** : un lead attribue au mauvais commercial ne se corrige
-  que par un rejeu depuis le journal des morts, ou en base.
+- **Une reattribution ne remonte pas jusqu'a l'ERP** : elle corrige LeadFlow, pas Dolibarr
+  ni Odoo. Un lead deja `SYNCED` garde son ancien responsable chez l'ERP, et le dialogue de
+  reattribution le dit a l'operateur plutot que de le laisser croire a une correction qui
+  n'a pas lieu. Propager demanderait une methode de mise a jour sur le port `CrmConnector`,
+  que le pivot n'expose pas.
 - **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
   Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
 - **Le modele de l'analyse d'intention est un reglage, pas une constante** : Google retire

@@ -194,15 +194,25 @@ Un identifiant inconnu rend `404` en `ProblemDetail` (RFC 7807).
 GET /api/leads/{id}/timeline
 ```
 
-Rend la liste ordonnée de tout ce que le lead a vécu, **dérivée en lecture seule** de quatre
+Rend la liste ordonnée de tout ce que le lead a vécu, **dérivée en lecture seule** de cinq
 tables : `raw_lead_event` (la capture), `lead` (la qualification et l'attribution),
-`crm_sync_attempt` (chaque tentative de synchronisation) et `dead_letter` (la mort et son
-éventuel rejeu). Rien n'est stocké : il n'existe pas de table d'événements.
+`crm_sync_attempt` (chaque tentative de synchronisation), `dead_letter` (la mort et son
+éventuel rejeu) et `lead_action` (les gestes humains). Rien n'est stocké : il n'existe pas de
+table d'événements.
 
 Chaque entrée porte quatre champs — `type` parmi `CAPTURE`, `QUALIFICATION`, `ATTRIBUTION`,
-`SYNC_ERP`, `MORT`, `REJEU` ; `at` ; `outcome` parmi `SUCCES`, `ECHEC`, `NEUTRE` ; et un
-`details` de chaînes. **Aucune phrase n'est composée côté serveur** : l'API rend des faits
-typés, le dashboard les met en français.
+`REATTRIBUTION`, `SYNC_ERP`, `MORT`, `REJEU`, `ECART` ; `at` ; `outcome` parmi `SUCCES`,
+`ECHEC`, `NEUTRE` ; et un `details` de chaînes. **Aucune phrase n'est composée côté serveur** :
+l'API rend des faits typés, le dashboard les met en français.
+
+**`ECART` n'est pas un `REJEU`.** Les deux suivent la même mort, mais l'un abandonne le
+message et l'autre le republie : les confondre annoncerait un traitement là où il y a eu
+renoncement.
+
+**Un rejeu n'apparaît qu'une fois.** Il est lisible à deux endroits — `dead_letter.replayed_at`
+et la ligne `lead_action` qui porte son motif — et le service exclut la mort dont une action
+porte déjà le `dead_letter_id`. Un rejeu antérieur à `V8` n'a pas de motif : il ressort de
+`dead_letter` seul, avec son seul `par`.
 
 **`at` peut être `null`, et l'absence est une information.** Une attribution antérieure à la
 migration `V7` n'a pas de date : `lead.routed_at` n'existait pas, et `updated_at` ne la
@@ -259,12 +269,70 @@ curl -s "http://localhost:8090/api/leads/6f1c.../timeline" -H "Authorization: Be
     "type": "REJEU",
     "at": "2026-08-31T10:03:41.002Z",
     "outcome": "NEUTRE",
-    "details": { "par": "admin" }
+    "details": { "par": "admin", "motif": "Broker revenu" }
+  },
+  {
+    "type": "REATTRIBUTION",
+    "at": "2026-08-31T11:40:12.310Z",
+    "outcome": "NEUTRE",
+    "details": {
+      "par": "admin",
+      "motif": "Depart en conge de Karim",
+      "ancienCommercial": "3f2a...",
+      "nouveauCommercial": "8b71..."
+    }
   }
 ]
 ```
 
 Un identifiant inconnu rend `404` en `ProblemDetail`, comme le détail.
+
+### Réattribuer un lead
+
+```
+POST /api/leads/{id}/reassign
+```
+
+Le seul endpoint de cette section qui **écrive**. Il vit dans `routing/` et non dans
+`monitoring/` — le chemin suit la ressource, le package suit la responsabilité : le choix du
+commercial appartient au routage depuis F4.
+
+```bash
+curl -s -X POST "http://localhost:8090/api/leads/6f1c.../reassign" \
+  -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json' \
+  -d '{"salesRepId":"8b71-...","reason":"Départ en congé de Karim"}' | jq
+```
+
+Le corps porte deux champs, tous deux obligatoires : `salesRepId` et `reason` (500 caractères
+au plus). **L'opérateur n'y figure pas** — il est lu dans le jeton. Un acteur transmis par le
+client ferait un journal falsifiable.
+
+La réponse est **la fiche complète rechargée**, le même `LeadDetail` que `GET /api/leads/{id}`.
+C'est délibéré : l'écran affiche ainsi l'état réellement enregistré, sans un aller-retour de
+plus qui pourrait montrer autre chose.
+
+Ce que le geste fait, et surtout ce qu'il ne fait pas :
+
+- il pose le nouveau commercial et écrit une ligne `lead_action` avec son motif ;
+- il **ne change ni le statut ni `routed_at`** — un lead `SYNCED` réattribué reste `SYNCED`,
+  et la date de sa première attribution reste vraie ;
+- il **ne publie aucun message** : le tour de rôle n'est pas idempotent, et republier sur
+  `lead.routed` renverrait vers l'ERP un lead déjà synchronisé ;
+- il **ne touche pas l'ERP**. Chez Dolibarr ou Odoo, le lead garde son ancien responsable. Le
+  dashboard avertit l'opérateur quand le lead est `SYNCED` ; un client qui appelle l'API
+  directement doit le savoir.
+- il **déplace le tour de rôle** en revanche, puisque celui-ci se lit dans `lead` : le nouveau
+  titulaire vient d'être servi et passera en dernier.
+
+Quatre réponses à connaître :
+
+| Code  | Sens                                                                            |
+| ----- | ------------------------------------------------------------------------------- |
+| `400` | `salesRepId` absent, ou `reason` vide ou au-delà de 500 caractères               |
+| `404` | Le lead n'existe pas                                                            |
+| `409` | Réattribution impossible : lead sans commercial, commercial déjà en place, commercial désactivé, ou commercial d'une autre boutique |
+
+Le `409` porte la phrase du refus dans le `detail` du `ProblemDetail`.
 
 ---
 
@@ -417,19 +485,31 @@ POST /api/dead-letters/{id}/replay
 POST /api/dead-letters/{id}/discard
 ```
 
+**Les deux exigent un corps depuis F10** : `{"reason": "…"}`, non vide, 500 caractères au
+plus. Un corps vide rend `400`. Le motif n'est pas une formalité — il est écrit dans
+`lead_action` et ressort dans la chronologie du lead, et un journal dont la moitié des lignes
+n'ont pas de motif ne sert à rien six mois plus tard.
+
 ```bash
 curl -s -X POST "http://localhost:8090/api/dead-letters/9c02.../replay" \
-  -H "Authorization: Bearer $JETON" -i
+  -H "Authorization: Bearer $JETON" -H 'Content-Type: application/json' \
+  -d '{"reason":"Broker revenu"}' -i
 ```
 
 Le rejeu republie la charge d'origine sur la file d'où elle venait, marque la ligne `REPLAYED`
 et **retient qui l'a demandé** (`replayedBy`, tiré du jeton). `discard` marque `DISCARDED`,
 définitivement.
 
-Trois réponses à connaître :
+**Un rejeu qui échoue laisse quand même sa trace.** La ligne `lead_action` est écrite en
+`REQUIRES_NEW` avant que l'erreur ne remonte : elle survit au rollback, avec `outcome`
+`ECHEC` et la cause dans son `detail`. Sans cela, la seule trace d'un rejeu raté
+disparaîtrait avec lui.
+
+Quatre réponses à connaître :
 
 | Code  | Sens                                                                       |
 | ----- | -------------------------------------------------------------------------- |
+| `400` | Le motif est absent, vide, ou dépasse 500 caractères                        |
 | `409` | La ligne n'est plus `PENDING` — elle a été traitée ailleurs, sans doute par un autre onglet |
 | `503` | Le broker est injoignable. **La ligne reste `PENDING`** et le geste réussira plus tard |
 | `404` | La ligne n'existe pas                                                       |
