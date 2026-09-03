@@ -35,5 +35,26 @@ CREATE INDEX idx_lead_action_lead ON lead_action (lead_id, created_at);
 -- un fait reel qu'il faut garder. Restreindre aux lignes PENDING distingue ces deux cas, et
 -- aligne le schema sur le garde-fou deja ecrit en Java : QualifiedLeadRelay et
 -- RoutedLeadRelay ignorent les leads portant une mort PENDING.
+-- Le nettoyage prealable, sans lequel l'index ci-dessous refuse de se creer sur toute base
+-- ayant de l'historique. Le cas s'observe en developpement : un meme lead peut porter deux
+-- morts PENDING, de charges utiles differentes, mortes a quelques secondes d'ecart sans
+-- rejeu entre elles — le relais republie avant que la premiere mort ne soit journalisee, et
+-- le message republie meurt a son tour. Le garde-fou Java est au mieux, pas atomique.
+--
+-- On garde la mort la plus recente : c'est celle dont la charge utile serait rejouee, et
+-- c'est la seule que l'operateur ait a traiter. Les plus anciennes passent DISCARDED plutot
+-- que d'etre supprimees — le journal des morts est une trace, et l'effacer ferait disparaitre
+-- l'incident au lieu de le clore. C'est le meme geste que le rattrapage deja fait a
+-- l'execution par DeadLetterListener depuis F10.
+UPDATE dead_letter d
+   SET status = 'DISCARDED'
+ WHERE d.status = 'PENDING'
+   AND d.lead_id IS NOT NULL
+   AND EXISTS (SELECT 1
+                 FROM dead_letter plus_recente
+                WHERE plus_recente.lead_id = d.lead_id
+                  AND plus_recente.status = 'PENDING'
+                  AND plus_recente.dead_at > d.dead_at);
+
 CREATE UNIQUE INDEX uq_dead_letter_lead_pending
     ON dead_letter (lead_id) WHERE lead_id IS NOT NULL AND status = 'PENDING';
