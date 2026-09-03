@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { LeadDetail, LeadSummary, TimelineEntry } from '../models/lead';
+import { LeadDetail, LeadSummary, ReassignmentForm, TimelineEntry } from '../models/lead';
 import { PageResponse } from '../models/page-response';
 import { IntentSource, LeadStatus } from '../models/monitoring';
 
@@ -74,5 +74,13 @@ export class LeadApi {
    */
   timeline(id: string) {
     return this.http.get<TimelineEntry[]>(`/api/leads/${id}/timeline`);
+  }
+
+  /**
+   * Reattribution manuelle. Le backend rend la fiche rechargee : l'ecran affiche donc l'etat
+   * reellement enregistre, sans un aller-retour de plus qui pourrait montrer autre chose.
+   */
+  reattribue(id: string, formulaire: ReassignmentForm) {
+    return this.http.post<LeadDetail>(`/api/leads/${id}/reassign`, formulaire);
   }
 }

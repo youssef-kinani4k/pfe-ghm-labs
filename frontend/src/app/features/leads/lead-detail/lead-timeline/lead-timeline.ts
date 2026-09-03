@@ -5,7 +5,7 @@ import { LeadApi } from '../../../../core/api/lead-api';
 import { TimelineEntry, TimelineEventType, TimelineOutcome } from '../../../../core/models/lead';
 
 /**
- * Libelle et icone de chacun des six faits, en un seul endroit — meme parti que
+ * Libelle et icone de chacun des huit faits, en un seul endroit — meme parti que
  * `StatusBadge` : le vocabulaire d'interface ne se repete pas dans un template.
  *
  * Les icones sont des ligatures Material Symbols Outlined, police servie par l'origine :
@@ -16,9 +16,14 @@ const FAITS: Record<TimelineEventType, { libelle: string; icone: string }> = {
   CAPTURE: { libelle: 'Capture', icone: 'download' },
   QUALIFICATION: { libelle: 'Qualification', icone: 'psychology' },
   ATTRIBUTION: { libelle: 'Attribution', icone: 'person_add' },
+  REATTRIBUTION: { libelle: 'Reattribution', icone: 'swap_horiz' },
   SYNC_ERP: { libelle: 'Synchronisation ERP', icone: 'sync' },
   MORT: { libelle: 'Message mort', icone: 'report' },
   REJEU: { libelle: 'Rejeu', icone: 'replay' },
+  // Ecarter n'est pas rejouer : le message est abandonne, pas republie. Le libelle et
+  // l'icone disent ce renoncement, sans quoi l'ecran annoncerait un traitement qui n'a
+  // pas eu lieu.
+  ECART: { libelle: 'Ecart', icone: 'block' },
 };
 
 /** Le mot qui double la couleur. `NEUTRE` n'en a pas : il n'y a rien a signaler. */
@@ -42,7 +47,12 @@ const DETAILS: Record<string, string> = {
   connecteur: 'connecteur',
   commercialId: 'commercial',
   file: 'file',
-  par: 'rejoue par',
+  // « par » et non « rejoue par » : la meme cle porte desormais l'auteur d'un rejeu, d'un
+  // ecart et d'une reattribution.
+  par: 'par',
+  motif: 'motif',
+  ancienCommercial: 'ancien commercial',
+  nouveauCommercial: 'nouveau commercial',
 };
 
 /**

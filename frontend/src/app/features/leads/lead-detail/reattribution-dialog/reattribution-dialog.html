@@ -1,0 +1,65 @@
+<h2 mat-dialog-title>Réattribuer ce lead</h2>
+
+<mat-dialog-content class="reattribution">
+  @if (avertitSurERP()) {
+    <!-- L'icone double le mot et la couleur ne porte jamais seule l'information : cet
+         avertissement doit rester lisible sur un ecran imprime en noir et blanc. -->
+    <p class="reattribution__avertissement">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>
+        Ce lead est déjà synchronisé. L'ERP conservera l'ancien responsable : seul LeadFlow est
+        corrigé.
+      </span>
+    </p>
+  }
+
+  @if (chargement()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Chargement des commerciaux" />
+  }
+
+  <mat-form-field appearance="outline">
+    <mat-label>Nouveau commercial</mat-label>
+    <mat-select
+      required
+      [disabled]="aucunCandidat()"
+      [ngModel]="commercialChoisi()"
+      (ngModelChange)="commercialChoisi.set($event)"
+      name="commercial"
+    >
+      @for (candidat of candidats(); track candidat.id) {
+        <mat-option [value]="candidat.id">{{ candidat.fullName }}</mat-option>
+      }
+    </mat-select>
+    @if (aucunCandidat()) {
+      <mat-hint>Aucun autre commercial actif dans cette boutique.</mat-hint>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Motif</mat-label>
+    <textarea
+      matInput
+      required
+      rows="3"
+      maxlength="500"
+      [ngModel]="motif()"
+      (ngModelChange)="motif.set($event)"
+      name="motif"
+    ></textarea>
+    <mat-hint>Obligatoire : il est conservé dans la chronologie du lead.</mat-hint>
+  </mat-form-field>
+
+  @if (erreur(); as message) {
+    <p class="reattribution__erreur" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ message }}</span>
+    </p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton type="button" (click)="annule()">Annuler</button>
+  <button matButton="filled" type="button" [disabled]="!valide() || enCours()" (click)="confirme()">
+    Réattribuer
+  </button>
+</mat-dialog-actions>

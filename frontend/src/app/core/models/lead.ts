@@ -88,8 +88,22 @@ export interface LeadDetail {
   chaud: boolean;
 }
 
+/**
+ * Les huit faits que la chronologie sait porter, dans l'ordre du pipeline — le meme que
+ * celui de l'enumeration backend, qui s'en sert pour placer une entree non datee.
+ *
+ * `REATTRIBUTION` suit `ATTRIBUTION` et `ECART` suit `REJEU` : ecarter n'est pas rejouer,
+ * et confondre les deux dirait un message republie la ou il a ete abandonne.
+ */
 export type TimelineEventType =
-  'CAPTURE' | 'QUALIFICATION' | 'ATTRIBUTION' | 'SYNC_ERP' | 'MORT' | 'REJEU';
+  | 'CAPTURE'
+  | 'QUALIFICATION'
+  | 'ATTRIBUTION'
+  | 'REATTRIBUTION'
+  | 'SYNC_ERP'
+  | 'MORT'
+  | 'REJEU'
+  | 'ECART';
 
 export type TimelineOutcome = 'SUCCES' | 'ECHEC' | 'NEUTRE';
 
@@ -102,4 +116,15 @@ export interface TimelineEntry {
   at: string | null;
   outcome: TimelineOutcome;
   details: Record<string, string>;
+}
+
+/**
+ * Le corps de `POST /api/leads/{id}/reassign`.
+ *
+ * L'operateur n'y figure pas : le backend le lit dans le jeton. Un acteur transmis par le
+ * client ferait un journal falsifiable.
+ */
+export interface ReassignmentForm {
+  salesRepId: string;
+  reason: string;
 }
