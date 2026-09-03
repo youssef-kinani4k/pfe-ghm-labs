@@ -13,35 +13,5 @@
   width: 100%;
 }
 
-// Les deux messages partagent la meme forme — icone, puis phrase — et ne different que par
-// leur couleur de statut, prise dans les jetons metier de styles.scss : ils gardent le meme
-// sens ici que dans les listes et les badges.
-.reattribution__avertissement,
-.reattribution__erreur {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--lf-space-1);
-  margin: 0;
-  padding: var(--lf-space-2);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.reattribution__avertissement {
-  color: var(--lf-attente);
-  background: var(--lf-attente-fond);
-}
-
-.reattribution__erreur {
-  color: var(--lf-echec);
-  background: var(--lf-echec-fond);
-}
-
-.reattribution__avertissement mat-icon,
-.reattribution__erreur mat-icon {
-  flex: none;
-  font-size: 1.25rem;
-  width: 1.25rem;
-  height: 1.25rem;
-}
+// Les deux bandeaux — avertissement ERP et refus serveur — viennent de `.lf-bandeau` dans
+// styles.scss : c'est une convention de dialogue, pas une decoration de cet ecran.

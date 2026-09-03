@@ -4,7 +4,7 @@
   @if (avertitSurERP()) {
     <!-- L'icone double le mot et la couleur ne porte jamais seule l'information : cet
          avertissement doit rester lisible sur un ecran imprime en noir et blanc. -->
-    <p class="reattribution__avertissement">
+    <p class="lf-bandeau lf-bandeau--attente">
       <mat-icon aria-hidden="true">warning</mat-icon>
       <span>
         Ce lead est déjà synchronisé. L'ERP conservera l'ancien responsable : seul LeadFlow est
@@ -50,7 +50,7 @@
   </mat-form-field>
 
   @if (erreur(); as message) {
-    <p class="reattribution__erreur" role="alert">
+    <p class="lf-bandeau lf-bandeau--echec" role="alert">
       <mat-icon aria-hidden="true">error</mat-icon>
       <span>{{ message }}</span>
     </p>

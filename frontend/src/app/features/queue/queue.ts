@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -15,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { DeadLetterApi, DeadLetterQuery } from '../../core/api/dead-letter-api';
 import { QueueApi } from '../../core/api/queue-api';
 import { DeadLetterStatus, DeadLetterView, QueuesView } from '../../core/models/monitoring';
+import { MotifData, MotifDialog } from '../../shared/motif-dialog/motif-dialog';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 
 /**
@@ -47,6 +49,7 @@ import { StatusBadge } from '../../shared/status-badge/status-badge';
 export class Queue implements OnInit {
   private readonly queueApi = inject(QueueApi);
   private readonly api = inject(DeadLetterApi);
+  private readonly dialogue = inject(MatDialog);
 
   readonly colonnes = [
     'selection',
@@ -134,17 +137,25 @@ export class Queue implements OnInit {
   rejoue(mort: DeadLetterView): void {
     // L'avertissement vient du serveur : la reattribution est une consequence d'une
     // decision de F4 — le tour de role n'est pas idempotent — pas une regle d'ecran.
-    if (mort.replayWarning && !confirm(`${mort.replayWarning}\n\nRejouer quand meme ?`)) {
-      return;
-    }
-    this.appelle(this.api.rejoue(mort.id), 'Message rejoue.');
+    this.demandeUnMotif(
+      {
+        titre: 'Rejouer ce message',
+        avertissement: mort.replayWarning ?? undefined,
+        action: 'Rejouer',
+      },
+      (motif) => this.appelle(this.api.rejoue(mort.id, motif), 'Message rejoue.'),
+    );
   }
 
   ecarte(mort: DeadLetterView): void {
-    if (!confirm('Ecarter ce message ? Il ne sera plus rejouable.')) {
-      return;
-    }
-    this.appelle(this.api.ecarte(mort.id), 'Message ecarte.');
+    this.demandeUnMotif(
+      {
+        titre: 'Ecarter ce message',
+        avertissement: 'Il ne sera plus rejouable.',
+        action: 'Ecarter',
+      },
+      (motif) => this.appelle(this.api.ecarte(mort.id, motif), 'Message ecarte.'),
+    );
   }
 
   /**
@@ -159,20 +170,45 @@ export class Queue implements OnInit {
     if (identifiants.length === 0) {
       return;
     }
-    if (!confirm(`Rejouer ${identifiants.length} message(s) ?`)) {
-      return;
-    }
-    let restants = identifiants.length;
-    let echecs = 0;
-    for (const id of identifiants) {
-      this.api.rejoue(id).subscribe({
-        next: () => this.termine(--restants, echecs),
-        error: () => {
-          echecs += 1;
-          this.termine(--restants, echecs);
-        },
+    // Un seul motif pour tout le lot, et non un par ligne : on rejoue une selection parce
+    // qu'on a compris une cause commune, et redemander la meme phrase a chaque ligne la
+    // ferait ecrire au hasard des la troisieme.
+    this.demandeUnMotif(
+      {
+        titre: `Rejouer ${identifiants.length} message(s)`,
+        avertissement: 'Le meme motif sera consigne pour toute la selection.',
+        action: 'Rejouer',
+      },
+      (motif) => {
+        let restants = identifiants.length;
+        let echecs = 0;
+        for (const id of identifiants) {
+          this.api.rejoue(id, motif).subscribe({
+            next: () => this.termine(--restants, echecs),
+            error: () => {
+              echecs += 1;
+              this.termine(--restants, echecs);
+            },
+          });
+        }
+      },
+    );
+  }
+
+  /**
+   * Le motif remplace le `confirm()` du navigateur : il confirme le geste et le justifie
+   * d'un seul mouvement, la ou la boite native ne rendait qu'un oui ou un non. Une fermeture
+   * sans motif — annulation, echappement, clic hors du cadre — n'appelle rien.
+   */
+  private demandeUnMotif(donnees: MotifData, suite: (motif: string) => void): void {
+    this.dialogue
+      .open<MotifDialog, MotifData, string>(MotifDialog, { width: '30rem', data: donnees })
+      .afterClosed()
+      .subscribe((motif) => {
+        if (motif) {
+          suite(motif);
+        }
       });
-    }
   }
 
   private termine(restants: number, echecs: number): void {

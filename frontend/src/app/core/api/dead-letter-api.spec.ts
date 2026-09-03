@@ -34,21 +34,25 @@ describe('DeadLetterApi', () => {
     requete.flush({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 });
   });
 
-  it('rejoue une ligne par un POST unitaire', () => {
-    api.rejoue('abc').subscribe();
+  it('rejoue une ligne par un POST unitaire, motif compris', () => {
+    api.rejoue('abc', 'Broker revenu').subscribe();
 
     // Pas d'endpoint de rejeu en masse : un rejeu de masse sur un incident non compris
     // multiplie l'incident. L'ecran boucle sur une selection explicite.
     const requete = httpMock.expectOne('/api/dead-letters/abc/replay');
     expect(requete.request.method).toBe('POST');
+    // Le corps, et pas seulement le code retour : le serveur refuse un motif absent en
+    // 400 depuis F10, et un corps vide passerait ce test s'il n'assertait que la methode.
+    expect(requete.request.body).toEqual({ reason: 'Broker revenu' });
     requete.flush(null);
   });
 
-  it('ecarte une ligne', () => {
-    api.ecarte('abc').subscribe();
+  it('ecarte une ligne, motif compris', () => {
+    api.ecarte('abc', 'Doublon').subscribe();
 
     const requete = httpMock.expectOne('/api/dead-letters/abc/discard');
     expect(requete.request.method).toBe('POST');
+    expect(requete.request.body).toEqual({ reason: 'Doublon' });
     requete.flush(null);
   });
 });
