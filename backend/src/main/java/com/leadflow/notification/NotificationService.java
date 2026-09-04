@@ -128,10 +128,11 @@ public class NotificationService {
                 commercial.getEmail(),
                 nomComplet(lead),
                 lead.getEmail(),
+                lead.getPhone(),
                 lead.getCompanyName(),
                 lead.getScore(),
                 lead.getDetectedIntent(),
-                proprietes.urlDe(lead.getId()));
+                lead.getMessage());
     }
 
     /**

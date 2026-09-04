@@ -11,7 +11,6 @@ import com.leadflow.notification.NotificationException;
 import com.leadflow.notification.model.NotificationLead;
 import jakarta.mail.internet.MimeMessage;
 import java.time.Duration;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -20,7 +19,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *
  * <p>Le test <b>asserte le contenu du message</b>, et pas seulement l'absence d'exception :
  * c'est le parti des adaptateurs ERP, qui assertent les corps envoyes et non les codes
- * retour. Un gabarit qui oublierait le score ou l'URL de la fiche passerait sans cela.
+ * retour. Un gabarit qui oublierait le score ou le telephone passerait sans cela.
  */
 class CanalSmtpTest {
 
@@ -28,14 +27,11 @@ class CanalSmtpTest {
     static final GreenMailExtension SERVEUR =
             new GreenMailExtension(ServerSetupTest.SMTP).withPerMethodLifecycle(true);
 
-    private static final UUID LEAD_ID = UUID.fromString("0198f3c2-0000-7000-8000-000000000042");
-
     private static CanalSmtp canalVers(String hote, int port) {
         return new CanalSmtp(new NotificationProperties(
                 new NotificationProperties.Smtp(
                         true, hote, port, null, null, "leadflow@agence.test",
-                        Duration.ofSeconds(3)),
-                "http://localhost:4200/leads/{id}"));
+                        Duration.ofSeconds(3))));
     }
 
     private static CanalSmtp canal() {
@@ -45,7 +41,8 @@ class CanalSmtpTest {
     private static NotificationLead unLead() {
         return new NotificationLead(
                 "Karim Idrissi", "karim@demo.test", "Sara Benali", "sara@rif.test",
-                "Rif Logistics", 92, "DEVIS", "http://localhost:4200/leads/" + LEAD_ID);
+                "+212600000000", "Rif Logistics", 92, "DEVIS",
+                "Je souhaite un devis urgent pour 80 postes");
     }
 
     @Test
@@ -64,7 +61,23 @@ class CanalSmtpTest {
                 .contains("92")
                 .contains("Rif Logistics")
                 .contains("DEVIS")
-                .contains(LEAD_ID.toString());
+                // Ce dont un commercial a besoin pour rappeler, et qui manquait : le
+                // telephone du prospect et ce qu'il a ecrit.
+                .contains("+212600000000")
+                .contains("Je souhaite un devis urgent pour 80 postes");
+    }
+
+    @Test
+    void neCiteAucunLienVersLeDashboard() {
+        canal().envoie(unLead());
+
+        // Le commercial n'a aucun compte sur le dashboard : c'est une console d'agence, un
+        // seul modele d'utilisateur et aucun role. Un lien l'enverrait sur un ecran de
+        // connexion qu'il ne peut pas franchir, et un lien mort dans une alerte apprend
+        // surtout a ignorer les suivantes.
+        assertThat(GreenMailUtil.getBody(SERVEUR.getReceivedMessages()[0]))
+                .doesNotContain("localhost:4200")
+                .doesNotContain("/leads/");
     }
 
     @Test
@@ -73,8 +86,8 @@ class CanalSmtpTest {
         // intention peuvent etre nuls. Un gabarit qui les concatenerait sans precaution
         // enverrait « null » a un commercial.
         canal().envoie(new NotificationLead(
-                "Karim Idrissi", "karim@demo.test", null, "sara@rif.test", null, 80, null,
-                "http://localhost:4200/leads/" + LEAD_ID));
+                "Karim Idrissi", "karim@demo.test", null, "sara@rif.test", null, null, 80,
+                null, null));
 
         MimeMessage recu = SERVEUR.getReceivedMessages()[0];
         assertThat(recu.getSubject()).doesNotContain("null");

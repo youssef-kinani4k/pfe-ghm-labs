@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.leadflow.config.NotificationProperties;
 import com.leadflow.notification.model.NotificationLead;
 import java.time.Duration;
-import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -63,16 +62,15 @@ class CanalSmtpIntegrationTest {
                 "Relais SMTP non configure : definir LEADFLOW_SMTP_HOST et "
                         + "LEADFLOW_SMTP_DESTINATAIRE_DE_TEST");
 
-        CanalSmtp canal = new CanalSmtp(new NotificationProperties(
-                config, "http://localhost:4200/leads/{id}"));
+        CanalSmtp canal = new CanalSmtp(new NotificationProperties(config));
 
         // Aucune assertion sur le contenu : elle est deja faite contre GreenMail. Ce qui
         // s'eprouve ici, c'est que le relais ACCEPTE — donc l'authentification, le domaine
         // d'expedition et le reseau sortant.
         canal.envoie(new NotificationLead(
                 "Karim Idrissi", destinataire, "Sara Benali", "sara@rif.test",
-                "Rif Logistics", 92, "DEVIS",
-                "http://localhost:4200/leads/" + UUID.randomUUID()));
+                "+212600000000", "Rif Logistics", 92, "DEVIS",
+                "Je souhaite un devis urgent pour 80 postes"));
 
         assertThat(canal.identifiant()).isEqualTo("smtp");
     }

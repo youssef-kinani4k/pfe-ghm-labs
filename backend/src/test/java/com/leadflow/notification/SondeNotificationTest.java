@@ -30,8 +30,7 @@ class SondeNotificationTest {
         NotificationProperties proprietes = new NotificationProperties(
                 new NotificationProperties.Smtp(
                         true, hote, port, null, null, "leadflow@agence.test",
-                        Duration.ofSeconds(3)),
-                "http://localhost:4200/leads/{id}");
+                        Duration.ofSeconds(3)));
         return new SondeNotification(new CanalSmtp(proprietes), proprietes);
     }
 

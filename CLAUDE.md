@@ -394,6 +394,14 @@ seuil. `SondeNotification` eprouve la configuration depuis l'ecran « Parametres
 un **vrai** message d'essai — un diagnostic qui ne prouverait que l'ouverture du port ne
 prouverait rien — et n'ecrit aucune ligne de `notification_attempt`.
 
+**L'alerte ne cite aucun lien vers le dashboard**, et porte a la place le telephone du
+prospect et son message. Le commercial n'a **aucun compte** sur la console — un seul modele
+d'utilisateur, aucun role — donc un lien l'enverrait sur un ecran de connexion qu'il ne peut
+pas franchir, et un lien mort dans une alerte apprend surtout a ignorer les suivantes. Un
+test le verrouille. Pointer vers l'ERP serait la bonne reponse a terme, le lead y etant deja
+et le commercial y ayant un vrai compte, mais construire cette URL demanderait au port
+`CrmConnector` de la fournir.
+
 **Ajouter un canal** = une classe `@Component` implementant `CanalDeNotification`, dans son
 propre sous-package. Aucun `switch`, aucun autre package a modifier — et **aucun terme propre
 a un canal dans `NotificationLead`**, sans quoi la generalisation est perdue exactement comme
@@ -533,7 +541,6 @@ Cinq variables gouvernent l'instance, plus celles du relais d'alerte :
 | `LEADFLOW_SMTP_USERNAME`       | Identifiant du relais, si celui-ci en demande un         |
 | `LEADFLOW_SMTP_PASSWORD`       | Son mot de passe                                         |
 | `LEADFLOW_SMTP_FROM`           | Adresse d'expedition des alertes                         |
-| `LEADFLOW_URL_FICHE`           | Gabarit de l'URL citee dans l'alerte, `{id}` remplace    |
 
 **`LEADFLOW_JWT_SECRET` n'a aucune valeur de repli en production, comme `LEADFLOW_MASTER_KEY`** :
 l'application refuse de demarrer plutot que de signer avec un secret devinable. Le controle

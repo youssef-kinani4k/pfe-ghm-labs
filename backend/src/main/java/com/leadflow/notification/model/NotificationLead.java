@@ -9,8 +9,12 @@ package com.leadflow.notification.model;
  * remonte dans ce record, un second canal (tache d'agenda dans l'ERP, webhook sortant)
  * devient impossible sans reecriture.
  *
- * <p>{@code urlFiche} est un fait et non une decision de presentation : le commercial doit
- * pouvoir ouvrir le lead depuis l'alerte, quel que soit le canal qui le previent.
+ * <p><b>Aucun lien vers le dashboard n'est porte ici, et c'est delibere.</b> Le commercial
+ * n'y a aucun compte : la console est une console d'agence, un seul modele d'utilisateur et
+ * aucun role. Un lien l'enverrait sur un ecran de connexion qu'il ne peut pas franchir, et
+ * un lien mort dans une alerte apprend surtout a ignorer les suivantes. Le message doit donc
+ * porter <b>de quoi agir</b> — le telephone et ce que le prospect a ecrit — plutot que de
+ * renvoyer ailleurs.
  *
  * <p>Les champs du prospect autres que l'e-mail peuvent etre nuls : la qualification ne fait
  * echouer un lead que sur son email, tout le reste passe a {@code null} quand il est
@@ -21,8 +25,9 @@ public record NotificationLead(
         String adresseCommercial,
         String nomProspect,
         String emailProspect,
+        String telephoneProspect,
         String societeProspect,
         int score,
         String intention,
-        String urlFiche) {
+        String messageProspect) {
 }

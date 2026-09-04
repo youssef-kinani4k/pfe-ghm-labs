@@ -10,8 +10,12 @@ import com.leadflow.notification.model.NotificationLead;
  * comme la chronologie laisse ses libelles au template Angular. Un second canal ecrira son
  * propre gabarit sans toucher a celui-ci.
  *
- * <p>Texte brut et non HTML : le message tient en six lignes, un client de messagerie le
- * rend correctement partout, et rien n'a a etre echappe.
+ * <p>Texte brut et non HTML : un client de messagerie le rend correctement partout, et rien
+ * n'a a etre echappe.
+ *
+ * <p><b>Il ne cite aucun lien vers le dashboard</b>, et porte a la place de quoi agir : le
+ * telephone du prospect et son message. Le commercial n'a pas de compte sur la console — un
+ * lien l'enverrait sur un ecran de connexion qu'il ne peut pas franchir.
  *
  * <p>Tous les champs du prospect sauf son adresse peuvent etre nuls — la qualification ne
  * fait echouer un lead que sur son email. Chaque ligne est donc conditionnelle, et jamais
@@ -39,11 +43,19 @@ final class GabaritMessage {
 
         ligne(corps, "Prospect", lead.nomProspect());
         ligne(corps, "E-mail", lead.emailProspect());
+        ligne(corps, "Telephone", lead.telephoneProspect());
         ligne(corps, "Societe", lead.societeProspect());
         ligne(corps, "Intention", lead.intention());
         ligne(corps, "Score", String.valueOf(lead.score()));
 
-        corps.append("\nLa fiche complete : ").append(lead.urlFiche()).append('\n');
+        // Ce que le prospect a ecrit, en entier et cite tel quel. C'est la seule chose du
+        // message qui ne soit pas un fait derive, et souvent la seule qui dise quoi lui
+        // repondre.
+        if (lead.messageProspect() != null && !lead.messageProspect().isBlank()) {
+            corps.append("\nCe que le prospect a ecrit :\n");
+            corps.append(lead.messageProspect().trim()).append('\n');
+        }
+
         corps.append("\n-- \nLeadFlow\n");
         return corps.toString();
     }

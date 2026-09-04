@@ -1,7 +1,6 @@
 package com.leadflow.config;
 
 import java.time.Duration;
-import java.util.UUID;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -17,17 +16,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * repli</b>. Un repli pointant vers un serveur imaginaire ferait echouer chaque lead chaud
  * en developpement et remplirait la DLQ de morts sans interet.
  *
- * @param urlFiche gabarit de l'adresse de la fiche du lead, {@code {id}} etant remplace.
- *     C'est un fait et non une decision de presentation : le commercial doit pouvoir ouvrir
- *     son lead, quel que soit le canal qui le previent.
+ * <p>Aucune adresse de dashboard ici : les alertes n'en citent pas. Le commercial n'a pas de
+ * compte sur la console, donc un lien l'enverrait sur un ecran de connexion infranchissable.
  */
 @ConfigurationProperties(prefix = "leadflow.notification")
-public record NotificationProperties(Smtp smtp, String urlFiche) {
-
-    /** L'adresse de la fiche d'un lead, prete a etre citee par un canal. */
-    public String urlDe(UUID leadId) {
-        return urlFiche.replace("{id}", leadId.toString());
-    }
+public record NotificationProperties(Smtp smtp) {
 
     /**
      * @param enabled eteint l'envoi sans effacer les reglages

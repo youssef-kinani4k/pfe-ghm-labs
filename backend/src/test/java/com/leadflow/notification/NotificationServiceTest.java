@@ -113,6 +113,8 @@ class NotificationServiceTest {
         lead.setFirstName("Sara");
         lead.setLastName("Benali");
         lead.setDetectedIntent("DEVIS");
+        lead.setPhone("+212600000000");
+        lead.setMessage("Je souhaite un devis urgent pour 80 postes");
         lead.setAssignedSalesRepId(commercialId);
 
         boutique = new Client();
@@ -142,8 +144,7 @@ class NotificationServiceTest {
                 new NotificationProperties(
                         new NotificationProperties.Smtp(
                                 true, "smtp.test", 587, "u", "p", "leadflow@agence.test",
-                                Duration.ofSeconds(10)),
-                        "http://localhost:4200/leads/{id}"));
+                                Duration.ofSeconds(10))));
     }
 
     private void boutiqueAvecSeuil(int seuil) {
@@ -242,7 +243,11 @@ class NotificationServiceTest {
         assertThat(envoye.societeProspect()).isEqualTo("Rif Logistics");
         assertThat(envoye.score()).isEqualTo(90);
         assertThat(envoye.intention()).isEqualTo("DEVIS");
-        assertThat(envoye.urlFiche()).isEqualTo("http://localhost:4200/leads/" + leadId);
+        // Le telephone et le message remplacent le lien vers le dashboard : le commercial
+        // n'y a pas de compte, donc il doit pouvoir rappeler sans cliquer nulle part.
+        assertThat(envoye.telephoneProspect()).isEqualTo("+212600000000");
+        assertThat(envoye.messageProspect())
+                .isEqualTo("Je souhaite un devis urgent pour 80 postes");
     }
 
     @Test

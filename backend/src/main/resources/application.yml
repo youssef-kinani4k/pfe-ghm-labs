@@ -154,8 +154,6 @@ leadflow:
       # Presence du consommateur de leadflow.leads.notify. Toujours vrai en production ;
       # la suite de tests le retire, comme les cinq autres consommateurs.
       enabled: true
-    # Adresse de la fiche citee dans l'alerte. {id} est remplace par l'identifiant du lead.
-    url-fiche: ${LEADFLOW_URL_FICHE:http://localhost:4200/leads/{id}}
     smtp:
       # Reglages globaux a l'instance : l'agence exploite un seul relais pour toutes ses
       # boutiques. Un hote absent rend le canal INERTE — l'application demarre, les leads
