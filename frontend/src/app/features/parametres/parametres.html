@@ -171,4 +171,68 @@
       </p>
     </mat-card-content>
   </mat-card>
+
+  <mat-card appearance="outlined" class="parametres__bloc">
+    <mat-card-header>
+      <mat-card-title>Alerte des commerciaux</mat-card-title>
+      <mat-card-subtitle>
+        Un commercial est prevenu par e-mail des qu'un lead depasse le seuil de notification de sa
+        boutique, une fois le lead synchronise dans l'ERP.
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <!-- Rien a enregistrer : le relais est un reglage d'instance, pose par l'environnement.
+           Ce que l'operateur peut faire, c'est verifier qu'il fonctionne — sans ce bouton, un
+           relais mal configure ne se decouvrirait qu'au premier lead chaud perdu. -->
+      <p class="parametres__note">
+        Le relais se regle par variables d'environnement, pas depuis cet ecran. Le seuil, lui, se
+        regle par boutique dans son bareme.
+      </p>
+
+      <mat-form-field appearance="outline" class="parametres__champ">
+        <mat-label>Adresse de test</mat-label>
+        <input
+          matInput
+          type="email"
+          autocomplete="email"
+          placeholder="vous@agence.test"
+          [ngModel]="destinataireDEssai()"
+          (ngModelChange)="destinataireDEssai.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        <mat-hint>Un vrai message part a cette adresse : c'est ce qui prouve la chaine.</mat-hint>
+      </mat-form-field>
+
+      <div class="parametres__actions">
+        <button
+          matButton
+          type="button"
+          (click)="testeLEnvoi()"
+          [disabled]="envoiEnCours() || destinataireDEssai().trim().length === 0"
+        >
+          <mat-icon>outgoing_mail</mat-icon>
+          Tester l'envoi
+        </button>
+      </div>
+
+      @if (diagnosticEnvoi(); as resultat) {
+        <p
+          class="diagnostic"
+          [class.diagnostic--ok]="resultat.ok"
+          [class.diagnostic--echec]="!resultat.ok"
+          role="status"
+        >
+          <mat-icon>{{ resultat.ok ? 'check_circle' : 'error' }}</mat-icon>
+          <span>
+            {{ libelleCauseEnvoi(resultat.cause) }}
+            <!-- Le motif du relais distingue un port ferme d'un domaine refuse : sans lui,
+                 l'operateur corrige un reglage qui n'etait pas en cause. -->
+            @if (!resultat.ok && resultat.detail) {
+              <span class="diagnostic__motif lf-mono">{{ resultat.detail }}</span>
+            }
+          </span>
+        </p>
+      }
+    </mat-card-content>
+  </mat-card>
 }

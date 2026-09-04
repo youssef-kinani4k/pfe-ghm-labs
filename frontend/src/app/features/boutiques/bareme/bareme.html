@@ -165,19 +165,38 @@
 
       <mat-card appearance="outlined" class="bareme__bloc">
         <mat-card-header>
-          <mat-card-title class="bareme__titre">Seuil de chaleur</mat-card-title>
+          <mat-card-title class="bareme__titre">Seuils</mat-card-title>
           <mat-card-subtitle>
-            A partir de combien de points un lead est signale comme chaud dans la liste. Le score
-            total est borne a 100.
+            Deux seuils, deux effets distincts. Le score total est borne a 100 : maximum atteignable
+            avec ce bareme, {{ scoreMaximum() }}.
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content class="bareme__champs">
           <mat-form-field appearance="outline">
             <mat-label>Seuil chaud</mat-label>
             <input matInput type="number" min="0" max="100" formControlName="seuilChaud" />
-            <mat-hint>Maximum atteignable avec ce bareme : {{ scoreMaximum() }}.</mat-hint>
+            <!-- Ce qui distingue les deux champs n'est pas leur nom, presque identique, mais
+                 ce que l'ecran dit qu'ils font. -->
+            <mat-hint>Colore le badge « chaud » dans la liste. N envoie rien.</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Seuil de notification</mat-label>
+            <input matInput type="number" min="0" max="100" formControlName="seuilNotification" />
+            <mat-hint>
+              Le commercial recoit un e-mail a partir de ce score, une fois le lead synchronise.
+            </mat-hint>
           </mat-form-field>
         </mat-card-content>
+        @if (notificationInatteignable()) {
+          <mat-card-content>
+            <p class="bareme__alerte" role="status">
+              <mat-icon aria-hidden="true">notifications_off</mat-icon>
+              Aucun commercial ne sera prevenu : le seuil de notification depasse le maximum que ce
+              bareme peut atteindre.
+            </p>
+          </mat-card-content>
+        }
       </mat-card>
 
       <div class="bareme__actions">

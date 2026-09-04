@@ -94,6 +94,22 @@
     line-height: 1.5;
   }
 
+  // Avertissement d'etat, pas d'erreur de saisie : le bareme reste enregistrable. Les
+  // jetons d'attente le disent mieux que ceux d'echec, et l'icone double la couleur pour
+  // ne pas dependre d'elle seule.
+  &__alerte {
+    display: flex;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin: 0;
+    padding: var(--lf-space-2) var(--lf-space-3);
+    border-radius: 8px;
+    background: var(--lf-attente-fond);
+    color: var(--lf-attente);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
   &__compteurs {
     display: flex;
     gap: var(--lf-space-4);
