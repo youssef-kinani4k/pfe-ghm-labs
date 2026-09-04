@@ -36,8 +36,14 @@ class NotificationTopologieTest {
     void videLesFiles() {
         // Les tests des autres etapes laissent des messages derriere eux : sans purge, on
         // lirait le leur au lieu du notre.
-        rabbitAdmin.purgeQueue(RabbitMQConfig.NOTIFY_QUEUE, true);
-        rabbitAdmin.purgeQueue(RabbitMQConfig.MONITORING_QUEUE, true);
+        //
+        // La purge est BLOQUANTE, et ce n'est pas un detail de style : la surcharge
+        // purgeQueue(nom, noWait) avec noWait a vrai rend la main avant que le broker ait
+        // fini. En isolation la file est vide et cela ne se voit pas ; dans la suite
+        // complete, elle a accumule les lead.synced des tests amont, la purge tourne encore
+        // quand on publie, et elle emporte le message qu'on vient d'envoyer.
+        rabbitAdmin.purgeQueue(RabbitMQConfig.NOTIFY_QUEUE);
+        rabbitAdmin.purgeQueue(RabbitMQConfig.MONITORING_QUEUE);
     }
 
     @Test
