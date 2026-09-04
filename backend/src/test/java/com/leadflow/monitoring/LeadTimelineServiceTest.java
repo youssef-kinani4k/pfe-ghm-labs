@@ -16,6 +16,9 @@ import com.leadflow.monitoring.deadletter.DeadLetterStatus;
 import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
+import com.leadflow.notification.NotificationAttempt;
+import com.leadflow.notification.NotificationAttemptRepository;
+import com.leadflow.notification.NotificationStatus;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
@@ -57,6 +60,7 @@ class LeadTimelineServiceTest {
     @Autowired private SalesRepRepository commerciaux;
     @Autowired private DeadLetterRepository morts;
     @Autowired private LeadActionRepository actions;
+    @Autowired private NotificationAttemptRepository notifications;
 
     private UUID clientId;
     private UUID commercialId;
@@ -78,6 +82,7 @@ class LeadTimelineServiceTest {
      */
     @AfterEach
     void nettoyage() {
+        notifications.deleteAll();
         actions.deleteAll();
         morts.deleteAll();
         tentatives.deleteAll();
@@ -418,6 +423,84 @@ class LeadTimelineServiceTest {
         action.setOutcome(LeadActionOutcome.SUCCES);
         action.setCreatedAt(quand);
         actions.saveAndFlush(action);
+    }
+
+    @Test
+    void uneNotificationEnvoyeeApparaitDansLaChronologie() {
+        notification(NotificationStatus.ENVOYEE, 90, 70, null);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        assertThat(entrees.stream().map(TimelineEntry::type))
+                .contains(TimelineEventType.NOTIFICATION);
+        assertThat(detail(entrees, TimelineEventType.NOTIFICATION))
+                .containsEntry("destinataire", "karim@demo.test")
+                .containsEntry("statut", "ENVOYEE")
+                .containsEntry("score", "90")
+                .containsEntry("seuil", "70");
+    }
+
+    @Test
+    void uneNotificationIgnoreeApparaitAussiCarElleExpliqueUnSilence() {
+        notification(NotificationStatus.IGNOREE, 55, 70, null);
+
+        TimelineEntry entree = entree(TimelineEventType.NOTIFICATION);
+
+        // L'absence d'entree ferait croire a une panne. Une ignoree n'est pas un echec :
+        // c'est une decision, et le score et le seuil la rendent lisible.
+        assertThat(entree.outcome()).isEqualTo(TimelineOutcome.NEUTRE);
+        assertThat(entree.details()).containsEntry("statut", "IGNOREE");
+        assertThat(entree.details()).containsEntry("score", "55");
+    }
+
+    @Test
+    void uneNotificationEnEchecEstMarqueeCommeTelle() {
+        notification(NotificationStatus.ECHEC, 90, 70, "smtp injoignable");
+
+        TimelineEntry entree = entree(TimelineEventType.NOTIFICATION);
+
+        assertThat(entree.outcome()).isEqualTo(TimelineOutcome.ECHEC);
+        assertThat(entree.details()).containsEntry("erreur", "smtp injoignable");
+    }
+
+    @Test
+    void laNotificationSePlaceApresLaSynchronisationErp() {
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("dolibarr");
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setAttemptedAt(base.minus(20, ChronoUnit.MINUTES));
+        tentatives.saveAndFlush(tentative);
+
+        notification(NotificationStatus.ENVOYEE, 90, 70, null);
+
+        // L'ordre du pipeline : on ne previent qu'une fois le lead arrive chez le commercial
+        // dans l'ERP. L'inverse alerterait sur un lead introuvable a l'ecran.
+        List<TimelineEventType> types =
+                service.timeline(leadId).stream().map(TimelineEntry::type).toList();
+        assertThat(types.indexOf(TimelineEventType.NOTIFICATION))
+                .isGreaterThan(types.indexOf(TimelineEventType.SYNC_ERP));
+    }
+
+    private void notification(NotificationStatus statut, int score, int seuil, String erreur) {
+        NotificationAttempt tentative = new NotificationAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setChannel("smtp");
+        tentative.setRecipient("karim@demo.test");
+        tentative.setSalesRepId(commercialId);
+        tentative.setStatus(statut);
+        tentative.setScore(score);
+        tentative.setSeuil(seuil);
+        tentative.setErrorMessage(erreur);
+        tentative.setAttemptedAt(base.minus(5, ChronoUnit.MINUTES));
+        notifications.saveAndFlush(tentative);
+    }
+
+    private TimelineEntry entree(TimelineEventType type) {
+        return service.timeline(leadId).stream()
+                .filter(e -> e.type() == type)
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test

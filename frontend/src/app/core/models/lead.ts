@@ -101,6 +101,7 @@ export type TimelineEventType =
   | 'ATTRIBUTION'
   | 'REATTRIBUTION'
   | 'SYNC_ERP'
+  | 'NOTIFICATION'
   | 'MORT'
   | 'REJEU'
   | 'ECART';
