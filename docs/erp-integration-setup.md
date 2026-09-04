@@ -195,9 +195,13 @@ cd backend && ./mvnw verify -Perp-it
 
 Les tests marqués `@Tag("erp")` sont exclus de `./mvnw test` : sans ces variables et sans
 les conteneurs, la suite ordinaire reste rapide et verte. L'exclusion vient du plugin
-Surefire, configuré sur `<excludedGroups>${erp.excludedGroups}</excludedGroups>` ; la
-propriété vaut `erp` par défaut et le profil `erp-it` la remplace par un nom de groupe
-inexistant, ce qui laisse tout passer.
+Surefire, configuré sur `<excludedGroups>${tests.excludedGroups}</excludedGroups>`.
+
+**La propriété liste désormais deux groupes**, `erp,notification`, et **chaque profil n'ouvre
+que le sien** : `erp-it` n'exclut plus que `notification`, et `notification-it` — l'étage
+d'intégration du relais SMTP, ajouté en F12 — n'exclut plus que `erp`. Ce n'est pas de la
+symétrie décorative : un profil qui remplacerait l'exclusion par un nom de groupe inexistant,
+comme `erp-it` le faisait, ferait partir de **vrais e-mails** à chaque exécution ERP.
 
 Chaque test est en plus conditionné par une variable d'environnement
 (`LEADFLOW_DOLIBARR_API_KEY` pour Dolibarr, `LEADFLOW_ODOO_DB` pour Odoo) : sous
