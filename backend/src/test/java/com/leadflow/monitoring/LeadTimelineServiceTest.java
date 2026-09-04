@@ -346,6 +346,81 @@ class LeadTimelineServiceTest {
     }
 
     @Test
+    void sansReattributionLAttributionMontreLeTitulaireCourant() {
+        // Le cas de loin le plus frequent : rien ne s'est passe depuis le routage, donc le
+        // titulaire courant EST celui de l'attribution d'origine.
+        assertThat(detail(service.timeline(leadId), TimelineEventType.ATTRIBUTION))
+                .containsEntry("commercial", "Karim Idrissi");
+    }
+
+    @Test
+    void lAttributionMontreLeTitulaireDOrigineEtNonLeCourant() {
+        UUID repreneuseId = commercialNomme("Amina Bensalem");
+        deplaceLeLeadVers(repreneuseId);
+        reattribution(commercialId, repreneuseId, base.minus(30, ChronoUnit.MINUTES));
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        // Lu de haut en bas, le recit doit se tenir : le lead a d'abord ete attribue a
+        // Karim, PUIS deplace vers Amina. Montrer Amina sur la ligne d'attribution ferait
+        // dire a la chronologie qu'elle l'a toujours eu, et la reattribution juste en
+        // dessous la contredirait.
+        assertThat(detail(entrees, TimelineEventType.ATTRIBUTION))
+                .containsEntry("commercial", "Karim Idrissi");
+        assertThat(detail(entrees, TimelineEventType.REATTRIBUTION))
+                .containsEntry("ancienCommercial", "Karim Idrissi")
+                .containsEntry("nouveauCommercial", "Amina Bensalem");
+    }
+
+    @Test
+    void apresDeuxReattributionsLAttributionMontreLeToutPremierTitulaire() {
+        UUID aminaId = commercialNomme("Amina Bensalem");
+        UUID sofiaId = commercialNomme("Sofia Alaoui");
+        deplaceLeLeadVers(sofiaId);
+        reattribution(commercialId, aminaId, base.minus(30, ChronoUnit.MINUTES));
+        reattribution(aminaId, sofiaId, base.minus(10, ChronoUnit.MINUTES));
+
+        // C'est le cas qui distingue « la premiere reattribution » de « la derniere » :
+        // prendre le mauvais bout du journal donnerait Amina, qui n'a ete ni la premiere
+        // ni la derniere titulaire.
+        assertThat(detail(service.timeline(leadId), TimelineEventType.ATTRIBUTION))
+                .containsEntry("commercial", "Karim Idrissi");
+    }
+
+    private UUID commercialNomme(String nom) {
+        SalesRep commercial = new SalesRep();
+        commercial.setClient(clients.findById(clientId).orElseThrow());
+        commercial.setFullName(nom);
+        commercial.setEmail("c+" + UUID.randomUUID() + "@demo.test");
+        commercial.setActive(true);
+        return commerciaux.saveAndFlush(commercial).getId();
+    }
+
+    /**
+     * Ce que fait une vraie reattribution au lead : elle change le titulaire, sans toucher
+     * ni le statut ni {@code routed_at}. C'est ce qui rend le defaut visible — la ligne
+     * d'attribution garde sa date d'origine mais changeait de nom.
+     */
+    private void deplaceLeLeadVers(UUID commercial) {
+        Lead lead = leads.findById(leadId).orElseThrow();
+        lead.setAssignedSalesRepId(commercial);
+        leads.saveAndFlush(lead);
+    }
+
+    private void reattribution(UUID precedent, UUID nouveau, Instant quand) {
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(precedent);
+        action.setNewSalesRepId(nouveau);
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        action.setCreatedAt(quand);
+        actions.saveAndFlush(action);
+    }
+
+    @Test
     void unCommercialIntrouvableGardeSonIdentifiant() {
         UUID disparu = UUID.randomUUID();
 

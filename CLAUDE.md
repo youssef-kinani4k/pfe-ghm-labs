@@ -401,13 +401,23 @@ n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 **La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
 recompose en lecture seule ce que le lead a vecu depuis cinq tables existantes —
 `raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` et, depuis F10, `lead_action` —
-sans qu'aucune table d'evenements n'existe. Trois consequences a ne pas casser. **L'endpoint
+sans qu'aucune table d'evenements n'existe. Quatre consequences a ne pas casser. **L'endpoint
 est separe du detail** parce que la fiche rafraichit la seule chronologie apres une
 reattribution, sans refaire tout le detail. **Une entree non datee garde sa place dans le
 pipeline** au lieu d'etre rejetee en tete ou en queue : c'est le cas de toute attribution
 anterieure a `V7`, et l'ordre des etapes est connu meme quand leur date ne l'est pas. Et **un
 rejeu n'est compte qu'une fois** : il est lisible dans `dead_letter.replayed_at` comme dans
 `lead_action`, et le service exclut la mort dont une action porte deja le `dead_letter_id`.
+Enfin, **la ligne « Attribution » nomme le titulaire d'origine, pas le titulaire courant** :
+`lead.assigned_sales_rep_id` ne retient que le dernier en date, si bien que le lire ferait
+dire a la chronologie qu'un lead reattribue a toujours appartenu a son commercial actuel — et
+la ligne « Reattribution » juste en dessous la contredirait. L'origine se derive du journal,
+c'est le `previous_sales_rep_id` de la **premiere** reattribution. La derivation est exacte et
+non approchee, parce que F10 a introduit ensemble la reattribution et sa trace : il n'existe
+aucune reattribution non journalisee, et un lead sans commercial est refuse en `409`, donc
+cette colonne ne peut pas etre nulle sur une ligne `REATTRIBUTION`. Aucune migration n'a donc
+ete necessaire, la ou stocker l'attribution d'origine en colonne aurait rendu « inconnu » pour
+tout l'historique anterieur.
 
 Le service rend des faits typés, jamais des phrases — la mise en francais appartient au
 template Angular, qui tient la table des huit libelles dans `lead-timeline.ts`. Ajouter une
