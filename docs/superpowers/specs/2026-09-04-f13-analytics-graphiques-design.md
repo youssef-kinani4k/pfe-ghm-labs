@@ -76,15 +76,18 @@ aucune methode d'ecriture n'est meme exposee. F13 ne touche ni `lead`, ni `raw_l
 ni `crm_sync_attempt` autrement qu'en lecture. C'est la propriete qui rend cet observateur
 sur, et elle ne doit pas bouger.
 
-### Deux styles de requete, et pourquoi
+### Trois requetes natives, et pourquoi
 
-Le volume et les intentions restent en **JPQL**, dans le style de `StatsRepository` — memes
-`cast(:param as ...)` autour des parametres facultatifs, pour la meme raison : un parametre
-qui n'apparait que dans `? is null` n'a aucun type deductible pour Postgres, qui refuse alors
-la requete entiere.
+`SeriesRepository` est le **premier repository natif du projet**. Le reste du monitoring est
+en JPQL, et ce n'est pas une preference : deux contraintes independantes ferment cette porte.
 
-Le delai passe par **une requete native, la premiere du projet**, parce que `percentile_cont`
-n'existe pas en JPQL. Les deux alternatives ont ete pesees et refusees :
+**Le regroupement par jour dans un fuseau ne s'exprime pas en JPQL.** Il n'y a ni `date_trunc`
+ni `AT TIME ZONE` dans le langage, et la seule alternative — poser
+`hibernate.jdbc.time_zone` — est globale : elle changerait la facon dont tout le projet lit et
+ecrit ses `Instant`, pour resoudre un besoin de trois requetes. Ce reglage n'est pas touche.
+
+**`percentile_cont` n'existe pas non plus en JPQL**, ce qui condamnait deja la requete des
+delais a elle seule. Ses deux alternatives ont ete pesees et refusees :
 
 - `avg`/`min`/`max` en JPQL resterait dans le style existant, mais **la moyenne ment sur une
   latence** : un seul ERP en timeout a 30 s ecrase la lecture d'une journee normale a 2 s.
@@ -93,6 +96,10 @@ n'existe pas en JPQL. Les deux alternatives ont ete pesees et refusees :
   la table — ce que le Javadoc de `StatsRepository` interdit explicitement.
 
 La non-portabilite hors Postgres est deja acquise ailleurs (`jsonb`, index partiels).
+
+Le prix reel du natif est ailleurs : **Hibernate ne valide plus la requete au demarrage**, et
+une colonne renommee ne se verra qu'a l'execution. C'est ce qui rend les tests de F13
+obligatoirement des `@SpringBootTest` contre un vrai Postgres, et non un choix de confort.
 
 ### Le chemin du delai
 
