@@ -96,8 +96,11 @@ Backend démarré sur `:8090` et données de démonstration chargées (profil `d
 > mais la base de `docker compose` est persistante : dès qu'on a tourné la clé publique ou le
 > secret depuis l'écran des boutiques, ce sont les valeurs tournées qui font foi, et cet
 > exemple rend `401`. La migration répétable ne les restaure pas, puisqu'elle ne se rejoue
-> que si son contenu change. Le secret HMAC écrit en commentaire de ce fichier est de plus
-> **faux depuis F7.2** : il ne correspond pas à la valeur chiffrée posée juste en dessous.
+> que si son contenu change. Le secret HMAC écrit en commentaire de ce fichier, lui, **est
+> bon** : `DonneesDeDemoTest` déchiffre la colonne à chaque `./mvnw test` et vérifie qu'elle
+> vaut exactement la valeur documentée. On l'a cru faux entre le 31 août et le 4 septembre
+> 2026 ; l'exemple ci-dessous a été rejoué le 4 septembre sur une base de développement et
+> rend bien `202`.
 >
 > **Les valeurs qui font foi se lisent et se refont depuis le dashboard**, écran
 > « Boutiques » : la fiche affiche le chemin de webhook, donc la clé publique, et le bouton
