@@ -205,6 +205,12 @@ Chaque entrée porte quatre champs — `type` parmi `CAPTURE`, `QUALIFICATION`, 
 `ECHEC`, `NEUTRE` ; et un `details` de chaînes. **Aucune phrase n'est composée côté serveur** :
 l'API rend des faits typés, le dashboard les met en français.
 
+**Les commerciaux sont nommes, pas identifies.** `commercial`, `ancienCommercial` et
+`nouveauCommercial` portent le nom complet : c'est un fait au meme titre que l'identifiant, et
+c'est celui qu'un ecran d'agence sait lire. Un commercial supprime fait exception — `lead_action`
+ne porte aucune cle etrangere vers `sales_rep`, pour qu'une suppression n'efface pas l'histoire —
+et son identifiant reste alors affiche, faute de mieux.
+
 **`ECART` n'est pas un `REJEU`.** Les deux suivent la même mort, mais l'un abandonne le
 message et l'autre le republie : les confondre annoncerait un traitement là où il y a eu
 renoncement.
@@ -247,7 +253,7 @@ curl -s "http://localhost:8090/api/leads/6f1c.../timeline" -H "Authorization: Be
     "type": "ATTRIBUTION",
     "at": null,
     "outcome": "NEUTRE",
-    "details": { "commercialId": "3f2a..." }
+    "details": { "commercial": "Karim Haddad" }
   },
   {
     "type": "SYNC_ERP",
@@ -278,8 +284,8 @@ curl -s "http://localhost:8090/api/leads/6f1c.../timeline" -H "Authorization: Be
     "details": {
       "par": "admin",
       "motif": "Depart en conge de Karim",
-      "ancienCommercial": "3f2a...",
-      "nouveauCommercial": "8b71..."
+      "ancienCommercial": "Karim Haddad",
+      "nouveauCommercial": "Amina Bensalem"
     }
   }
 ]

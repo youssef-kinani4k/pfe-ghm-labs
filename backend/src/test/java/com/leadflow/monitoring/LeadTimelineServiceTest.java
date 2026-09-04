@@ -314,6 +314,67 @@ class LeadTimelineServiceTest {
     }
 
     @Test
+    void lesCommerciauxSontNommesEtNonIdentifies() {
+        // Un deuxieme commercial, pour que la reattribution ait une cible reelle.
+        SalesRep repreneuse = new SalesRep();
+        repreneuse.setClient(clients.findById(clientId).orElseThrow());
+        repreneuse.setFullName("Amina Bensalem");
+        repreneuse.setEmail("amina+" + UUID.randomUUID() + "@demo.test");
+        repreneuse.setActive(true);
+        UUID repreneuseId = commerciaux.saveAndFlush(repreneuse).getId();
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(commercialId);
+        action.setNewSalesRepId(repreneuseId);
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        // Un UUID ne se lit pas : l'ecran est celui d'une agence, pas d'un administrateur
+        // de base. Le nom est un fait, au meme titre que l'identifiant — il n'y a pas de
+        // phrase composee ici.
+        assertThat(detail(entrees, TimelineEventType.ATTRIBUTION))
+                .containsEntry("commercial", "Karim Idrissi");
+        assertThat(detail(entrees, TimelineEventType.REATTRIBUTION))
+                .containsEntry("ancienCommercial", "Karim Idrissi")
+                .containsEntry("nouveauCommercial", "Amina Bensalem");
+    }
+
+    @Test
+    void unCommercialIntrouvableGardeSonIdentifiant() {
+        UUID disparu = UUID.randomUUID();
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(disparu);
+        action.setNewSalesRepId(commercialId);
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        // Le journal ne porte pas de cle etrangere vers sales_rep, pour qu'un commercial
+        // supprime n'efface pas l'histoire. L'identifiant reste alors la seule chose vraie
+        // qu'on puisse afficher — mieux qu'un blanc ou qu'un nom invente.
+        assertThat(detail(service.timeline(leadId), TimelineEventType.REATTRIBUTION))
+                .containsEntry("ancienCommercial", disparu.toString());
+    }
+
+    private Map<String, String> detail(List<TimelineEntry> entrees, TimelineEventType type) {
+        return entrees.stream()
+                .filter(e -> e.type() == type)
+                .findFirst()
+                .orElseThrow()
+                .details();
+    }
+
+    @Test
     void unRejeuJournaliseNApparaitQuUneFois() {
         DeadLetter mort = new DeadLetter();
         mort.setOriginQueue("leadflow.leads.routed");

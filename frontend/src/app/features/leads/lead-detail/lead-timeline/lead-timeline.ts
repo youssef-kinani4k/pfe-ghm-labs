@@ -36,6 +36,9 @@ const ISSUES: Record<TimelineOutcome, string | null> = {
 /**
  * Les cles de `details` viennent du backend, qui rend des faits et non des phrases. Leur
  * mise en francais est une decision d'interface et vit donc ici.
+ *
+ * Une cle deja francaise — `commercial`, `motif` — n'a pas besoin d'entree : `libelleDetail`
+ * rend la cle telle quelle quand la table n'en dit rien.
  */
 const DETAILS: Record<string, string> = {
   source: 'source',
@@ -45,7 +48,6 @@ const DETAILS: Record<string, string> = {
   intention: 'intention',
   sourceIntention: 'source de l intention',
   connecteur: 'connecteur',
-  commercialId: 'commercial',
   file: 'file',
   // « par » et non « rejoue par » : la meme cle porte desormais l'auteur d'un rejeu, d'un
   // ecart et d'une reattribution.
