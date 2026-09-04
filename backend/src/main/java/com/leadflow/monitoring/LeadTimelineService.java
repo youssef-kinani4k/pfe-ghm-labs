@@ -74,7 +74,7 @@ public class LeadTimelineService {
         Map<UUID, String> noms = nomsDesCommerciaux(lead, journal);
 
         if (lead.getAssignedSalesRepId() != null) {
-            entrees.add(attribution(lead, noms));
+            entrees.add(attribution(lead, journal, noms));
         }
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
                 .forEach(tentative -> entrees.add(synchronisation(tentative)));
@@ -167,12 +167,40 @@ public class LeadTimelineService {
                 Map.copyOf(details));
     }
 
-    private TimelineEntry attribution(Lead lead, Map<UUID, String> noms) {
+    private TimelineEntry attribution(Lead lead, List<LeadAction> journal, Map<UUID, String> noms) {
         return new TimelineEntry(
                 TimelineEventType.ATTRIBUTION,
                 lead.getRoutedAt(),
                 TimelineOutcome.NEUTRE,
-                Map.of("commercial", nomDe(lead.getAssignedSalesRepId(), noms)));
+                Map.of("commercial", nomDe(titulaireDOrigine(lead, journal), noms)));
+    }
+
+    /**
+     * Le commercial de l'attribution d'origine, et non le titulaire courant.
+     *
+     * <p>{@code lead.assigned_sales_rep_id} ne retient que le dernier en date : le lire ici
+     * ferait dire a la chronologie qu'un lead reattribue a toujours appartenu a son titulaire
+     * actuel, et la ligne « Reattribution » juste en dessous la contredirait. L'origine se lit
+     * donc du journal — c'est le {@code previousSalesRepId} de la <b>premiere</b>
+     * reattribution, celle qui a deplace le lead hors de son premier titulaire.
+     *
+     * <p>La derivation est exacte, et non approchee : F10 a introduit ensemble la
+     * reattribution et son journal, donc il n'existe aucune reattribution non journalisee, et
+     * {@code ReattributionService} refuse en {@code 409} un lead sans commercial — la colonne
+     * ne peut pas etre nulle sur une ligne {@code REATTRIBUTION}. A defaut de toute
+     * reattribution, le cas de loin le plus frequent, le titulaire courant <i>est</i> celui
+     * de l'origine.
+     *
+     * <p>Le journal arrive trie par date croissante, ce que {@code findByLeadIdOrderBy...}
+     * garantit : {@code findFirst} y lit donc bien la plus ancienne, et non l'avant-derniere.
+     */
+    private UUID titulaireDOrigine(Lead lead, List<LeadAction> journal) {
+        return journal.stream()
+                .filter(action -> action.getAction() == LeadActionType.REATTRIBUTION)
+                .map(LeadAction::getPreviousSalesRepId)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseGet(lead::getAssignedSalesRepId);
     }
 
     /**

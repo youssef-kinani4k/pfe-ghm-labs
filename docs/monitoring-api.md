@@ -211,6 +211,13 @@ c'est celui qu'un ecran d'agence sait lire. Un commercial supprime fait exceptio
 ne porte aucune cle etrangere vers `sales_rep`, pour qu'une suppression n'efface pas l'histoire —
 et son identifiant reste alors affiche, faute de mieux.
 
+**Le `commercial` de la ligne `ATTRIBUTION` est celui de l'origine, pas le titulaire actuel.**
+`lead.assigned_sales_rep_id` ne retient que le dernier en date : le rendre ici ferait dire à la
+chronologie qu'un lead réattribué a toujours appartenu à son commercial actuel, et la ligne
+`REATTRIBUTION` juste en dessous la contredirait. L'origine se dérive du journal — c'est le
+`previous_sales_rep_id` de la **première** réattribution — et vaut le titulaire courant quand
+il n'y en a eu aucune, ce qui est le cas courant.
+
 **`ECART` n'est pas un `REJEU`.** Les deux suivent la même mort, mais l'un abandonne le
 message et l'autre le republie : les confondre annoncerait un traitement là où il y a eu
 renoncement.
