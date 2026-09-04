@@ -83,6 +83,7 @@ export class Bareme implements OnInit {
     messagePresent: [0, [Validators.required, Validators.min(0), Validators.max(100)]],
     bonusCible: [0, [Validators.required, Validators.min(0), Validators.max(100)]],
     seuilChaud: [0, [Validators.required, Validators.min(0), Validators.max(100)]],
+    seuilNotification: [0, [Validators.required, Validators.min(0), Validators.max(100)]],
     intention: this.fb.nonNullable.group(
       Object.fromEntries(
         INTENTIONS.map((intention) => [
@@ -123,6 +124,15 @@ export class Bareme implements OnInit {
   readonly seuilInatteignable = computed(() => {
     this.valeurs();
     return this.nombre(this.formulaire.getRawValue().seuilChaud) > this.scoreMaximum();
+  });
+
+  /**
+   * Le pendant du precedent, et le plus important des deux : un badge qui ne s'allume jamais
+   * finit par se remarquer, un commercial qui n'est jamais prevenu ne remarque rien.
+   */
+  readonly notificationInatteignable = computed(() => {
+    this.valeurs();
+    return this.nombre(this.formulaire.getRawValue().seuilNotification) > this.scoreMaximum();
   });
 
   ngOnInit(): void {
@@ -167,6 +177,7 @@ export class Bareme implements OnInit {
       messagePresent: valeurs.messagePresent,
       bonusCible: valeurs.bonusCible,
       seuilChaud: valeurs.seuilChaud,
+      seuilNotification: valeurs.seuilNotification,
       intention: Object.fromEntries(
         INTENTIONS.map((intention) => [intention.cle, valeurs.intention[intention.cle] ?? 0]),
       ),
@@ -196,6 +207,9 @@ export class Bareme implements OnInit {
       paysCibles: this.pays(),
       bonusCible: this.nombre(brut.bonusCible),
       seuilChaud: this.nombre(brut.seuilChaud),
+      // Le PUT remplace le document entier : oublier ce champ ferait retomber la boutique
+      // sur le defaut a chaque enregistrement du bareme.
+      seuilNotification: this.nombre(brut.seuilNotification),
     };
     this.api.enregistreBareme(this.boutiqueId, formulaire).subscribe({
       next: (vue) => {

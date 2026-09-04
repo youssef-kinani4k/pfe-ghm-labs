@@ -11,6 +11,9 @@ import com.leadflow.monitoring.deadletter.DeadLetterRepository;
 import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
+import com.leadflow.notification.NotificationAttempt;
+import com.leadflow.notification.NotificationAttemptRepository;
+import com.leadflow.notification.NotificationStatus;
 import com.leadflow.qualification.Lead;
 import com.leadflow.routing.LeadAction;
 import com.leadflow.routing.LeadActionOutcome;
@@ -45,6 +48,7 @@ public class LeadTimelineService {
     private final CrmSyncAttemptRepository tentatives;
     private final DeadLetterRepository morts;
     private final LeadActionRepository actions;
+    private final NotificationAttemptRepository notifications;
     private final SalesRepRepository commerciaux;
 
     public LeadTimelineService(
@@ -53,12 +57,14 @@ public class LeadTimelineService {
             CrmSyncAttemptRepository tentatives,
             DeadLetterRepository morts,
             LeadActionRepository actions,
+            NotificationAttemptRepository notifications,
             SalesRepRepository commerciaux) {
         this.leads = leads;
         this.evenements = evenements;
         this.tentatives = tentatives;
         this.morts = morts;
         this.actions = actions;
+        this.notifications = notifications;
         this.commerciaux = commerciaux;
     }
 
@@ -78,6 +84,8 @@ public class LeadTimelineService {
         }
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
                 .forEach(tentative -> entrees.add(synchronisation(tentative)));
+        notifications.findByLeadIdOrderByAttemptedAtAsc(leadId)
+                .forEach(tentative -> entrees.add(notification(tentative)));
 
         Set<UUID> mortsDejaJournalisees = journal.stream()
                 .map(LeadAction::getDeadLetterId)
@@ -300,6 +308,33 @@ public class LeadTimelineService {
             case REJEU -> TimelineEventType.REJEU;
             case ECART -> TimelineEventType.ECART;
         };
+    }
+
+    /**
+     * Une tentative de notification, y compris ignoree. Une entree {@code IGNOREE} n'est pas
+     * du bruit : elle explique un silence, et son absence ferait croire a une panne la ou il
+     * n'y a eu qu'un lead sous le seuil de sa boutique. Le score et le seuil sont ceux figes
+     * au moment de la decision, non relus, donc ils restent vrais apres un reglage du bareme.
+     */
+    private TimelineEntry notification(NotificationAttempt tentative) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("canal", tentative.getChannel());
+        details.put("statut", String.valueOf(tentative.getStatus()));
+        details.put("score", String.valueOf(tentative.getScore()));
+        details.put("seuil", String.valueOf(tentative.getSeuil()));
+        if (tentative.getRecipient() != null && !tentative.getRecipient().isBlank()) {
+            details.put("destinataire", tentative.getRecipient());
+        }
+        if (tentative.getErrorMessage() != null) {
+            details.put("erreur", tentative.getErrorMessage());
+        }
+        return new TimelineEntry(
+                TimelineEventType.NOTIFICATION,
+                tentative.getAttemptedAt(),
+                tentative.getStatus() == NotificationStatus.ECHEC
+                        ? TimelineOutcome.ECHEC
+                        : TimelineOutcome.NEUTRE,
+                Map.copyOf(details));
     }
 
     private TimelineEntry synchronisation(CrmSyncAttempt tentative) {

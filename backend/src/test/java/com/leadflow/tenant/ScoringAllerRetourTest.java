@@ -28,7 +28,7 @@ class ScoringAllerRetourTest {
                         LeadIntent.INFORMATION, 10,
                         LeadIntent.SUPPORT, 4,
                         LeadIntent.AUTRE, 1),
-                Set.of("industrie"), Set.of("FR"), 9, 65);
+                Set.of("industrie"), Set.of("FR"), 9, 65, 70);
 
         ScoringConfig relu = ScoringConfig.depuis(formulaire.versDocument());
 
@@ -44,11 +44,63 @@ class ScoringAllerRetourTest {
         assertThat(relu.seuilChaud()).isEqualTo(65);
     }
 
+    @Test
+    void leSeuilDeNotificationSurvitAAllerRetourEtResteDistinctDuSeuilChaud() {
+        ScoringForm formulaire = new ScoringForm(
+                15, 10, 5, 10, Map.of(), Set.of(), Set.of(), 10, 65, 85);
+
+        ScoringConfig relu = ScoringConfig.depuis(formulaire.versDocument());
+
+        // Deux seuils, deux questions : colorer une pastille et deranger quelqu'un. Les
+        // confondre ferait qu'ajuster l'affichage changerait qui recoit des e-mails.
+        assertThat(relu.seuilChaud()).isEqualTo(65);
+        assertThat(relu.seuilNotification()).isEqualTo(85);
+    }
+
+    @Test
+    void unDocumentSansSeuilDeNotificationPrendLeDefaut() {
+        // La lecture est tolerante : toutes les boutiques configurees avant F12 continuent
+        // de fonctionner sans etre touchees, et c'est ce qui evite une migration.
+        Map<String, Object> ancien = new java.util.LinkedHashMap<>(
+                new ScoringForm(15, 10, 5, 10, Map.of(), Set.of(), Set.of(), 10, 70, 70)
+                        .versDocument());
+        ancien.remove("seuilNotification");
+
+        assertThat(ScoringConfig.depuis(ancien).seuilNotification())
+                .isEqualTo(ScoringConfig.defaut().seuilNotification());
+    }
+
+    @Test
+    void unFormulaireSansSeuilDeNotificationPrendLeDefautEtNonZero() {
+        // Le PUT remplace le document entier. Un client ecrit avant F12 n'envoie pas le
+        // champ : s'il valait alors zero, la boutique se mettrait a notifier TOUS ses
+        // leads sans que personne ne l'ait demande. Le defaut est la seule valeur sure.
+        ScoringForm sansLeChamp = new ScoringForm(
+                15, 10, 5, 10, Map.of(), Set.of(), Set.of(), 10, 70, null);
+
+        assertThat(sansLeChamp.seuilNotification())
+                .isEqualTo(ScoringConfig.defaut().seuilNotification());
+    }
+
+    @Test
+    void laVueSignaleUnSeuilDeNotificationHorsDePortee() {
+        // Meme raison que pour seuilChaud : un seuil qu'aucun lead ne peut atteindre n'est
+        // pas une erreur de saisie, c'est un etat qu'il faut voir — ici, « personne ne sera
+        // jamais prevenu ».
+        ScoringForm maigre = new ScoringForm(
+                1, 1, 1, 1, Map.of(LeadIntent.DEVIS, 5), Set.of(), Set.of(), 0, 5, 80);
+
+        ScoringView vue = ScoringView.de(ScoringConfig.depuis(maigre.versDocument()));
+
+        assertThat(vue.seuilInatteignable()).isFalse();
+        assertThat(vue.notificationInatteignable()).isTrue();
+    }
+
     /** L'ecran montre la normalisation au lieu de la subir : ce que l'on relit est normalise. */
     @Test
     void lesListesCiblesSontNormaliseesALaRelecture() {
         ScoringForm formulaire = new ScoringForm(
-                15, 10, 5, 10, Map.of(), Set.of("  Industrie  "), Set.of("fr"), 10, 70);
+                15, 10, 5, 10, Map.of(), Set.of("  Industrie  "), Set.of("fr"), 10, 70, 70);
 
         ScoringConfig relu = ScoringConfig.depuis(formulaire.versDocument());
 
@@ -60,7 +112,7 @@ class ScoringAllerRetourTest {
     @Test
     void uneIntentionAbsenteGardeLeDefaut() {
         ScoringForm formulaire = new ScoringForm(
-                15, 10, 5, 10, Map.of(LeadIntent.DEVIS, 45), Set.of(), Set.of(), 10, 70);
+                15, 10, 5, 10, Map.of(LeadIntent.DEVIS, 45), Set.of(), Set.of(), 10, 70, 70);
 
         ScoringConfig relu = ScoringConfig.depuis(formulaire.versDocument());
 
@@ -78,7 +130,7 @@ class ScoringAllerRetourTest {
         assertThat(pardefaut.defauts().seuilChaud()).isEqualTo(70);
 
         ScoringForm maigre = new ScoringForm(
-                1, 1, 1, 1, Map.of(LeadIntent.DEVIS, 5), Set.of(), Set.of(), 0, 80);
+                1, 1, 1, 1, Map.of(LeadIntent.DEVIS, 5), Set.of(), Set.of(), 0, 80, 70);
         ScoringView vue = ScoringView.de(ScoringConfig.depuis(maigre.versDocument()));
 
         assertThat(vue.seuilInatteignable()).isTrue();
@@ -117,7 +169,7 @@ class ScoringAllerRetourTest {
     @Test
     void unDocumentAPoidsExcessifsResteBorneACent() {
         ScoringForm genereux = new ScoringForm(
-                100, 100, 100, 100, Map.of(LeadIntent.DEVIS, 100), Set.of(), Set.of(), 100, 70);
+                100, 100, 100, 100, Map.of(LeadIntent.DEVIS, 100), Set.of(), Set.of(), 100, 70, 70);
 
         ScoringView vue = ScoringView.de(ScoringConfig.depuis(genereux.versDocument()));
 

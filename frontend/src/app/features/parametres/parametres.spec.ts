@@ -93,6 +93,49 @@ describe('Parametres', () => {
     expect(composant.cleSaisie()).toBe('');
   });
 
+  /**
+   * L'ecran porte desormais deux sondes tres proches. Celle du relais doit envoyer une
+   * adresse : sans destinataire, le serveur ne peut rien eprouver, et un bouton qui rendrait
+   * toujours « indiquez une adresse » ferait croire a une panne du relais.
+   */
+  it('eprouve le relais avec l adresse saisie', () => {
+    const fixture = ecran();
+    repondEtat();
+    fixture.detectChanges();
+
+    fixture.componentInstance.destinataireDEssai.set('operateur@agence.test');
+    fixture.componentInstance.testeLEnvoi();
+
+    const requete = httpMock.expectOne('/api/admin/notification/test');
+    expect(requete.request.method).toBe('POST');
+    expect(requete.request.body.destinataire).toBe('operateur@agence.test');
+    requete.flush({ ok: true, cause: 'OK', detail: 'Message d essai accepte par le relais' });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.diagnosticEnvoi()?.ok).toBeTrue();
+  });
+
+  /**
+   * La cause est une enumeration precisement pour que l'ecran dise quoi faire. L'afficher
+   * brute — « RELAIS_INJOIGNABLE » — reviendrait a ne pas l'avoir traduite.
+   */
+  it('traduit la cause d un echec de relais au lieu de la montrer brute', () => {
+    const fixture = ecran();
+    repondEtat();
+    fixture.detectChanges();
+
+    fixture.componentInstance.destinataireDEssai.set('operateur@agence.test');
+    fixture.componentInstance.testeLEnvoi();
+    httpMock
+      .expectOne('/api/admin/notification/test')
+      .flush({ ok: false, cause: 'RELAIS_INJOIGNABLE', detail: 'Connection refused' });
+    fixture.detectChanges();
+
+    const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texte).not.toContain('RELAIS_INJOIGNABLE');
+    expect(texte).toContain('injoignable');
+  });
+
   it('compte les leads analyses par le modele et par le lexique', () => {
     const fixture = ecran();
     repondEtat();

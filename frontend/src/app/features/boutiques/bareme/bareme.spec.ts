@@ -26,12 +26,14 @@ describe('Bareme', () => {
     paysCibles: [],
     bonusCible: 10,
     seuilChaud: 70,
+    seuilNotification: 70,
   };
 
   const VUE: ScoringView = {
     valeurs: VALEURS,
     scoreMaximum: 90,
     seuilInatteignable: false,
+    notificationInatteignable: false,
     defauts: VALEURS,
   };
 
@@ -129,6 +131,56 @@ describe('Bareme', () => {
 
     expect(composant.secteurs()).toEqual(['industrie']);
     expect(composant.pays()).toEqual(['FR']);
+  });
+
+  /**
+   * Le PUT remplace le document entier : un seuil de notification absent du corps ferait
+   * retomber la boutique sur le defaut a chaque enregistrement de barème, sans que personne
+   * ne l'ait demande. C'est le test le moins spectaculaire de ce fichier et le plus utile.
+   */
+  it('envoie le seuil de notification dans le PUT', () => {
+    const fixture = ecran();
+    const composant = fixture.componentInstance;
+
+    composant.formulaire.controls.seuilNotification.setValue(85);
+    composant.enregistre();
+
+    const requete = httpMock.expectOne('/api/admin/clients/boutique-1/scoring');
+    expect(requete.request.body.seuilNotification).toBe(85);
+    requete.flush(VUE);
+  });
+
+  /**
+   * Un seuil de notification hors de portee compte davantage qu'un seuil de chaleur hors de
+   * portee : un badge qui ne s'allume jamais se remarque, un commercial qui n'est jamais
+   * prevenu ne remarque rien du tout.
+   */
+  it('avertit quand le seuil de notification depasse le maximum atteignable', () => {
+    const fixture = ecran();
+
+    fixture.componentInstance.formulaire.controls.seuilNotification.setValue(95);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.notificationInatteignable()).toBeTrue();
+    const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texte).toContain('Aucun commercial ne sera prevenu');
+  });
+
+  /**
+   * Regler le mauvais seuil est une erreur silencieuse : elle ne se voit qu'au lead suivant,
+   * ou a son absence. C'est arrive en recette de F12, avec deux champs nommes « Seuil ... ».
+   * Les libelles decrivent donc l'action et ne partagent plus aucun mot.
+   */
+  it('nomme les deux seuils par leur action, sans mot commun', () => {
+    const fixture = ecran();
+
+    const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(texte).toContain('Badge « chaud » a partir de');
+    expect(texte).toContain('Alerter le commercial a partir de');
+    // Aucun des deux libelles ne commence par « Seuil » : c'est ce mot partage qui les
+    // rendait interchangeables en lecture diagonale.
+    expect(texte).not.toContain('Seuil chaud');
+    expect(texte).not.toContain('Seuil de notification');
   });
 
   it('revient aux defauts sans rien demander au serveur', () => {

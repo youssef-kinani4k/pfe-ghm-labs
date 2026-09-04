@@ -18,6 +18,7 @@ const FAITS: Record<TimelineEventType, { libelle: string; icone: string }> = {
   ATTRIBUTION: { libelle: 'Attribution', icone: 'person_add' },
   REATTRIBUTION: { libelle: 'Reattribution', icone: 'swap_horiz' },
   SYNC_ERP: { libelle: 'Synchronisation ERP', icone: 'sync' },
+  NOTIFICATION: { libelle: 'Notification', icone: 'notifications' },
   MORT: { libelle: 'Message mort', icone: 'report' },
   REJEU: { libelle: 'Rejeu', icone: 'replay' },
   // Ecarter n'est pas rejouer : le message est abandonne, pas republie. Le libelle et
@@ -55,6 +56,11 @@ const DETAILS: Record<string, string> = {
   motif: 'motif',
   ancienCommercial: 'ancien commercial',
   nouveauCommercial: 'nouveau commercial',
+  canal: 'canal',
+  destinataire: 'destinataire',
+  // Le seuil accompagne toujours le score sur une notification : sans lui, « score 55 » ne
+  // dit pas pourquoi personne n'a ete prevenu.
+  seuil: 'seuil',
 };
 
 /**

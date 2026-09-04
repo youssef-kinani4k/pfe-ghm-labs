@@ -165,19 +165,44 @@
 
       <mat-card appearance="outlined" class="bareme__bloc">
         <mat-card-header>
-          <mat-card-title class="bareme__titre">Seuil de chaleur</mat-card-title>
+          <mat-card-title class="bareme__titre">Seuils</mat-card-title>
           <mat-card-subtitle>
-            A partir de combien de points un lead est signale comme chaud dans la liste. Le score
-            total est borne a 100.
+            Deux reglages independants : l'un colore, l'autre alerte. Le score total est borne a 100
+            ; maximum atteignable avec ce bareme, {{ scoreMaximum() }}.
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content class="bareme__champs">
+          <!-- Les deux libelles ne partagent volontairement aucun mot, et decrivent l'ACTION
+               plutot que l'objet. Deux champs nommes « Seuil ... » se confondent en lecture
+               diagonale, et regler le mauvais est une erreur silencieuse : elle ne se voit
+               qu'au lead suivant, ou a son absence. L'icone double la distinction. -->
           <mat-form-field appearance="outline">
-            <mat-label>Seuil chaud</mat-label>
+            <mat-label>Badge « chaud » a partir de</mat-label>
+            <mat-icon matPrefix aria-hidden="true">local_fire_department</mat-icon>
             <input matInput type="number" min="0" max="100" formControlName="seuilChaud" />
-            <mat-hint>Maximum atteignable avec ce bareme : {{ scoreMaximum() }}.</mat-hint>
+            <mat-hint
+              >Colore la pastille dans la liste des leads. N envoie rien a personne.</mat-hint
+            >
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Alerter le commercial a partir de</mat-label>
+            <mat-icon matPrefix aria-hidden="true">outgoing_mail</mat-icon>
+            <input matInput type="number" min="0" max="100" formControlName="seuilNotification" />
+            <mat-hint>
+              Un e-mail part au commercial, une fois le lead synchronise dans l ERP.
+            </mat-hint>
           </mat-form-field>
         </mat-card-content>
+        @if (notificationInatteignable()) {
+          <mat-card-content>
+            <p class="bareme__alerte" role="status">
+              <mat-icon aria-hidden="true">notifications_off</mat-icon>
+              Aucun commercial ne sera prevenu : le seuil de notification depasse le maximum que ce
+              bareme peut atteindre.
+            </p>
+          </mat-card-content>
+        }
       </mat-card>
 
       <div class="bareme__actions">

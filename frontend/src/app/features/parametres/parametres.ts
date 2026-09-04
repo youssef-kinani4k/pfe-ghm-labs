@@ -8,8 +8,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { IntentApi } from '../../core/api/intent-api';
+import { NotificationApi } from '../../core/api/notification-api';
 import { StatsApi } from '../../core/api/stats-api';
 import { CauseIntent, EtatIntent, IntentTestResult } from '../../core/models/intent';
+import { CauseNotification, DiagnosticNotification } from '../../core/models/notification';
 
 /**
  * Reglage de l'analyse d'intention par IA.
@@ -41,6 +43,7 @@ import { CauseIntent, EtatIntent, IntentTestResult } from '../../core/models/int
 export class Parametres implements OnInit {
   private readonly api = inject(IntentApi);
   private readonly statsApi = inject(StatsApi);
+  private readonly notificationApi = inject(NotificationApi);
 
   readonly etat = signal<EtatIntent | null>(null);
   readonly diagnostic = signal<IntentTestResult | null>(null);
@@ -48,6 +51,14 @@ export class Parametres implements OnInit {
   readonly cleVisible = signal(false);
   readonly enCours = signal(false);
   readonly erreur = signal<string | null>(null);
+
+  /**
+   * Le canal de notification n'a rien a enregistrer ici : ses reglages sont globaux a
+   * l'instance et viennent de l'environnement. Seul le diagnostic vit a l'ecran.
+   */
+  readonly destinataireDEssai = signal('');
+  readonly diagnosticEnvoi = signal<DiagnosticNotification | null>(null);
+  readonly envoiEnCours = signal(false);
   readonly message = signal<string | null>(null);
 
   private readonly parSource = signal<Record<string, number>>({});
@@ -150,6 +161,43 @@ export class Parametres implements OnInit {
   }
 
   /** Ce que l'operateur doit faire, cause par cause. Un code HTTP ne le lui dirait pas. */
+  /**
+   * Envoie un vrai message d'essai. Un diagnostic qui ne prouverait que l'ouverture du port
+   * ne prouverait rien : l'authentification et les filtres du relais se decouvriraient au
+   * premier lead chaud.
+   */
+  testeLEnvoi(): void {
+    this.diagnosticEnvoi.set(null);
+    this.envoiEnCours.set(true);
+    this.notificationApi.teste(this.destinataireDEssai().trim()).subscribe({
+      next: (resultat) => {
+        this.diagnosticEnvoi.set(resultat);
+        this.envoiEnCours.set(false);
+      },
+      error: () => {
+        this.envoiEnCours.set(false);
+        this.erreur.set('Le test d envoi n a pas pu etre lance.');
+      },
+    });
+  }
+
+  /**
+   * La cause est une enumeration precisement pour que l'ecran dise quoi faire. L'afficher
+   * brute reviendrait a ne pas l'avoir traduite, et « ENVOI_REFUSE » n'apprend rien a
+   * l'operateur d'une agence.
+   */
+  libelleCauseEnvoi(cause: CauseNotification): string {
+    return {
+      OK: 'Le relais a accepte le message : le commercial recevra ses alertes',
+      NON_CONFIGURE: 'Aucun relais n est configure sur cette instance : definir LEADFLOW_SMTP_HOST',
+      DESTINATAIRE_ABSENT: 'Indiquer une adresse a laquelle envoyer le message d essai',
+      RELAIS_INJOIGNABLE: 'Relais injoignable : verifier l hote, le port et le reseau sortant',
+      AUTHENTIFICATION_REFUSEE:
+        'Identifiants refuses par le relais : verifier LEADFLOW_SMTP_USERNAME et son mot de passe',
+      ENVOI_REFUSE: 'Le relais a refuse le message : verifier l adresse d expedition',
+    }[cause];
+  }
+
   libelleCause(cause: CauseIntent): string {
     return {
       OK: 'La cle fonctionne',

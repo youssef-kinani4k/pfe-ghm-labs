@@ -134,6 +134,11 @@ export interface ScoringForm {
   paysCibles: string[];
   bonusCible: number;
   seuilChaud: number;
+  /**
+   * Distinct de `seuilChaud`, et pas un doublon : l'un colore un badge, l'autre envoie un
+   * e-mail. On tolere un badge genereux, pas une boite mail saturee.
+   */
+  seuilNotification: number;
 }
 
 /**
@@ -146,5 +151,6 @@ export interface ScoringView {
   valeurs: ScoringForm;
   scoreMaximum: number;
   seuilInatteignable: boolean;
+  notificationInatteignable: boolean;
   defauts: ScoringForm;
 }

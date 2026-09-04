@@ -39,8 +39,20 @@ public class RabbitMQConfig {
     public static final String ROUTED_QUEUE = "leadflow.leads.routed";
     public static final String ROUTED_ROUTING_KEY = "lead.routed";
 
-    /** Sortie de la synchronisation ERP. Aucun consommateur metier : le monitoring seul. */
+    /**
+     * Sortie de la synchronisation ERP. <b>Deux files y sont liees</b> depuis F12 : celle du
+     * monitoring, qui observe, et celle de la notification, qui previent le commercial. Un
+     * DirectExchange livrant a toutes les files liees a une cle, la seconde n'a rien vole a
+     * la premiere et le publieur n'a pas eu a changer.
+     */
     public static final String SYNCED_ROUTING_KEY = "lead.synced";
+
+    /**
+     * Entree de la notification du commercial. Elle porte une DLX, contrairement a la file
+     * d'observation : un relais injoignable est un echec reparable par un humain, qui merite
+     * le journal des morts et un rejeu, la ou un echec d'affichage ne le merite pas.
+     */
+    public static final String NOTIFY_QUEUE = "leadflow.leads.notify";
 
     /**
      * File d'observation du monitoring. Distincte des files metier : un DirectExchange
@@ -89,6 +101,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Queue notifyQueue() {
+        return QueueBuilder.durable(NOTIFY_QUEUE)
+                .deadLetterExchange(DLX_EXCHANGE)
+                .deadLetterRoutingKey(DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue deadLetterQueue() {
         return QueueBuilder.durable(DLQ_QUEUE).build();
     }
@@ -112,6 +132,16 @@ public class RabbitMQConfig {
                 .with(ROUTED_ROUTING_KEY);
     }
 
+    /**
+     * Liee a la meme cle que la file d'observation, et c'est tout l'interet : brancher la
+     * notification n'a demande aucune modification de la synchronisation ERP ni de son
+     * publieur.
+     */
+    @Bean
+    Binding notifyBinding(Queue notifyQueue, DirectExchange leadsExchange) {
+        return BindingBuilder.bind(notifyQueue).to(leadsExchange).with(SYNCED_ROUTING_KEY);
+    }
+
     @Bean
     Binding deadLetterBinding(Queue deadLetterQueue, DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with(DLQ_ROUTING_KEY);
@@ -126,7 +156,7 @@ public class RabbitMQConfig {
      */
     private static final String[] PAQUETS_DE_CONFIANCE =
             {"com.leadflow.capture", "com.leadflow.qualification", "com.leadflow.routing",
-                    "com.leadflow.crm"};
+                    "com.leadflow.crm", "com.leadflow.notification"};
 
     /**
      * Le convertisseur ne fait confiance qu'a {@code java.util} et {@code java.lang} par

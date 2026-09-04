@@ -201,7 +201,7 @@ tables : `raw_lead_event` (la capture), `lead` (la qualification et l'attributio
 table d'événements.
 
 Chaque entrée porte quatre champs — `type` parmi `CAPTURE`, `QUALIFICATION`, `ATTRIBUTION`,
-`REATTRIBUTION`, `SYNC_ERP`, `MORT`, `REJEU`, `ECART` ; `at` ; `outcome` parmi `SUCCES`,
+`REATTRIBUTION`, `SYNC_ERP`, `NOTIFICATION`, `MORT`, `REJEU`, `ECART` ; `at` ; `outcome` parmi `SUCCES`,
 `ECHEC`, `NEUTRE` ; et un `details` de chaînes. **Aucune phrase n'est composée côté serveur** :
 l'API rend des faits typés, le dashboard les met en français.
 
@@ -217,6 +217,13 @@ chronologie qu'un lead réattribué a toujours appartenu à son commercial actue
 `REATTRIBUTION` juste en dessous la contredirait. L'origine se dérive du journal — c'est le
 `previous_sales_rep_id` de la **première** réattribution — et vaut le titulaire courant quand
 il n'y en a eu aucune, ce qui est le cas courant.
+
+**Une `NOTIFICATION` `IGNOREE` explique un silence, et n'est pas un échec.** Ses détails
+portent `canal`, `statut`, `score`, `seuil`, le `destinataire` quand il est connu, et
+`erreur` le cas échéant. Son `outcome` vaut `NEUTRE` pour un envoi comme pour un lead sous le
+seuil, `ECHEC` pour un relais qui a refusé. **Le score et le seuil sont ceux figés au moment
+de la décision**, jamais relus : régler le barème d'une boutique ne fait donc pas mentir
+l'historique de ses notifications.
 
 **`ECART` n'est pas un `REJEU`.** Les deux suivent la même mort, mais l'un abandonne le
 message et l'autre le republie : les confondre annoncerait un traitement là où il y a eu

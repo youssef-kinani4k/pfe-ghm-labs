@@ -32,6 +32,9 @@ RabbitMQ  leadflow.leads  --(3 echecs)-->  leadflow.leads.dlq
 [crm]  CrmConnector (port)  -->  crm.dolibarr  |  crm.odoo  |  ...
     |
     v
+[notification]  CanalDeNotification (port)  -->  notification.smtp  |  ...
+    |
+    v
 [monitoring]  API REST  -->  dashboard Angular
 ```
 
@@ -345,6 +348,65 @@ survit au rollback de ce qu'elle raconte. C'est ce dont depend le rejeu en echec
 journalise **avant** de laisser partir l'exception, sans quoi la seule trace d'un rejeu rate
 disparaitrait avec lui.
 
+### Notification — prevenir le commercial
+
+**Le point d'accroche n'a rien coute au pipeline.** La file `leadflow.leads.notify` est liee
+a la cle `lead.synced` que `SyncedLeadPublisher` publie deja depuis F6. Un `DirectExchange`
+livrant a **toutes** les files liees a une cle, le monitoring continue de recevoir ce qu'il
+recevait, et ni `CrmSyncService` ni son publieur n'ont eu a changer. Un test l'asserte sur
+les deux files a la fois.
+
+**On previent apres la synchronisation, jamais apres le routage.** Alerter sur `lead.routed`
+enverrait le commercial chercher une fiche qui n'existe pas encore dans son ERP, et l'alerte
+perdrait sa credibilite des la premiere fois. Le prix assume : un lead dont la
+synchronisation echoue ne declenche aucune alerte — cet echec a deja son canal, le journal
+des morts.
+
+**Le seuil de notification est distinct de `seuilChaud`.** Les deux vivent dans
+`client.scoring_config` et repondent a des questions differentes : colorer une pastille, et
+deranger quelqu'un. On tolere un badge genereux, pas une boite mail saturee. Aucune migration
+n'a ete necessaire — c'est precisement ce pour quoi ce reglage est un document JSON — et la
+lecture etant tolerante, toute boutique configuree avant F12 prend le defaut.
+`ScoringForm.seuilNotification` est un `Integer` et non un `int`, seul champ du record dans ce
+cas : le `PUT` remplacant le document entier, un client qui n'envoie pas le champ le lierait
+sinon a **zero**, et la boutique se mettrait a notifier tous ses leads.
+
+**Trois causes ne partent jamais en DLQ** : un score sous le seuil, un lead sans commercial,
+un commercial sans adresse. Aucune repetition ne les repare, donc elles ecrivent une trace
+explicite et acquittent — meme parti que `DISCARDED` en qualification. Seul un echec technique
+merite les trois tentatives puis la DLQ, et **sa trace s'ecrit avant que l'exception ne
+parte**, en `REQUIRES_NEW` : sans cela elle disparaitrait avec le rollback, comme le
+`LeadActionJournal` d'un rejeu rate.
+
+**`IGNOREE` est un statut, pas une absence de ligne.** Un lead sous le seuil ecrit quand meme
+sa trace, et la chronologie l'affiche : c'est ce qui repond « score 55, seuil 70 » a la
+question « pourquoi n'ai-je pas ete prevenu ? ». Le score et le seuil sont figes dans la
+ligne, jamais relus, pour qu'un reglage de bareme ne fasse pas mentir l'historique.
+
+**Le canal est inerte sans hote de relais**, et l'application demarre quand meme : c'est le
+parti de `GEMINI_API_KEY`. L'alerte est un confort, le pipeline ne l'est pas. Le profil `dev`
+ne porte donc aucun repli — un repli vers un serveur imaginaire ferait mourir chaque lead
+chaud en developpement.
+
+**Les reglages du relais sont globaux a l'instance**, pas portes par le client : l'agence
+exploite un seul relais pour toutes ses boutiques. Ce qui se regle par boutique, c'est le
+seuil. `SondeNotification` eprouve la configuration depuis l'ecran « Parametres » en envoyant
+un **vrai** message d'essai — un diagnostic qui ne prouverait que l'ouverture du port ne
+prouverait rien — et n'ecrit aucune ligne de `notification_attempt`.
+
+**L'alerte ne cite aucun lien vers le dashboard**, et porte a la place le telephone du
+prospect et son message. Le commercial n'a **aucun compte** sur la console — un seul modele
+d'utilisateur, aucun role — donc un lien l'enverrait sur un ecran de connexion qu'il ne peut
+pas franchir, et un lien mort dans une alerte apprend surtout a ignorer les suivantes. Un
+test le verrouille. Pointer vers l'ERP serait la bonne reponse a terme, le lead y etant deja
+et le commercial y ayant un vrai compte, mais construire cette URL demanderait au port
+`CrmConnector` de la fournir.
+
+**Ajouter un canal** = une classe `@Component` implementant `CanalDeNotification`, dans son
+propre sous-package. Aucun `switch`, aucun autre package a modifier — et **aucun terme propre
+a un canal dans `NotificationLead`**, sans quoi la generalisation est perdue exactement comme
+elle le serait dans `crm/model`.
+
 ### Monitoring — l'observateur
 
 Le contrat complet de l'API, avec exemples `curl` et reponses, vit dans
@@ -399,8 +461,9 @@ drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur no
 n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
 **La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
-recompose en lecture seule ce que le lead a vecu depuis cinq tables existantes —
-`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter` et, depuis F10, `lead_action` —
+recompose en lecture seule ce que le lead a vecu depuis six tables existantes —
+`raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter`, `lead_action` depuis F10 et
+`notification_attempt` depuis F12 —
 sans qu'aucune table d'evenements n'existe. Quatre consequences a ne pas casser. **L'endpoint
 est separe du detail** parce que la fiche rafraichit la seule chronologie apres une
 reattribution, sans refaire tout le detail. **Une entree non datee garde sa place dans le
@@ -450,6 +513,7 @@ responsabilite — le lire avant d'ajouter du code dedans.
 - `qualification/` — consommateur de la file : validation, dedup, NLP, scoring.
 - `routing/` — selection du commercial, notifications.
 - `crm/` — port de sortie vers les ERP/CRM (voir la section dediee plus bas).
+- `notification/` — port de sortie vers les canaux d'alerte du commercial.
 - `monitoring/` — API REST du dashboard.
 - `tenant/` — donnees de reference multi-tenant : client et commerciaux. Seul package qui
   ne soit pas une etape du pipeline ; il porte ce qui parametre toutes les etapes.
@@ -464,7 +528,7 @@ prefixe `leadflow.*` et se lisent via un `record`
 `@ConfigurationProperties` place dans `config/` — `@ConfigurationPropertiesScan` est actif
 sur `BackendApplication`, aucun enregistrement manuel n'est necessaire.
 
-Cinq variables gouvernent l'instance :
+Cinq variables gouvernent l'instance, plus celles du relais d'alerte :
 
 | Variable                       | Role                                                    |
 | ------------------------------ | ------------------------------------------------------- |
@@ -473,6 +537,10 @@ Cinq variables gouvernent l'instance :
 | `LEADFLOW_ADMIN_USER`          | Identifiant de l'operateur (defaut `admin`)              |
 | `LEADFLOW_ADMIN_PASSWORD_HASH` | **Hash BCrypt** du mot de passe, jamais le mot de passe  |
 | `GEMINI_API_KEY`               | Repli de la cle d'analyse d'intention ; l'ecran prime    |
+| `LEADFLOW_SMTP_HOST`           | Relais d'envoi des alertes. **Absent : canal inerte**    |
+| `LEADFLOW_SMTP_USERNAME`       | Identifiant du relais, si celui-ci en demande un         |
+| `LEADFLOW_SMTP_PASSWORD`       | Son mot de passe                                         |
+| `LEADFLOW_SMTP_FROM`           | Adresse d'expedition des alertes                         |
 
 **`LEADFLOW_JWT_SECRET` n'a aucune valeur de repli en production, comme `LEADFLOW_MASTER_KEY`** :
 l'application refuse de demarrer plutot que de signer avec un secret devinable. Le controle
@@ -496,7 +564,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Huit migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Neuf migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -505,7 +573,8 @@ l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt
 (quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
 en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial) et
-`V8__lead_action.sql` (journal des gestes humains portes par un lead).
+`V8__lead_action.sql` (journal des gestes humains portes par un lead) et
+`V9__notification_attempt.sql` (trace des alertes envoyees au commercial).
 
 **`V8` porte deux choses.** La table `lead_action` d'abord — qui a change quoi, quand, et
 **pourquoi** : `dead_letter` ne retenait d'un rejeu que `replayed_by` et `replayed_at`, jamais
@@ -711,8 +780,9 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 ## Etat actuel
 
 Le pipeline est **complet de bout en bout, observable et administrable** : capture (F2),
-qualification (F3), routage et synchronisation ERP (F4), sur le socle multi-tenant de F1, les
-adaptateurs de F5, le monitoring de F6 et la gestion des boutiques de F7.
+qualification (F3), routage et synchronisation ERP (F4), notification du commercial (F12), sur
+le socle multi-tenant de F1, les adaptateurs de F5, le monitoring de F6 et la gestion des
+boutiques de F7.
 
 Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et dix ecrans Angular
 couvrent l'exploitation comme l'administration.
@@ -726,10 +796,11 @@ gestes humains laissent une trace dans `lead_action`, et la chronologie du lead 
 
 Ce qui n'existe pas :
 
-- **Aucune notification n'est envoyee au commercial** : ni tache d'agenda dans l'ERP, ni
-  alerte pour les leads chauds. Depuis F8, `ScoringConfig.seuilChaud` a un consommateur — le
-  badge du dashboard — mais **il reste passif** : un lead chaud se voit si quelqu'un regarde
-  l'ecran, personne n'est prevenu.
+- **L'alerte du commercial ne passe que par l'e-mail** : depuis F12 un lead au-dessus du
+  seuil de notification de sa boutique declenche un envoi SMTP, mais **aucune tache d'agenda
+  n'est creee dans l'ERP**. Ce second canal demanderait un adaptateur de plus derriere le
+  port `CanalDeNotification` — additif, contrairement a la propagation d'une reattribution.
+  Et rien ne previent l'operateur qu'une alerte a echoue, sinon le journal des morts.
 - **Aucun recalcul retroactif des scores** : changer un bareme ne touche pas les leads deja
   qualifies. Le badge se deplace, le score non — c'est voulu, mais cela surprend.
 - **Une reattribution ne remonte pas jusqu'a l'ERP** : elle corrige LeadFlow, pas Dolibarr

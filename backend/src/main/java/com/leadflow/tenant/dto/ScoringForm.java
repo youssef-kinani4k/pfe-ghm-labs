@@ -1,6 +1,7 @@
 package com.leadflow.tenant.dto;
 
 import com.leadflow.qualification.LeadIntent;
+import com.leadflow.qualification.ScoringConfig;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -36,7 +37,25 @@ public record ScoringForm(
         @NotNull Set<@Size(max = 80) String> secteursCibles,
         @NotNull Set<@Pattern(regexp = "(?i)[a-z]{2}") String> paysCibles,
         @Min(0) @Max(100) int bonusCible,
-        @Min(0) @Max(100) int seuilChaud) {
+        @Min(0) @Max(100) int seuilChaud,
+        @Min(0) @Max(100) Integer seuilNotification) {
+
+    /**
+     * {@code seuilNotification} est un {@code Integer} et non un {@code int}, contrairement a
+     * tous les autres champs, et c'est delibere. Le {@code PUT} remplace le document entier :
+     * un client ecrit avant F12 n'envoie pas ce champ, et un {@code int} le lierait alors a
+     * <b>zero</b> — la boutique se mettrait a notifier tous ses leads sans que personne ne
+     * l'ait demande. Le compact constructor lui substitue le defaut, seule valeur sure.
+     *
+     * <p>{@code seuilChaud} ne recoit pas le meme traitement, et l'asymetrie est assumee :
+     * un seuil de chaleur tombe a zero colore trop de pastilles, un seuil de notification
+     * tombe a zero sature des boites mail.
+     */
+    public ScoringForm {
+        if (seuilNotification == null) {
+            seuilNotification = ScoringConfig.defaut().seuilNotification();
+        }
+    }
 
     /** Document tel qu'il part dans {@code client.scoring_config}. */
     public Map<String, Object> versDocument() {
@@ -56,10 +75,11 @@ public record ScoringForm(
         document.put("paysCibles", List.copyOf(paysCibles));
         document.put("bonusCible", bonusCible);
         document.put("seuilChaud", seuilChaud);
+        document.put("seuilNotification", seuilNotification);
         return document;
     }
 
-    public static ScoringForm de(com.leadflow.qualification.ScoringConfig bareme) {
+    public static ScoringForm de(ScoringConfig bareme) {
         return new ScoringForm(
                 bareme.telephonePresent(),
                 bareme.societePresente(),
@@ -69,6 +89,7 @@ public record ScoringForm(
                 bareme.secteursCibles(),
                 bareme.paysCibles(),
                 bareme.bonusCible(),
-                bareme.seuilChaud());
+                bareme.seuilChaud(),
+                bareme.seuilNotification());
     }
 }

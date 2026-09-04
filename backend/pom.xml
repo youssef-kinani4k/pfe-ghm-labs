@@ -28,8 +28,10 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<!-- Les tests contre de vrais ERP ne tournent que sous -Perp-it. -->
-		<erp.excludedGroups>erp</erp.excludedGroups>
+		<!-- Les etages d'integration ne tournent que sous leur profil : -Perp-it contre de
+		     vrais Dolibarr et Odoo, -Pnotification-it contre un vrai relais SMTP. Chaque
+		     profil n'ouvre que le sien — sans quoi -Perp-it ferait partir de vrais e-mails. -->
+		<tests.excludedGroups>erp,notification</tests.excludedGroups>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -47,6 +49,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -126,6 +132,12 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>com.icegreen</groupId>
+			<artifactId>greenmail-junit5</artifactId>
+			<version>2.1.9</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-testcontainers</artifactId>
 			<scope>test</scope>
@@ -157,7 +169,7 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
-					<excludedGroups>${erp.excludedGroups}</excludedGroups>
+					<excludedGroups>${tests.excludedGroups}</excludedGroups>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -207,8 +219,16 @@
 		<profile>
 			<id>erp-it</id>
 			<properties>
-				<!-- Groupe inexistant : plus rien n'est exclu, les tests @Tag("erp") tournent. -->
-				<erp.excludedGroups>aucun-groupe-exclu</erp.excludedGroups>
+				<!-- Les tests @Tag("erp") tournent ; ceux du relais restent exclus, sinon ce
+				     profil enverrait de vrais e-mails a chaque execution ERP. -->
+				<tests.excludedGroups>notification</tests.excludedGroups>
+			</properties>
+		</profile>
+		<profile>
+			<id>notification-it</id>
+			<properties>
+				<!-- Symetrique : le relais est eprouve, les ERP restent hors jeu. -->
+				<tests.excludedGroups>erp</tests.excludedGroups>
 			</properties>
 		</profile>
 	</profiles>

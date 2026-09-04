@@ -17,11 +17,16 @@ import com.leadflow.qualification.ScoringConfig;
  *
  * <p>{@code seuilInatteignable} dit qu'aucun lead ne pourra jamais etre chaud avec ce bareme.
  * Ce n'est pas une erreur de saisie — c'est un etat qu'il faut voir.
+ *
+ * <p>{@code notificationInatteignable} dit la meme chose du seuil de notification, et compte
+ * davantage : un badge qui ne s'allume jamais se remarque, un commercial qui n'est jamais
+ * prevenu ne remarque rien du tout.
  */
 public record ScoringView(
         ScoringForm valeurs,
         int scoreMaximum,
         boolean seuilInatteignable,
+        boolean notificationInatteignable,
         ScoringForm defauts) {
 
     private static final int PLANCHER = 0;
@@ -43,6 +48,7 @@ public record ScoringView(
                 ScoringForm.de(bareme),
                 maximum,
                 bareme.seuilChaud() > maximum,
+                bareme.seuilNotification() > maximum,
                 ScoringForm.de(ScoringConfig.defaut()));
     }
 }
