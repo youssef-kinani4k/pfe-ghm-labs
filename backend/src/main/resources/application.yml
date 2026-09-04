@@ -149,6 +149,25 @@ leadflow:
       read-timeout: 8s
       # Garde-fou sur le texte envoye au modele.
       max-message-chars: 2000
+  notification:
+    listener:
+      # Presence du consommateur de leadflow.leads.notify. Toujours vrai en production ;
+      # la suite de tests le retire, comme les cinq autres consommateurs.
+      enabled: true
+    # Adresse de la fiche citee dans l'alerte. {id} est remplace par l'identifiant du lead.
+    url-fiche: ${LEADFLOW_URL_FICHE:http://localhost:4200/leads/{id}}
+    smtp:
+      # Reglages globaux a l'instance : l'agence exploite un seul relais pour toutes ses
+      # boutiques. Un hote absent rend le canal INERTE — l'application demarre, les leads
+      # continuent d'etre traites, et chaque alerte laisse une trace disant pourquoi elle
+      # n'a pas eu lieu. C'est le parti de GEMINI_API_KEY.
+      enabled: ${LEADFLOW_SMTP_ENABLED:true}
+      host: ${LEADFLOW_SMTP_HOST:}
+      port: ${LEADFLOW_SMTP_PORT:587}
+      username: ${LEADFLOW_SMTP_USERNAME:}
+      password: ${LEADFLOW_SMTP_PASSWORD:}
+      from: ${LEADFLOW_SMTP_FROM:leadflow@localhost}
+      timeout: ${LEADFLOW_SMTP_TIMEOUT:10s}
   crm:
     listener:
       # Presence du consommateur de leadflow.leads.routed. Toujours vrai en production ;
