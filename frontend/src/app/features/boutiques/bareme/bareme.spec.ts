@@ -167,15 +167,20 @@ describe('Bareme', () => {
   });
 
   /**
-   * Les deux seuils sont a un caractere l'un de l'autre dans le formulaire. Ce qui les
-   * distingue n'est pas leur nom mais ce que l'ecran dit qu'ils font.
+   * Regler le mauvais seuil est une erreur silencieuse : elle ne se voit qu'au lead suivant,
+   * ou a son absence. C'est arrive en recette de F12, avec deux champs nommes « Seuil ... ».
+   * Les libelles decrivent donc l'action et ne partagent plus aucun mot.
    */
-  it("dit a l'ecran ce qui distingue les deux seuils", () => {
+  it('nomme les deux seuils par leur action, sans mot commun', () => {
     const fixture = ecran();
 
     const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(texte).toContain('badge');
-    expect(texte).toContain('e-mail');
+    expect(texte).toContain('Badge « chaud » a partir de');
+    expect(texte).toContain('Alerter le commercial a partir de');
+    // Aucun des deux libelles ne commence par « Seuil » : c'est ce mot partage qui les
+    // rendait interchangeables en lecture diagonale.
+    expect(texte).not.toContain('Seuil chaud');
+    expect(texte).not.toContain('Seuil de notification');
   });
 
   it('revient aux defauts sans rien demander au serveur', () => {

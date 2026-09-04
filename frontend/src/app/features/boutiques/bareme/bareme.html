@@ -167,24 +167,30 @@
         <mat-card-header>
           <mat-card-title class="bareme__titre">Seuils</mat-card-title>
           <mat-card-subtitle>
-            Deux seuils, deux effets distincts. Le score total est borne a 100 : maximum atteignable
-            avec ce bareme, {{ scoreMaximum() }}.
+            Deux reglages independants : l'un colore, l'autre alerte. Le score total est borne a 100
+            ; maximum atteignable avec ce bareme, {{ scoreMaximum() }}.
           </mat-card-subtitle>
         </mat-card-header>
         <mat-card-content class="bareme__champs">
+          <!-- Les deux libelles ne partagent volontairement aucun mot, et decrivent l'ACTION
+               plutot que l'objet. Deux champs nommes « Seuil ... » se confondent en lecture
+               diagonale, et regler le mauvais est une erreur silencieuse : elle ne se voit
+               qu'au lead suivant, ou a son absence. L'icone double la distinction. -->
           <mat-form-field appearance="outline">
-            <mat-label>Seuil chaud</mat-label>
+            <mat-label>Badge « chaud » a partir de</mat-label>
+            <mat-icon matPrefix aria-hidden="true">local_fire_department</mat-icon>
             <input matInput type="number" min="0" max="100" formControlName="seuilChaud" />
-            <!-- Ce qui distingue les deux champs n'est pas leur nom, presque identique, mais
-                 ce que l'ecran dit qu'ils font. -->
-            <mat-hint>Colore le badge « chaud » dans la liste. N envoie rien.</mat-hint>
+            <mat-hint
+              >Colore la pastille dans la liste des leads. N envoie rien a personne.</mat-hint
+            >
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Seuil de notification</mat-label>
+            <mat-label>Alerter le commercial a partir de</mat-label>
+            <mat-icon matPrefix aria-hidden="true">outgoing_mail</mat-icon>
             <input matInput type="number" min="0" max="100" formControlName="seuilNotification" />
             <mat-hint>
-              Le commercial recoit un e-mail a partir de ce score, une fois le lead synchronise.
+              Un e-mail part au commercial, une fois le lead synchronise dans l ERP.
             </mat-hint>
           </mat-form-field>
         </mat-card-content>
