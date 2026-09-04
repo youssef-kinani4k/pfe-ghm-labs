@@ -11,17 +11,23 @@
 -- Secret HMAC en clair, pour signer les requetes de test en F2 :
 --   c6702b700b1673ae027ce903ff753c4239522e71b21297259c396540b9e5ec19
 --
--- ATTENTION — cette valeur en clair est FAUSSE depuis F7.2 : elle ne correspond pas au
--- chiffre pose plus bas dans hmac_secret. Signer avec elle rend 401. Verifie le 31 aout
--- 2026 sur une base neuve. La corriger demande de rechiffrer une valeur choisie avec la
--- cle maitre de dev, ce qui n'a pas ete fait ici ; en attendant, le geste qui marche est
--- de faire tourner le secret depuis l'ecran « Boutiques » du dashboard, qui le rend une
--- seule fois, a la rotation.
+-- Cette valeur en clair est bien celle que hmac_secret contient, et DonneesDeDemoTest le
+-- verifie a chaque ./mvnw test : il dechiffre la colonne avec la cle maitre de
+-- application-dev.yml et la compare a la ligne ci-dessus. Les deux ne peuvent donc plus
+-- diverger sans que la suite le dise.
 --
--- Meme reserve pour public_key, pour une raison differente : cette migration est repetable,
--- donc elle ne se rejoue que si son contenu change. Sur une base docker compose deja
--- utilisee — elle est persistante d'une session a l'autre —, une clef publique tournee
--- depuis le dashboard reste en place et c'est elle qui fait foi, pas la valeur ci-dessous.
+-- Elle a ete tenue pour FAUSSE entre le 31 aout et le 4 septembre 2026, a la suite d'un 401
+-- au webhook. C'etait une erreur : le 4 septembre, un webhook signe avec cette valeur a rendu
+-- 202 sur cette base, les deux colonnes chiffrees n'ont pas bouge depuis F1, et la base
+-- portait exactement le chiffre de ce fichier. La cause du 401 d'aout n'a jamais ete
+-- etablie ; elle n'etait pas ici.
+--
+-- Le piege reel, lui, tient a la persistance : cette migration est repetable, donc elle ne se
+-- rejoue que si son contenu change. Sur une base docker compose deja utilisee — elle survit
+-- d'une session a l'autre —, un secret ou une clef publique tournes depuis l'ecran
+-- « Boutiques » restent en place et ce sont eux qui font foi, pas les valeurs ci-dessous.
+-- Cela vaut pour hmac_secret comme pour public_key. Le geste qui tranche : lire la fiche de
+-- la boutique dans le dashboard, ou repartir d'une base neuve par docker compose down -v.
 --
 -- Contenu en clair de crm_config, pour la verification manuelle du pipeline en F4 :
 --   {"baseUrl":"http://localhost:8081/api/index.php","apiKey":"cle-dolibarr-de-demo"}
