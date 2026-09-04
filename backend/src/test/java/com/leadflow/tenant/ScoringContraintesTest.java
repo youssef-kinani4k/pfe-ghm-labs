@@ -88,6 +88,7 @@ class ScoringContraintesTest {
                 Set.of(secteur),
                 Set.of(pays),
                 10,
+                70,
                 70);
     }
 

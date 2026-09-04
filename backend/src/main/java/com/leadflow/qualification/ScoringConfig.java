@@ -17,8 +17,14 @@ import java.util.Set;
  * carrement malforme, les valeurs manquantes prennent le defaut et rien n'echoue. Un client
  * mal configure doit produire un score discutable, jamais un lead perdu.
  *
- * @param seuilChaud lu et porte des maintenant pour figer la forme du document, mais F3 ne
- *     s'en sert pas : c'est F4 qui alertera sur les leads chauds
+ * @param seuilChaud score a partir duquel le badge « chaud » s'allume dans le monitoring.
+ *     Il est calcule a la lecture et ne declenche rien : c'est un fait d'affichage.
+ * @param seuilNotification score a partir duquel le commercial est <b>prevenu</b>. Distinct
+ *     de {@code seuilChaud}, et non le meme reglage porte deux fois : les deux repondent a
+ *     des questions differentes — colorer une pastille, et deranger quelqu'un — et meritent
+ *     des valeurs differentes, parce qu'on tolere un badge genereux mais pas une boite mail
+ *     saturee. Les confondre donnerait deux roles a un meme champ, et deplacer le seuil pour
+ *     ajuster l'affichage changerait silencieusement qui recoit des e-mails.
  */
 public record ScoringConfig(
         int telephonePresent,
@@ -29,10 +35,12 @@ public record ScoringConfig(
         Set<String> secteursCibles,
         Set<String> paysCibles,
         int bonusCible,
-        int seuilChaud) {
+        int seuilChaud,
+        int seuilNotification) {
 
     public static ScoringConfig defaut() {
-        return new ScoringConfig(15, 10, 5, 10, intentionsParDefaut(), Set.of(), Set.of(), 10, 70);
+        return new ScoringConfig(
+                15, 10, 5, 10, intentionsParDefaut(), Set.of(), Set.of(), 10, 70, 70);
     }
 
     private static Map<LeadIntent, Integer> intentionsParDefaut() {
@@ -60,7 +68,8 @@ public record ScoringConfig(
                 minuscules(document.get("secteursCibles")),
                 majuscules(document.get("paysCibles")),
                 entier(document.get("bonusCible"), defaut.bonusCible()),
-                entier(document.get("seuilChaud"), defaut.seuilChaud()));
+                entier(document.get("seuilChaud"), defaut.seuilChaud()),
+                entier(document.get("seuilNotification"), defaut.seuilNotification()));
     }
 
     /**
