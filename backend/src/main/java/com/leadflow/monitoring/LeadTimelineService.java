@@ -12,12 +12,22 @@ import com.leadflow.monitoring.dto.TimelineEntry;
 import com.leadflow.monitoring.dto.TimelineEventType;
 import com.leadflow.monitoring.dto.TimelineOutcome;
 import com.leadflow.qualification.Lead;
+import com.leadflow.routing.LeadAction;
+import com.leadflow.routing.LeadActionOutcome;
+import com.leadflow.routing.LeadActionRepository;
+import com.leadflow.routing.LeadActionType;
+import com.leadflow.tenant.SalesRep;
+import com.leadflow.tenant.SalesRepRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,16 +44,22 @@ public class LeadTimelineService {
     private final RawLeadEventRepository evenements;
     private final CrmSyncAttemptRepository tentatives;
     private final DeadLetterRepository morts;
+    private final LeadActionRepository actions;
+    private final SalesRepRepository commerciaux;
 
     public LeadTimelineService(
             LeadQueryRepository leads,
             RawLeadEventRepository evenements,
             CrmSyncAttemptRepository tentatives,
-            DeadLetterRepository morts) {
+            DeadLetterRepository morts,
+            LeadActionRepository actions,
+            SalesRepRepository commerciaux) {
         this.leads = leads;
         this.evenements = evenements;
         this.tentatives = tentatives;
         this.morts = morts;
+        this.actions = actions;
+        this.commerciaux = commerciaux;
     }
 
     @Transactional(readOnly = true)
@@ -54,18 +70,32 @@ public class LeadTimelineService {
         List<TimelineEntry> entrees = new ArrayList<>();
         evenements.findById(lead.getRawEventId()).ifPresent(e -> entrees.add(capture(e)));
         entrees.add(qualification(lead));
+        List<LeadAction> journal = actions.findByLeadIdOrderByCreatedAtAsc(leadId);
+        Map<UUID, String> noms = nomsDesCommerciaux(lead, journal);
+
         if (lead.getAssignedSalesRepId() != null) {
-            entrees.add(attribution(lead));
+            entrees.add(attribution(lead, noms));
         }
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
                 .forEach(tentative -> entrees.add(synchronisation(tentative)));
 
+        Set<UUID> mortsDejaJournalisees = journal.stream()
+                .map(LeadAction::getDeadLetterId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
         morts.findByLeadIdOrderByDeadAtAsc(leadId).forEach(mort -> {
             entrees.add(mort(mort));
-            if (mort.getReplayedAt() != null) {
+            // Le rejeu derive de dead_letter ne sert plus que l'historique anterieur a V8 :
+            // des qu'une ligne de journal reference cette mort, c'est elle qui parle, et
+            // elle en dit plus — le motif, et l'issue.
+            if (mort.getReplayedAt() != null
+                    && !mortsDejaJournalisees.contains(mort.getId())) {
                 entrees.add(rejeu(mort));
             }
         });
+
+        journal.forEach(action -> entrees.add(action(action, noms)));
 
         return ordonne(entrees);
     }
@@ -137,12 +167,45 @@ public class LeadTimelineService {
                 Map.copyOf(details));
     }
 
-    private TimelineEntry attribution(Lead lead) {
+    private TimelineEntry attribution(Lead lead, Map<UUID, String> noms) {
         return new TimelineEntry(
                 TimelineEventType.ATTRIBUTION,
                 lead.getRoutedAt(),
                 TimelineOutcome.NEUTRE,
-                Map.of("commercialId", String.valueOf(lead.getAssignedSalesRepId())));
+                Map.of("commercial", nomDe(lead.getAssignedSalesRepId(), noms)));
+    }
+
+    /**
+     * Les noms des commerciaux cites par la chronologie, en une seule requete.
+     *
+     * <p>Le nom est un fait au meme titre que l'identifiant, et c'est celui que l'ecran d'une
+     * agence sait lire : un UUID n'y apprend rien a personne. Les resoudre ici plutot que
+     * dans le template evite au frontend de connaitre la boutique du lead — la chronologie
+     * est chargee seule, sans le detail.
+     */
+    private Map<UUID, String> nomsDesCommerciaux(Lead lead, List<LeadAction> journal) {
+        Set<UUID> identifiants = new HashSet<>();
+        identifiants.add(lead.getAssignedSalesRepId());
+        journal.forEach(action -> {
+            identifiants.add(action.getPreviousSalesRepId());
+            identifiants.add(action.getNewSalesRepId());
+        });
+        identifiants.remove(null);
+        if (identifiants.isEmpty()) {
+            return Map.of();
+        }
+        return commerciaux.findAllById(identifiants).stream()
+                .collect(Collectors.toMap(SalesRep::getId, SalesRep::getFullName));
+    }
+
+    /**
+     * Le nom, ou l'identifiant a defaut. {@code lead_action} ne porte pas de cle etrangere
+     * vers {@code sales_rep} — pour qu'un commercial supprime n'efface pas l'histoire — donc
+     * l'introuvable est un cas normal, et son identifiant reste la seule chose vraie qu'on
+     * puisse montrer.
+     */
+    private String nomDe(UUID identifiant, Map<UUID, String> noms) {
+        return noms.getOrDefault(identifiant, String.valueOf(identifiant));
     }
 
     private TimelineEntry mort(DeadLetter mort) {
@@ -168,6 +231,47 @@ public class LeadTimelineService {
         return new TimelineEntry(
                 TimelineEventType.REJEU, mort.getReplayedAt(), TimelineOutcome.NEUTRE,
                 Map.copyOf(details));
+    }
+
+    /**
+     * Un geste humain. Les cles de {@code details} sont des faits, jamais des phrases : la
+     * mise en francais appartient au template Angular.
+     */
+    private TimelineEntry action(LeadAction action, Map<UUID, String> noms) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("par", action.getActor());
+        details.put("motif", action.getReason());
+        if (action.getPreviousSalesRepId() != null) {
+            details.put("ancienCommercial", nomDe(action.getPreviousSalesRepId(), noms));
+        }
+        if (action.getNewSalesRepId() != null) {
+            details.put("nouveauCommercial", nomDe(action.getNewSalesRepId(), noms));
+        }
+        if (action.getDetail() != null) {
+            details.put("erreur", action.getDetail());
+        }
+        return new TimelineEntry(
+                typeDe(action.getAction()),
+                action.getCreatedAt(),
+                action.getOutcome() == LeadActionOutcome.SUCCES
+                        ? TimelineOutcome.NEUTRE
+                        : TimelineOutcome.ECHEC,
+                Map.copyOf(details));
+    }
+
+    /**
+     * Correspondance un pour un avec {@link TimelineEventType} : un ecart n'est pas un
+     * rejeu, meme s'il suit la meme mort — l'un abandonne le message, l'autre le republie,
+     * et confondre les deux a l'ecran dirait un succes la ou il y a un renoncement. Ecrit en
+     * expression, sans branche par defaut, pour qu'une valeur ajoutee a
+     * {@link LeadActionType} ne compile plus tant qu'elle n'a pas sa place ici.
+     */
+    private TimelineEventType typeDe(LeadActionType type) {
+        return switch (type) {
+            case REATTRIBUTION -> TimelineEventType.REATTRIBUTION;
+            case REJEU -> TimelineEventType.REJEU;
+            case ECART -> TimelineEventType.ECART;
+        };
     }
 
     private TimelineEntry synchronisation(CrmSyncAttempt tentative) {

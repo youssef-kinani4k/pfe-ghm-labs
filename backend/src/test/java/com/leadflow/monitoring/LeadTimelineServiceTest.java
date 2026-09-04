@@ -19,6 +19,10 @@ import com.leadflow.monitoring.dto.TimelineOutcome;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
+import com.leadflow.routing.LeadAction;
+import com.leadflow.routing.LeadActionOutcome;
+import com.leadflow.routing.LeadActionRepository;
+import com.leadflow.routing.LeadActionType;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import com.leadflow.tenant.SalesRep;
@@ -52,9 +56,11 @@ class LeadTimelineServiceTest {
     @Autowired private ClientRepository clients;
     @Autowired private SalesRepRepository commerciaux;
     @Autowired private DeadLetterRepository morts;
+    @Autowired private LeadActionRepository actions;
 
     private UUID clientId;
     private UUID commercialId;
+    private UUID leadId;
     /**
      * Le fixture est ancre sur l'instant courant, et non sur une date fixe : la date de
      * qualification est {@code lead.created_at}, posee par {@code @PrePersist} au moment de
@@ -72,6 +78,7 @@ class LeadTimelineServiceTest {
      */
     @AfterEach
     void nettoyage() {
+        actions.deleteAll();
         morts.deleteAll();
         tentatives.deleteAll();
         leads.deleteAll();
@@ -99,6 +106,13 @@ class LeadTimelineServiceTest {
         commercial.setEmail("karim+" + UUID.randomUUID() + "@demo.test");
         commercial.setActive(true);
         commercialId = commerciaux.saveAndFlush(commercial).getId();
+
+        // Un lead deja attribue, dans le passe : les tests du journal (reattribution, rejeu)
+        // y ajoutent une ligne dont la date est posee par @PrePersist a l'instant de
+        // l'ecriture, donc necessairement apres cette attribution.
+        leadId = leadAvec(
+                base.minus(2, ChronoUnit.HOURS), base.minus(1, ChronoUnit.HOURS),
+                LeadStatus.ROUTED);
     }
 
     private UUID leadAvec(Instant recuA, Instant attribueA, LeadStatus statut) {
@@ -269,5 +283,182 @@ class LeadTimelineServiceTest {
 
         assertThat(timeline).filteredOn(e -> e.type() == TimelineEventType.REJEU).isEmpty();
         assertThat(timeline).filteredOn(e -> e.type() == TimelineEventType.MORT).hasSize(1);
+    }
+
+    @Test
+    void laReattributionApparaitApresLAttribution() {
+        // Le lead et son attribution sont poses par le jeu de donnees de la classe.
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(UUID.randomUUID());
+        action.setNewSalesRepId(UUID.randomUUID());
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        List<TimelineEventType> types = entrees.stream().map(TimelineEntry::type).toList();
+        assertThat(types).contains(TimelineEventType.REATTRIBUTION);
+        assertThat(types.indexOf(TimelineEventType.REATTRIBUTION))
+                .isGreaterThan(types.indexOf(TimelineEventType.ATTRIBUTION));
+
+        TimelineEntry reattribution = entrees.stream()
+                .filter(e -> e.type() == TimelineEventType.REATTRIBUTION)
+                .findFirst()
+                .orElseThrow();
+        assertThat(reattribution.details()).containsEntry("par", "admin");
+        assertThat(reattribution.details()).containsEntry("motif", "Depart en conge");
+    }
+
+    @Test
+    void lesCommerciauxSontNommesEtNonIdentifies() {
+        // Un deuxieme commercial, pour que la reattribution ait une cible reelle.
+        SalesRep repreneuse = new SalesRep();
+        repreneuse.setClient(clients.findById(clientId).orElseThrow());
+        repreneuse.setFullName("Amina Bensalem");
+        repreneuse.setEmail("amina+" + UUID.randomUUID() + "@demo.test");
+        repreneuse.setActive(true);
+        UUID repreneuseId = commerciaux.saveAndFlush(repreneuse).getId();
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(commercialId);
+        action.setNewSalesRepId(repreneuseId);
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        // Un UUID ne se lit pas : l'ecran est celui d'une agence, pas d'un administrateur
+        // de base. Le nom est un fait, au meme titre que l'identifiant — il n'y a pas de
+        // phrase composee ici.
+        assertThat(detail(entrees, TimelineEventType.ATTRIBUTION))
+                .containsEntry("commercial", "Karim Idrissi");
+        assertThat(detail(entrees, TimelineEventType.REATTRIBUTION))
+                .containsEntry("ancienCommercial", "Karim Idrissi")
+                .containsEntry("nouveauCommercial", "Amina Bensalem");
+    }
+
+    @Test
+    void unCommercialIntrouvableGardeSonIdentifiant() {
+        UUID disparu = UUID.randomUUID();
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REATTRIBUTION);
+        action.setActor("admin");
+        action.setReason("Depart en conge");
+        action.setPreviousSalesRepId(disparu);
+        action.setNewSalesRepId(commercialId);
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        // Le journal ne porte pas de cle etrangere vers sales_rep, pour qu'un commercial
+        // supprime n'efface pas l'histoire. L'identifiant reste alors la seule chose vraie
+        // qu'on puisse afficher — mieux qu'un blanc ou qu'un nom invente.
+        assertThat(detail(service.timeline(leadId), TimelineEventType.REATTRIBUTION))
+                .containsEntry("ancienCommercial", disparu.toString());
+    }
+
+    private Map<String, String> detail(List<TimelineEntry> entrees, TimelineEventType type) {
+        return entrees.stream()
+                .filter(e -> e.type() == type)
+                .findFirst()
+                .orElseThrow()
+                .details();
+    }
+
+    @Test
+    void unRejeuJournaliseNApparaitQuUneFois() {
+        DeadLetter mort = new DeadLetter();
+        mort.setOriginQueue("leadflow.leads.routed");
+        mort.setRoutingKey("lead.routed");
+        mort.setPayload("{}");
+        mort.setLeadId(leadId);
+        mort.setStatus(DeadLetterStatus.REPLAYED);
+        mort.setDeadAt(Instant.now());
+        mort.setReplayedAt(Instant.now());
+        mort.setReplayedBy("admin");
+        DeadLetter enregistree = morts.saveAndFlush(mort);
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.REJEU);
+        action.setActor("admin");
+        action.setReason("Dolibarr etait tombe");
+        action.setDeadLetterId(enregistree.getId());
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        assertThat(entrees.stream().filter(e -> e.type() == TimelineEventType.REJEU))
+                .hasSize(1);
+        assertThat(entrees.stream()
+                        .filter(e -> e.type() == TimelineEventType.REJEU)
+                        .findFirst()
+                        .orElseThrow()
+                        .details())
+                .containsEntry("motif", "Dolibarr etait tombe");
+    }
+
+    @Test
+    void unRejeuAnterieurAV8GardeSonEntreeDerivee() {
+        // Aucune ligne de lead_action : c'est tout l'historique d'avant la migration. Le
+        // rejeu doit rester visible, avec ce qu'on sait de lui — qui, et quand.
+        DeadLetter mort = new DeadLetter();
+        mort.setOriginQueue("leadflow.leads.routed");
+        mort.setRoutingKey("lead.routed");
+        mort.setPayload("{}");
+        mort.setLeadId(leadId);
+        mort.setStatus(DeadLetterStatus.REPLAYED);
+        mort.setDeadAt(Instant.now());
+        mort.setReplayedAt(Instant.now());
+        mort.setReplayedBy("admin");
+        morts.saveAndFlush(mort);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        assertThat(entrees.stream().filter(e -> e.type() == TimelineEventType.REJEU))
+                .hasSize(1);
+    }
+
+    @Test
+    void unEcartApparaitCommeTelEtNonCommeUnRejeu() {
+        // Meme construction que DeadLetterReplayService#ecarte : la mort ecartee porte quand
+        // meme replayedAt/replayedBy. Sans la deduplication, l'entree derivee REJEU
+        // apparaitrait en plus de l'entree ECART — c'est ce que ce test verrouille.
+        DeadLetter mort = new DeadLetter();
+        mort.setOriginQueue("leadflow.leads.routed");
+        mort.setRoutingKey("lead.routed");
+        mort.setPayload("{}");
+        mort.setLeadId(leadId);
+        mort.setStatus(DeadLetterStatus.DISCARDED);
+        mort.setDeadAt(Instant.now());
+        mort.setReplayedAt(Instant.now());
+        mort.setReplayedBy("admin");
+        DeadLetter enregistree = morts.saveAndFlush(mort);
+
+        LeadAction action = new LeadAction();
+        action.setLeadId(leadId);
+        action.setAction(LeadActionType.ECART);
+        action.setActor("admin");
+        action.setReason("Client injoignable, abandon");
+        action.setDeadLetterId(enregistree.getId());
+        action.setOutcome(LeadActionOutcome.SUCCES);
+        actions.saveAndFlush(action);
+
+        List<TimelineEntry> entrees = service.timeline(leadId);
+
+        assertThat(entrees.stream().filter(e -> e.type() == TimelineEventType.ECART))
+                .hasSize(1);
+        assertThat(entrees.stream().filter(e -> e.type() == TimelineEventType.REJEU))
+                .isEmpty();
     }
 }

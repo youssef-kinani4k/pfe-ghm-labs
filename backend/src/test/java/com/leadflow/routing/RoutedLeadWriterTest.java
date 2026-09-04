@@ -102,4 +102,65 @@ class RoutedLeadWriterTest {
         Lead lead = new Lead();
         assertThat(lead.getRoutedAt()).isNull();
     }
+
+    @Test
+    void laReattributionNeToucheNiLeStatutNiLaDateDAttribution() {
+        Client client = new Client();
+        client.setPublicKey("cle-" + UUID.randomUUID());
+        client.setName("Agence Sud");
+        client.setHmacSecret("secret");
+        client.setCrmProviderId("dolibarr");
+        client.setCrmConfig(Map.of());
+        Client boutique = clients.saveAndFlush(client);
+        UUID clientId = boutique.getId();
+
+        SalesRep premier = new SalesRep();
+        premier.setClient(boutique);
+        premier.setFullName("Amina Bensalem");
+        premier.setEmail("amina+" + UUID.randomUUID() + "@demo.test");
+        premier.setActive(true);
+        UUID premierId = commerciaux.saveAndFlush(premier).getId();
+
+        SalesRep second = new SalesRep();
+        second.setClient(boutique);
+        second.setFullName("Karim Haddad");
+        second.setEmail("karim+" + UUID.randomUUID() + "@demo.test");
+        second.setActive(true);
+        UUID secondId = commerciaux.saveAndFlush(second).getId();
+
+        RawLeadEvent evenement = new RawLeadEvent();
+        evenement.setClientId(clientId);
+        evenement.setSource("formulaire");
+        evenement.setPayload(new HashMap<>(Map.of("email", "b@exemple.fr")));
+        evenement.setSignature("sig-" + UUID.randomUUID());
+        evenement.setReceivedAt(Instant.now());
+        UUID rawEventId = evenements.saveAndFlush(evenement).getId();
+
+        Lead lead = new Lead();
+        lead.setClientId(clientId);
+        lead.setRawEventId(rawEventId);
+        lead.setEmail("b@exemple.fr");
+        lead.setScore(60);
+        lead.setStatus(LeadStatus.QUALIFIED);
+        UUID leadId = leads.saveAndFlush(lead).getId();
+
+        writer.attribue(leadId, premierId);
+        Instant dateDAttribution = leads.findById(leadId).orElseThrow().getRoutedAt();
+
+        // Le lead passe SYNCED entre l'attribution et la reattribution : c'est le cas qui
+        // compte, celui d'un lead deja pousse dans l'ERP.
+        Lead synchronise = leads.findById(leadId).orElseThrow();
+        synchronise.setStatus(LeadStatus.SYNCED);
+        leads.saveAndFlush(synchronise);
+
+        writer.reattribue(leadId, secondId);
+
+        Lead relu = leads.findById(leadId).orElseThrow();
+        assertThat(relu.getAssignedSalesRepId()).isEqualTo(secondId);
+        // Les deux assertions qui font tout l'interet du test : la reattribution n'est pas
+        // une attribution. routed_at date le passage automatique, qui a bien eu lieu ; le
+        // statut appartient au pipeline, pas a l'operateur.
+        assertThat(relu.getStatus()).isEqualTo(LeadStatus.SYNCED);
+        assertThat(relu.getRoutedAt()).isEqualTo(dateDAttribution);
+    }
 }

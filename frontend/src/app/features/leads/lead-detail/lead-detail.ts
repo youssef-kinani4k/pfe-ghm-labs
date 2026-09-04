@@ -1,8 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -10,6 +11,10 @@ import { LeadApi } from '../../../core/api/lead-api';
 import { LeadDetail as LeadDetailModel } from '../../../core/models/lead';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
 import { LeadTimeline } from './lead-timeline/lead-timeline';
+import {
+  ReattributionData,
+  ReattributionDialog,
+} from './reattribution-dialog/reattribution-dialog';
 
 /**
  * Detail d'un lead, sur une route et non dans une modale.
@@ -42,6 +47,13 @@ import { LeadTimeline } from './lead-timeline/lead-timeline';
 export class LeadDetail implements OnInit {
   private readonly api = inject(LeadApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly dialogue = inject(MatDialog);
+
+  /**
+   * La chronologie sait recharger sa propre matiere : apres une reattribution, c'est elle
+   * seule qu'il faut rafraichir, et c'est pour cela que son endpoint est separe du detail.
+   */
+  private readonly chronologie = viewChild(LeadTimeline);
 
   readonly lead = signal<LeadDetailModel | null>(null);
   readonly enCours = signal(true);
@@ -58,6 +70,39 @@ export class LeadDetail implements OnInit {
     const brut = this.lead()?.rawEvent?.payload;
     return brut ? JSON.stringify(brut, null, 2) : null;
   });
+
+  /**
+   * Un lead sans commercial n'a rien a reattribuer : le backend refuse le geste, autant ne
+   * pas offrir le bouton.
+   */
+  ouvreLaReattribution(): void {
+    const lead = this.lead();
+    if (!lead?.salesRep) {
+      return;
+    }
+    this.dialogue
+      // Les trois parametres de type rendent `afterClosed()` typé : sans eux la fiche
+      // revient en `any` et une erreur de forme passerait la compilation.
+      .open<ReattributionDialog, ReattributionData, LeadDetailModel>(ReattributionDialog, {
+        width: '32rem',
+        data: {
+          leadId: lead.id,
+          clientId: lead.clientId,
+          salesRepId: lead.salesRep.id,
+          statut: lead.status,
+        },
+      })
+      .afterClosed()
+      .subscribe((fiche) => {
+        if (!fiche) {
+          return;
+        }
+        // La fiche vient du serveur : elle montre l'etat reellement enregistre, pas celui
+        // qu'on esperait.
+        this.lead.set(fiche);
+        this.chronologie()?.recharge();
+      });
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

@@ -1,0 +1,11 @@
+// Meme echelle dense que le reste du dashboard ; les bandeaux de message viennent de
+// styles.scss, ou ils sont une convention partagee par tous les dialogues.
+.motif {
+  display: flex;
+  flex-direction: column;
+  min-width: min(26rem, 100%);
+}
+
+.motif mat-form-field {
+  width: 100%;
+}

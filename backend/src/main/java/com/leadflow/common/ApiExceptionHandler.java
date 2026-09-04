@@ -3,6 +3,7 @@ package com.leadflow.common;
 import com.leadflow.common.auth.DashboardAuthenticationException;
 import com.leadflow.monitoring.deadletter.DejaTraiteException;
 import com.leadflow.monitoring.deadletter.RejeuIndisponibleException;
+import com.leadflow.routing.ReattributionImpossibleException;
 import com.leadflow.tenant.DernierCommercialException;
 import com.leadflow.tenant.ReglageManquantException;
 import org.slf4j.Logger;
@@ -70,6 +71,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DernierCommercialException.class)
     ProblemDetail dernierCommercial(DernierCommercialException echec) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, echec.getMessage());
+    }
+
+    @ExceptionHandler(ReattributionImpossibleException.class)
+    ProblemDetail reattributionImpossible(ReattributionImpossibleException echec) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, echec.getMessage());
     }
 

@@ -1,0 +1,31 @@
+<h2 mat-dialog-title>{{ data.titre }}</h2>
+
+<mat-dialog-content class="motif">
+  @if (data.avertissement; as phrase) {
+    <p class="lf-bandeau lf-bandeau--attente" role="alert">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>{{ phrase }}</span>
+    </p>
+  }
+
+  <mat-form-field appearance="outline">
+    <mat-label>Motif</mat-label>
+    <textarea
+      matInput
+      required
+      rows="3"
+      maxlength="500"
+      name="motif"
+      [ngModel]="motif()"
+      (ngModelChange)="motif.set($event)"
+    ></textarea>
+    <mat-hint>Obligatoire : il est conservé dans la chronologie du lead.</mat-hint>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button matButton type="button" (click)="annule()">Annuler</button>
+  <button matButton="filled" type="button" [disabled]="!valide()" (click)="confirme()">
+    {{ data.action ?? 'Confirmer' }}
+  </button>
+</mat-dialog-actions>

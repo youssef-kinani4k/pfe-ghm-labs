@@ -65,6 +65,40 @@ code,
   font-size: 0.85em;
 }
 
+// Les deux bandeaux de message d'un dialogue. Ils vivent ici et non dans chaque composant
+// parce qu'ils sont une convention et non une decoration locale : le premier dialogue les a
+// poses, le suivant les reprend, et deux copies auraient derive. Icone puis phrase, la
+// couleur ne portant jamais seule l'information.
+.lf-bandeau {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lf-space-1);
+  margin: 0 0 var(--lf-space-2);
+  padding: var(--lf-space-2);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+
+  mat-icon {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 1.25rem;
+  }
+
+  // L'attente et non l'echec : un avertissement demande une decision, il ne signale pas
+  // une panne.
+  &--attente {
+    background: var(--lf-attente-fond);
+    color: var(--lf-attente);
+  }
+
+  &--echec {
+    background: var(--lf-echec-fond);
+    color: var(--lf-echec);
+  }
+}
+
 // Le focus visible n'est jamais retire : c'est le seul reperage au clavier, et l'ecran se
 // parcourt beaucoup au clavier une fois les filtres poses.
 :focus-visible {

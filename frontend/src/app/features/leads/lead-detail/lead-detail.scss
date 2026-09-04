@@ -38,6 +38,13 @@
     }
   }
 
+  // Le bouton se pose sous la valeur et non a cote : la grille des champs se resserre a
+  // 15rem, et une action alignee en ligne finirait tronquee sur un ecran etroit.
+  &__reattribuer {
+    display: flex;
+    margin: var(--lf-space-1) 0 0 -0.5rem;
+  }
+
   &__source {
     margin-left: var(--lf-space-1);
     color: var(--mat-sys-on-surface-variant);

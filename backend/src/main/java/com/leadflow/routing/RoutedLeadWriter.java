@@ -49,4 +49,20 @@ public class RoutedLeadWriter {
         lead.setRoutedAt(Instant.now());
         return leadRepository.saveAndFlush(lead);
     }
+
+    /**
+     * Reattribution manuelle : elle pose le commercial, et <b>rien d'autre</b>.
+     *
+     * <p>Le statut appartient au pipeline — un lead {@code SYNCED} reste {@code SYNCED},
+     * puisqu'il est bien dans l'ERP. Et {@code routedAt} date l'attribution automatique, un
+     * fait qui a eu lieu : la reattribution est un fait distinct, date par sa ligne de
+     * {@code lead_action}. Reecrire l'un ou l'autre ferait mentir la chronologie.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Lead reattribue(UUID leadId, UUID salesRepId) {
+        Lead lead = leadRepository.findById(leadId).orElseThrow(
+                () -> new IllegalStateException("Lead disparu en cours de reattribution : " + leadId));
+        lead.setAssignedSalesRepId(salesRepId);
+        return leadRepository.saveAndFlush(lead);
+    }
 }

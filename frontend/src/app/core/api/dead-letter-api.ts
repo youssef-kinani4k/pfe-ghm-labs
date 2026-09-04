@@ -39,11 +39,16 @@ export class DeadLetterApi {
     return this.http.get<PageResponse<DeadLetterView>>('/api/dead-letters', { params });
   }
 
-  rejoue(id: string) {
-    return this.http.post<void>(`/api/dead-letters/${id}/replay`, {});
+  /**
+   * Le motif est obligatoire cote serveur depuis F10 : un corps vide rend `400`. Il est
+   * porte par la signature plutot que facultatif, pour qu'un appelant qui l'oublie ne
+   * compile pas.
+   */
+  rejoue(id: string, motif: string) {
+    return this.http.post<void>(`/api/dead-letters/${id}/replay`, { reason: motif });
   }
 
-  ecarte(id: string) {
-    return this.http.post<void>(`/api/dead-letters/${id}/discard`, {});
+  ecarte(id: string, motif: string) {
+    return this.http.post<void>(`/api/dead-letters/${id}/discard`, { reason: motif });
   }
 }

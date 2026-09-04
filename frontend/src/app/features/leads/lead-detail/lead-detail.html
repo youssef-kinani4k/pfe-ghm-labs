@@ -72,6 +72,15 @@
             <dd>
               @if (lead.salesRep; as commercial) {
                 {{ commercial.fullName }} — {{ commercial.email }}
+                <button
+                  matButton
+                  type="button"
+                  class="detail__reattribuer"
+                  (click)="ouvreLaReattribution()"
+                >
+                  <mat-icon>swap_horiz</mat-icon>
+                  Reattribuer
+                </button>
               } @else {
                 Non attribue
               }

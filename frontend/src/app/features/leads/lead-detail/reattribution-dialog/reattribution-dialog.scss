@@ -1,0 +1,17 @@
+// Le dialogue reprend l'echelle dense du dashboard (--lf-space-*) plutot que les marges
+// larges d'une page vitrine : il s'ouvre par-dessus un ecran d'exploitation et doit tenir
+// sans faire defiler.
+.reattribution {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+  // Le dialogue est ouvert en 32rem ; sous cette largeur il occupe la fenetre.
+  min-width: min(28rem, 100%);
+}
+
+.reattribution mat-form-field {
+  width: 100%;
+}
+
+// Les deux bandeaux — avertissement ERP et refus serveur — viennent de `.lf-bandeau` dans
+// styles.scss : c'est une convention de dialogue, pas une decoration de cet ecran.
