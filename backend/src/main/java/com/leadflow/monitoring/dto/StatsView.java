@@ -6,8 +6,10 @@ import java.util.Map;
  * Tout l'ecran de statistiques en un appel. Un endpoint par compteur multiplierait les
  * allers-retours pour un ecran qui se lit d'un bloc.
  *
- * <p>Aucune serie temporelle : sans bibliotheque de graphiques, elle n'aurait aucun
- * consommateur. La requete par jour s'ajoutera le jour ou un graphique existera.
+ * <p>Aucune serie temporelle ici : elles vivent dans {@code SeriesView}, servies par
+ * {@code GET /api/stats/series}. La separation n'est pas cosmetique — le dashboard d'accueil
+ * paierait sinon le cout du {@code percentile_cont} des delais a chaque chargement, pour des
+ * figures qu'il n'affiche pas.
  */
 public record StatsView(
         long total,
