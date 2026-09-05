@@ -224,6 +224,31 @@ class SeriesRepositoryTest {
                 .satisfies(p -> assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 3)));
     }
 
+    @Test
+    void laBorneHauteEcarteCeQuiSuitLaFenetre() {
+        // Ce test est le seul endroit ou la borne haute est reellement eprouvee. Le meme
+        // controle porte depuis le service ne prouverait rien : celui-ci ne relit que les
+        // jours de son calendrier, si bien qu'une ligne posterieure disparaitrait de sa
+        // sortie avec ou sans clause `< :jusqu`. Ici, la clause est la seule chose qui
+        // puisse ecarter la ligne — retirez-la du SQL et l'assertion tombe.
+        Client boutique = boutique("borne-haute");
+        Instant lundi = instantParisien(2026, 3, 2, 10);
+        Instant mercredi = instantParisien(2026, 3, 4, 10);
+
+        evenement(boutique, lundi, RawLeadEventStatus.PUBLISHED);
+        evenement(boutique, mercredi, RawLeadEventStatus.PUBLISHED);
+
+        // Fenetre fermee au mardi minuit : le mercredi tombe au-dela.
+        Instant jusqu = instantParisien(2026, 3, 3, 0).plusSeconds(86_400);
+
+        List<PointVolumeBrut> points = series.volumeParJour(
+                boutique.getId().toString(), lundi.minusSeconds(3600), jusqu, PARIS);
+
+        assertThat(points)
+                .singleElement()
+                .satisfies(p -> assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 2)));
+    }
+
     private Client boutique(String suffixe) {
         Client c = new Client();
         c.setName("Boutique " + suffixe);
