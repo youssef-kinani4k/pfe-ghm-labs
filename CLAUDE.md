@@ -216,6 +216,19 @@ La cle stockee est la **forme canonique** de la signature rendue par `HmacSignat
 jamais le texte recu : l'analyse de l'en-tete tolere les espaces et les parametres inconnus,
 donc plusieurs textes valides decrivent la meme soumission et doivent partager une seule cle.
 
+**Depuis F14, une rotation de secret ouvre une fenetre pendant laquelle deux secrets sont
+acceptes.** `HmacSignatureVerifier.verifie` recoit une `List<String> secrets` ordonnee, le
+secret courant en premier : le cas normal ne calcule qu'un seul HMAC, et le second secret
+n'est essaye que si le premier ne correspond pas. L'analyse de l'en-tete et le controle de
+l'horodatage se font une seule fois, avant toute comparaison de secret. Le verificateur
+ignore jusqu'au mot « transition » — il ne connait qu'une liste de secrets acceptables ;
+c'est `LeadCaptureService` qui construit cette liste (le secret courant, plus le precedent
+tant que sa date d'expiration est future) et pose le drapeau sur la ligne `raw_lead_event` :
+c'est le seul endroit du projet qui connaisse la notion de fenetre. **Les cinq causes de
+refus rendent toujours la meme reponse `401`** : un secret precedent expire ou revoque est
+indiscernable d'une signature fausse, les deux echouent sur la meme exception, et l'index
+d'idempotence `(client_id, signature)` de `V3` n'est pas affecte par la rotation.
+
 **La publication est at-least-once.** Elle part apres le commit
 (`@TransactionalEventListener(AFTER_COMMIT)`), et `PendingEventRelay` reprend
 periodiquement ce qui est reste non publie. Si l'envoi reussit mais que le passage a
@@ -572,6 +585,13 @@ un serveur partage ne signe donc pas avec une cle publiee dans le depot. `GEMINI
 la seule des cinq qui puisse manquer sans consequence en production : l'analyse d'intention
 retombe alors sur le lexique.
 
+**`leadflow.webhook.transition-secret` ne figure pas dans ce tableau**, contrairement a
+`LEADFLOW_ANALYTICS_FUSEAU` : ce reglage n'a aucune variable d'environnement associee, c'est
+une valeur d'`application.yml`, par defaut `24h` — la duree pendant laquelle le secret
+precedent d'une boutique reste accepte apres une rotation. **Global a l'instance**, comme le
+fuseau des series de F13 et le relais SMTP de F12 : ce n'est pas une caracteristique du
+client, mais un parametre d'exploitation de l'agence.
+
 La production d'un hash BCrypt est documentee dans `docs/monitoring-api.md` — c'est le
 premier obstacle concret au deploiement.
 
@@ -582,7 +602,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Dix migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Onze migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -592,8 +612,19 @@ l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
 en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial),
 `V8__lead_action.sql` (journal des gestes humains portes par un lead),
-`V9__notification_attempt.sql` (trace des alertes envoyees au commercial) et
-`V10__analytics_index.sql` (deux index pour les series quotidiennes de F13).
+`V9__notification_attempt.sql` (trace des alertes envoyees au commercial),
+`V10__analytics_index.sql` (deux index pour les series quotidiennes de F13) et
+`V11__hmac_secret_transition.sql` (fenetre de transition du secret HMAC de F14).
+
+**`V11` ajoute deux colonnes nullables sur `client`** — `previous_hmac_secret` (chiffree au
+repos comme `hmac_secret`) et `previous_secret_expires_at` — **et un booleen sur
+`raw_lead_event`**, `signed_with_previous_secret NOT NULL DEFAULT false`. Aucun index,
+aucune table : comme `V7`, les deux colonnes de `client` sont sans remplissage retroactif,
+et vont toujours ensemble — un secret precedent sans date d'expiration serait un secret
+permanent, l'inverse de la feature. Le booleen se pose a l'insertion de la ligne, qui a de
+toute facon lieu : le chemin chaud de la capture ne paie aucune ecriture de plus, et c'est
+ce qui permet a la fiche de la boutique de dire quand le dernier lead a l'ancien secret est
+passe, donc quand une revocation est sans risque.
 
 **`V10` n'ajoute ni colonne ni table** : F13 ne fait que lire ce qui existe, comme la
 chronologie de F9 qui recompose six tables sans en creer aucune. `idx_lead_client_created`
@@ -827,7 +858,11 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 Le pipeline est **complet de bout en bout, observable et administrable** : capture (F2),
 qualification (F3), routage et synchronisation ERP (F4), notification du commercial (F12), sur
 le socle multi-tenant de F1, les adaptateurs de F5, le monitoring de F6 et la gestion des
-boutiques de F7. F13 ajoute l'ecran d'analyse et ses trois series quotidiennes.
+boutiques de F7. F13 ajoute l'ecran d'analyse et ses trois series quotidiennes. **F14 repare
+la rotation du secret HMAC** : regenerer le secret d'une boutique n'interrompt plus sa
+capture — une fenetre de transition, `leadflow.webhook.transition-secret` (defaut `24h`),
+laisse l'ancien secret valoir le temps que le site de la boutique redeploie, et l'ecran des
+boutiques montre l'etat de cette migration jusqu'a sa revocation.
 
 Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et onze ecrans Angular
 couvrent l'exploitation comme l'administration.

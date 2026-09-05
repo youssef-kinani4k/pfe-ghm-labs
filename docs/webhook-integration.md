@@ -122,6 +122,27 @@ curl -i -X POST "http://localhost:8090/api/webhooks/leads/$CLE" \
 
 Attendu : `202 Accepted` et `{"eventId":"..."}`.
 
+## Rotation du secret
+
+Quand l'agence régénère le secret HMAC de votre boutique depuis le dashboard, **le
+redéploiement de votre site n'a pas besoin d'être instantané**. Les deux secrets — l'ancien
+et le nouveau — sont acceptés le temps d'une fenêtre de transition (24 heures par défaut) :
+une requête signée avec l'un ou l'autre reçoit le même `202`.
+
+Ce que cela change concrètement pour votre intégration :
+
+- Vous pouvez continuer à signer avec l'ancien secret pendant la fenêtre, sans interruption
+  de capture, le temps de déployer le nouveau.
+- Vous **devez** avoir basculé sur le nouveau secret avant la fin de la fenêtre : passé ce
+  délai, l'ancien cesse de signer, et une requête qui l'utilise encore reçoit `401` — la même
+  réponse qu'une signature fausse, sans distinction possible.
+- Si l'agence révoque l'ancien secret avant la fin de la fenêtre (par exemple après une
+  fuite), le même effet est immédiat : basculez sur le nouveau secret dès que possible.
+
+La fenêtre ne change rien au format de la signature ni à la tolérance sur l'horodatage,
+décrits plus haut — seul le secret utilisé pour la calculer peut, temporairement, être l'un
+des deux.
+
 ## Réponses
 
 | Code | Signification |

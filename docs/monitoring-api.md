@@ -713,6 +713,27 @@ curl -s http://localhost:8090/api/admin/clients   -H "Authorization: Bearer $JET
 figure à aucun titre, et la clé d'API de l'ERP non plus — les deux sont chiffrés au repos et
 ne sont jamais rendus en lecture.
 
+Depuis F14, la fiche porte aussi `transition`, **nul hors transition** :
+
+```json
+{
+  "id": "3f2a...",
+  "name": "Boutique du Nord",
+  "publicKey": "pk_live_...",
+  "webhookPath": "/api/webhooks/leads/pk_live_...",
+  "...": "...",
+  "transition": {
+    "expireLe": "2026-09-06T10:15:00Z",
+    "dernierLeadAncienSecret": "2026-09-05T18:42:03Z"
+  }
+}
+```
+
+`expireLe` est la fin de la fenêtre pendant laquelle l'ancien secret reste accepté.
+`dernierLeadAncienSecret` est la date du dernier lead encore signé avec cet ancien secret,
+**nulle** tant qu'aucun n'est arrivé — c'est ce qui dit à l'opérateur qu'une révocation est
+sans risque. Aucun des deux secrets n'y figure jamais.
+
 ### Créer
 
 ```bash
@@ -762,9 +783,34 @@ curl -s -X POST http://localhost:8090/api/admin/clients/$ID/rotate-secret     -H
 curl -s -X POST http://localhost:8090/api/admin/clients/$ID/rotate-public-key -H "Authorization: Bearer $JETON"
 ```
 
-La première rend `{"hmacSecret":"..."}` — encore une fois, la seule et dernière occasion de
-le lire. L'ancien secret cesse immédiatement de signer : le webhook rend `401`. La seconde
-change l'**URL** du webhook ; l'ancienne n'est plus reconnue.
+La première rend :
+
+```json
+{
+  "hmacSecret": "le-nouveau-secret-en-clair",
+  "ancienSecretValideJusquA": "2026-09-06T10:15:00Z"
+}
+```
+
+`hmacSecret` est, encore une fois, la seule et dernière occasion de le lire. Depuis F14,
+l'ancien secret **ne cesse plus immédiatement de signer** : il reste accepté jusqu'à
+`ancienSecretValideJusquA`, une fenêtre de transition dont la durée est
+`leadflow.webhook.transition-secret` (24h par défaut, globale à l'instance) — le temps que
+le site de la boutique redéploie avec le nouveau secret sans perdre de leads entre-temps.
+Une seconde rotation pendant la fenêtre remplace l'ancien secret par celui qu'on vient de
+retirer : il n'y a jamais plus de deux secrets vivants, et le secret d'origine cesse alors
+immédiatement de valoir.
+
+La seconde change l'**URL** du webhook ; l'ancienne n'est plus reconnue, sans fenêtre de
+transition — c'est une clé publique, pas un secret de signature.
+
+```bash
+curl -s -X POST http://localhost:8090/api/admin/clients/$ID/revoke-previous-secret -H "Authorization: Bearer $JETON"
+```
+
+Ferme la fenêtre de transition avant son terme — le geste d'une fuite avérée sur l'ancien
+secret. Rend la fiche à jour, `transition` étant alors `null`. Révoquer une boutique qui
+n'est pas en transition est un succès sans effet : l'état visé est déjà atteint.
 
 ### Commerciaux
 
