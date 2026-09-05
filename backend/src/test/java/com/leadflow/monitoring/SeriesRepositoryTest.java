@@ -6,6 +6,9 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptRepository;
+import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.qualification.IntentSource;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
@@ -38,10 +41,12 @@ class SeriesRepositoryTest {
     @Autowired private RawLeadEventRepository evenements;
     @Autowired private ClientRepository clients;
     @Autowired private LeadRepository leads;
+    @Autowired private CrmSyncAttemptRepository tentatives;
     @Autowired private EntityManager em;
 
     @AfterEach
     void nettoie() {
+        tentatives.deleteAll();
         leads.deleteAll();
         evenements.deleteAll();
         clients.deleteAll();
@@ -128,6 +133,89 @@ class SeriesRepositoryTest {
         });
     }
 
+    @Test
+    @Transactional
+    void mesureLeDelaiDuPremierSuccesEtNonDuDernier() {
+        Client boutique = boutique("delais");
+        Instant capture = instantParisien(2026, 3, 2, 10);
+        Instant premierSucces = capture.plusSeconds(120);
+        Instant rejeuTardif = capture.plusSeconds(3 * 86_400);
+
+        Lead l = lead(boutique, capture, IntentSource.GEMINI);
+        tentative(l, premierSucces, CrmSyncAttemptStatus.SUCCESS);
+        // Un rejeu ajoute un succes tardif. Le lire ferait afficher trois jours de delai
+        // pour un lead synchronise en deux minutes.
+        tentative(l, rejeuTardif, CrmSyncAttemptStatus.SUCCESS);
+
+        List<PointDelaiBrut> points = series.delaisParJour(
+                boutique.getId().toString(), capture.minusSeconds(3600), PARIS);
+
+        assertThat(points).singleElement().satisfies(p -> {
+            assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
+            assertThat(p.getMedianeSecondes()).isEqualTo(120.0d);
+        });
+    }
+
+    @Test
+    @Transactional
+    void ignoreLesTentativesEnEchec() {
+        Client boutique = boutique("echecs");
+        Instant capture = instantParisien(2026, 3, 2, 10);
+
+        Lead l = lead(boutique, capture, IntentSource.GEMINI);
+        tentative(l, capture.plusSeconds(10), CrmSyncAttemptStatus.FAILED);
+        tentative(l, capture.plusSeconds(300), CrmSyncAttemptStatus.SUCCESS);
+
+        // Le delai se compte jusqu'au succes, pas jusqu'a la premiere tentative : un lead
+        // que l'ERP a refuse deux fois a bel et bien mis cinq minutes a arriver.
+        assertThat(series.delaisParJour(
+                        boutique.getId().toString(), capture.minusSeconds(3600), PARIS))
+                .singleElement()
+                .satisfies(p -> assertThat(p.getMedianeSecondes()).isEqualTo(300.0d));
+    }
+
+    @Test
+    @Transactional
+    void separeLaMedianeDuP95() {
+        Client boutique = boutique("percentiles");
+        Instant jour = instantParisien(2026, 3, 2, 10);
+
+        // Neuf leads a 10 s et un a 1000 s. La moyenne dirait 109 s, ce qui ne decrit
+        // aucun lead reel ; la mediane dit 10 s et le p95 revele la queue.
+        for (int i = 0; i < 9; i++) {
+            Lead rapide = lead(boutique, jour, IntentSource.RULES);
+            tentative(rapide, jour.plusSeconds(10), CrmSyncAttemptStatus.SUCCESS);
+        }
+        Lead lent = lead(boutique, jour, IntentSource.RULES);
+        tentative(lent, jour.plusSeconds(1000), CrmSyncAttemptStatus.SUCCESS);
+
+        PointDelaiBrut point = series.delaisParJour(
+                        boutique.getId().toString(), jour.minusSeconds(3600), PARIS)
+                .get(0);
+
+        assertThat(point.getMedianeSecondes()).isEqualTo(10.0d);
+        assertThat(point.getP95Secondes()).isGreaterThan(400.0d);
+    }
+
+    @Test
+    @Transactional
+    void ancreLePointSurLeJourDeLaSynchronisationEtNonDeLaCapture() {
+        Client boutique = boutique("ancrage");
+        Instant captureLundi = instantParisien(2026, 3, 2, 23);
+        Instant syncMardi = instantParisien(2026, 3, 3, 2);
+
+        Lead l = lead(boutique, captureLundi, IntentSource.RULES);
+        tentative(l, syncMardi, CrmSyncAttemptStatus.SUCCESS);
+
+        // Ancre sur la synchronisation, le point est definitif des que le jour est passe.
+        // Ancre sur la capture, la courbe s'ameliorerait quand ca va mal : un lead jamais
+        // synchronise n'y apparaitrait jamais.
+        assertThat(series.delaisParJour(
+                        boutique.getId().toString(), captureLundi.minusSeconds(3600), PARIS))
+                .singleElement()
+                .satisfies(p -> assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 3)));
+    }
+
     private Client boutique(String suffixe) {
         Client c = new Client();
         c.setName("Boutique " + suffixe);
@@ -177,6 +265,15 @@ class SeriesRepositoryTest {
         em.clear();
 
         return l;
+    }
+
+    private void tentative(Lead lead, Instant quand, CrmSyncAttemptStatus statut) {
+        CrmSyncAttempt a = new CrmSyncAttempt();
+        a.setLeadId(lead.getId());
+        a.setProviderId("dolibarr");
+        a.setStatus(statut);
+        a.setAttemptedAt(quand);
+        tentatives.save(a);
     }
 
     private static Instant instantParisien(int annee, int mois, int jour, int heure) {

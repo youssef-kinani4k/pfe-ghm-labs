@@ -66,4 +66,35 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
             @Param("clientId") String clientId,
             @Param("depuis") Instant depuis,
             @Param("fuseau") String fuseau);
+
+    @Query(
+            value =
+                    """
+                    with premier_succes as (
+                        select a.lead_id, min(a.attempted_at) as sync_at
+                        from crm_sync_attempt a
+                        where a.status = 'SUCCESS'
+                        group by a.lead_id
+                    )
+                    select (p.sync_at at time zone :fuseau)::date as jour,
+                           percentile_cont(0.5) within group (
+                               order by extract(epoch from (p.sync_at - e.received_at))
+                           ) as "medianeSecondes",
+                           percentile_cont(0.95) within group (
+                               order by extract(epoch from (p.sync_at - e.received_at))
+                           ) as "p95Secondes"
+                    from premier_succes p
+                    join lead l           on l.id = p.lead_id
+                    join raw_lead_event e on e.id = l.raw_event_id
+                    where p.sync_at >= :depuis
+                      and (cast(:clientId as uuid) is null
+                           or l.client_id = cast(:clientId as uuid))
+                    group by jour
+                    order by jour
+                    """,
+            nativeQuery = true)
+    List<PointDelaiBrut> delaisParJour(
+            @Param("clientId") String clientId,
+            @Param("depuis") Instant depuis,
+            @Param("fuseau") String fuseau);
 }
