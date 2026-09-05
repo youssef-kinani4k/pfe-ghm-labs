@@ -460,6 +460,23 @@ est chiffre au repos, illisible par Postgres, et `Lead` ne porte aucune associat
 drapeau se pose en Java sur les boutiques de la page, deja chargees pour leur nom. Le filtre
 n'a pas de negation : `chaud=false` vaut l'absence du parametre.
 
+**Les series quotidiennes de F13** (`GET /api/stats/series`) sortent de `SeriesRepository`, le
+**premier repository natif du projet**, et deux contraintes independantes l'imposent : JPQL n'a
+ni `date_trunc` ni `AT TIME ZONE` pour regrouper par jour dans un fuseau, et il n'a pas non plus
+`percentile_cont` pour les delais. Le seul contournement global, poser
+`hibernate.jdbc.time_zone`, changerait la lecture de tous les `Instant` du projet pour resoudre
+le besoin de trois requetes — non touche. Le prix du natif : Hibernate ne valide plus ces
+requetes au demarrage, ce qui rend les tests contre un vrai Postgres obligatoires et non
+facultatifs. **Le fuseau de regroupement** est `leadflow.analytics.fuseau`, defaut
+`Europe/Paris`, **global a l'instance** et non porte par la boutique, comme les reglages du
+relais SMTP de F12. **Les delais s'ancrent sur le jour de la synchronisation**, pas de la
+capture : le point est definitif des que le jour est passe, et l'ancrage inverse ferait
+s'ameliorer la courbe quand ca va mal, un lead jamais synchronise n'y apparaissant jamais — le
+delai se compte jusqu'au premier succes, un rejeu ajoutant un succes tardif. **Une journee sans
+donnee n'a pas de ligne en base**, et le service la comble : volume et intentions a zero,
+« aucun lead capture ce jour-la » etant un fait ; delais a `null`, « aucun lead synchronise » ne
+voulant pas dire « delai de zero seconde ». Le dashboard compte desormais **onze ecrans**.
+
 **La chronologie d'un lead est derivee, jamais stockee.** `GET /api/leads/{id}/timeline`
 recompose en lecture seule ce que le lead a vecu depuis six tables existantes —
 `raw_lead_event`, `lead`, `crm_sync_attempt`, `dead_letter`, `lead_action` depuis F10 et
@@ -528,7 +545,7 @@ prefixe `leadflow.*` et se lisent via un `record`
 `@ConfigurationProperties` place dans `config/` — `@ConfigurationPropertiesScan` est actif
 sur `BackendApplication`, aucun enregistrement manuel n'est necessaire.
 
-Cinq variables gouvernent l'instance, plus celles du relais d'alerte :
+Dix variables gouvernent l'instance :
 
 | Variable                       | Role                                                    |
 | ------------------------------ | ------------------------------------------------------- |
@@ -541,6 +558,7 @@ Cinq variables gouvernent l'instance, plus celles du relais d'alerte :
 | `LEADFLOW_SMTP_USERNAME`       | Identifiant du relais, si celui-ci en demande un         |
 | `LEADFLOW_SMTP_PASSWORD`       | Son mot de passe                                         |
 | `LEADFLOW_SMTP_FROM`           | Adresse d'expedition des alertes                         |
+| `LEADFLOW_ANALYTICS_FUSEAU`    | Facultative, fuseau des series quotidiennes, defaut `Europe/Paris` |
 
 **`LEADFLOW_JWT_SECRET` n'a aucune valeur de repli en production, comme `LEADFLOW_MASTER_KEY`** :
 l'application refuse de demarrer plutot que de signer avec un secret devinable. Le controle
@@ -564,7 +582,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Neuf migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Dix migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -572,9 +590,27 @@ Neuf migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 l'analyse d'intention, ligne unique, chiffree au repos) et `V6__crm_sync_attempt_assignee.sql`
 (quatrieme reference de synchronisation, `assignee_ref` : elle memorise le responsable deja
 lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de la sauter
-en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial) et
-`V8__lead_action.sql` (journal des gestes humains portes par un lead) et
-`V9__notification_attempt.sql` (trace des alertes envoyees au commercial).
+en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial),
+`V8__lead_action.sql` (journal des gestes humains portes par un lead),
+`V9__notification_attempt.sql` (trace des alertes envoyees au commercial) et
+`V10__analytics_index.sql` (deux index pour les series quotidiennes de F13).
+
+**`V10` n'ajoute ni colonne ni table** : F13 ne fait que lire ce qui existe, comme la
+chronologie de F9 qui recompose six tables sans en creer aucune. `idx_lead_client_created`
+sur `lead (client_id, created_at DESC)` sert le regroupement par jour des series de volume et
+d'intention — l'index existant sur `lead` porte `email` en deuxieme colonne, ce qui le rend
+inutilisable des qu'on saute cette colonne pour grouper par date. `idx_crm_sync_attempt_success_at`
+sur `crm_sync_attempt (attempted_at DESC)` est **partiel**, `WHERE status = 'SUCCESS'`, comme
+`uq_dead_letter_lead_pending` de `V8` : un index global ferait payer les echecs, qui sont
+l'essentiel du volume quand un ERP tombe. **Il ne sert cependant pas la requete des delais** :
+sa CTE `premier_succes` fait un `group by lead_id`, qu'un index trie par date n'accelere pas,
+et elle agrege **sans aucun filtre de date** — le predicat `depuis`/`jusqu` porte sur le
+resultat de l'agregat, apres coup, pas sur les lignes lues. Le cout de cette requete est donc
+proportionnel a tous les succes depuis toujours, pas a `jours` ; le vrai bornage demande un
+`where` dans la CTE plus un `not exists` de succes anterieur, dette documentee dans le Javadoc
+de `SeriesRepository` et volontairement non corrigee. Un troisieme index avait ete envisage
+pour la courbe de volume, mais `idx_raw_lead_event_client_received` sur
+`raw_lead_event (client_id, received_at DESC)` existe deja depuis `V2` et la sert.
 
 **`V8` porte deux choses.** La table `lead_action` d'abord — qui a change quoi, quand, et
 **pourquoi** : `dead_letter` ne retenait d'un rejeu que `replayed_by` et `replayed_at`, jamais
@@ -737,6 +773,15 @@ Chaque route de `app.routes.ts` utilise `loadComponent` : les features sont des 
 separes, verifiable dans la sortie de `npm run build`. Ajouter une feature = un dossier sous
 `features/` plus une entree `loadComponent`.
 
+### Chart.js — depuis F13, empaquete et confine
+
+**Chart.js existe**, dans le seul chunk de la feature qui l'a introduit : l'ecran `analyse`,
+charge en `loadComponent` comme les autres. **Un seul fichier l'importe**, `graphique-ligne.ts`
+— aucun autre ecran ne connait la bibliotheque, et l'ecran d'accueil (`dashboard.ts`) reste
+sans elle pour que son chunk, charge a chaque connexion, ne s'alourdisse pas. Pas de
+`ng2-charts` : un enrobage Angular de plus n'aurait rien resolu qu'un composant seul ne fasse,
+et aurait ajoute une dependance a suivre a chaque montee de version.
+
 ### Polices — servies par l'origine, jamais par un CDN
 
 **Le dashboard ne charge aucune ressource tierce a l'execution.** Les polices (Fira Sans,
@@ -782,9 +827,9 @@ d'environnement est cable dans `angular.json`, configuration `development`.
 Le pipeline est **complet de bout en bout, observable et administrable** : capture (F2),
 qualification (F3), routage et synchronisation ERP (F4), notification du commercial (F12), sur
 le socle multi-tenant de F1, les adaptateurs de F5, le monitoring de F6 et la gestion des
-boutiques de F7.
+boutiques de F7. F13 ajoute l'ecran d'analyse et ses trois series quotidiennes.
 
-Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et dix ecrans Angular
+Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et onze ecrans Angular
 couvrent l'exploitation comme l'administration.
 
 Trois capacites meritent d'etre connues avant d'ouvrir le code, parce qu'elles ont ete des
@@ -808,8 +853,6 @@ Ce qui n'existe pas :
   reattribution le dit a l'operateur plutot que de le laisser croire a une correction qui
   n'a pas lieu. Propager demanderait une methode de mise a jour sur le port `CrmConnector`,
   que le pivot n'expose pas.
-- **Aucun graphique** : les repartitions sont des compteurs et des barres de progression.
-  Aucune bibliotheque de graphiques n'est installee, et c'est un choix.
 - **Le modele de l'analyse d'intention est un reglage, pas une constante** : Google retire
   des modeles au fil du temps, et l'ancien nom se met a rendre `404`. Le libelle vit sous
   `leadflow.intent.gemini.model` pour que ce retrait se repare sans toucher au code. La

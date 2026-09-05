@@ -1,0 +1,54 @@
+<div class="graphique__toile">
+  <canvas #toile role="img" [attr.aria-label]="descriptionAccessible()"></canvas>
+</div>
+
+<ul class="graphique__legende">
+  @for (entree of legende(); track entree.nom; let i = $index) {
+    <li>
+      <button
+        type="button"
+        class="graphique__entree"
+        [class.graphique__entree--masquee]="entree.masquee"
+        [attr.aria-pressed]="!entree.masquee"
+        (click)="basculeSerie(i)"
+      >
+        <span
+          class="graphique__puce"
+          [class.graphique__puce--pointille]="entree.pointille"
+          [style.--puce]="entree.couleur"
+        ></span>
+        {{ entree.nom }}
+      </button>
+    </li>
+  }
+</ul>
+
+<!--
+  Un canvas est opaque pour un lecteur d'ecran. Ce tableau porte les memes valeurs, mises en
+  forme par le meme formateur, et reste hors flux visuel.
+-->
+<table class="graphique__table-cachee">
+  <caption>
+    {{
+      descriptionAccessible()
+    }}
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col">Jour</th>
+      @for (entree of legende(); track entree.nom) {
+        <th scope="col">{{ entree.nom }}</th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (ligne of lignesAccessibles(); track ligne.jour) {
+      <tr>
+        <th scope="row">{{ ligne.jour }}</th>
+        @for (valeur of ligne.valeurs; track $index) {
+          <td>{{ valeur }}</td>
+        }
+      </tr>
+    }
+  </tbody>
+</table>

@@ -37,6 +37,7 @@ export class App {
 
   readonly entrees = [
     { chemin: '/dashboard', libelle: 'Dashboard', icone: 'monitoring' },
+    { chemin: '/analyse', libelle: 'Analyse', icone: 'insights' },
     { chemin: '/leads', libelle: 'Leads', icone: 'contacts' },
     { chemin: '/queue', libelle: "File d'attente", icone: 'inbox' },
     { chemin: '/boutiques', libelle: 'Boutiques', icone: 'storefront' },

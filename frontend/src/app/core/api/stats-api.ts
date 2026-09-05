@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { StatsView } from '../models/monitoring';
+import { SeriesView, StatsView } from '../models/monitoring';
 
 /**
  * Agregats du dashboard.
@@ -20,5 +20,14 @@ export class StatsApi {
       }
     }
     return this.http.get<StatsView>('/api/stats', { params });
+  }
+
+  /** Les trois series quotidiennes. `jours` vaut 7, 30 ou 90 — le serveur refuse le reste. */
+  series(clientId: string | undefined, jours: number) {
+    let params = new HttpParams().set('jours', String(jours));
+    if (clientId !== undefined && clientId !== null && clientId !== '') {
+      params = params.set('clientId', clientId);
+    }
+    return this.http.get<SeriesView>('/api/stats/series', { params });
   }
 }

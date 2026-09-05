@@ -62,6 +62,12 @@ export const routes: Routes = [
       import('./features/boutiques/boutique-detail/boutique-detail').then((m) => m.BoutiqueDetail),
   },
   {
+    path: 'analyse',
+    title: 'Analyse',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/analyse/analyse').then((m) => m.Analyse),
+  },
+  {
     path: 'parametres',
     title: 'Parametres',
     canActivate: [authGuard],

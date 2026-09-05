@@ -1,0 +1,189 @@
+<header class="analyse__entete">
+  <div class="analyse__intitule">
+    <h1 class="analyse__titre">Analyse</h1>
+    <p class="analyse__sous-titre">
+      Ce que les compteurs ne disent pas : l'évolution du pipeline dans le temps.
+    </p>
+  </div>
+
+  <div class="analyse__commandes">
+    <mat-button-toggle-group
+      class="analyse__periodes"
+      aria-label="Période d'analyse"
+      [value]="jours()"
+      (change)="choisitFenetre($event.value)"
+    >
+      @for (fenetre of fenetres; track fenetre) {
+        <mat-button-toggle [value]="fenetre">{{ fenetre }} j</mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+
+    <mat-form-field appearance="outline" class="analyse__client" subscriptSizing="dynamic">
+      <mat-label>Boutique</mat-label>
+      <mat-select name="clientId" [ngModel]="clientId()" (ngModelChange)="choisitBoutique($event)">
+        <mat-option [value]="undefined">Toutes</mat-option>
+        @for (boutique of boutiques(); track boutique.id) {
+          <mat-option [value]="boutique.id">{{ boutique.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</header>
+
+@if (enCours()) {
+  <mat-progress-bar mode="indeterminate" aria-label="Chargement de l'analyse" />
+}
+
+@if (erreur(); as message) {
+  <p class="analyse__erreur" role="alert">{{ message }}</p>
+}
+
+@if (donnees()) {
+  @if (vide()) {
+    <div class="analyse__vide">
+      <mat-icon aria-hidden="true">insights</mat-icon>
+      <p class="analyse__vide-titre">Aucune donnée sur cette période</p>
+      <p class="analyse__vide-detail">
+        Les courbes apparaîtront dès le premier lead capturé par cette boutique.
+      </p>
+    </div>
+  } @else {
+    <div class="analyse__grille">
+      <!--
+        Chaque carte se lit en trois temps : le chiffre-clé, puis la courbe, puis le détail au
+        survol. L'en-tête porte donc la valeur avant le titre dans l'ordre visuel.
+      -->
+      <section class="carte">
+        <header class="carte__entete">
+          <div>
+            <h2 class="carte__titre">Volume quotidien</h2>
+            @if (kpiVolume(); as kpi) {
+              <p class="carte__valeur">{{ kpi.valeur }}<span class="carte__unite">leads</span></p>
+            }
+          </div>
+          @if (kpiVolume(); as kpi) {
+            @if (kpi.variation !== null) {
+              <p
+                class="carte__variation"
+                [class.carte__variation--bonne]="
+                  kpi.baisseEstBonne ? kpi.variation < 0 : kpi.variation > 0
+                "
+                [class.carte__variation--mauvaise]="
+                  kpi.baisseEstBonne ? kpi.variation > 0 : kpi.variation < 0
+                "
+              >
+                <mat-icon aria-hidden="true">{{
+                  kpi.variation > 0 ? 'trending_up' : kpi.variation < 0 ? 'trending_down' : 'remove'
+                }}</mat-icon>
+                {{ kpi.variation > 0 ? '+' : '' }}{{ kpi.variation }} %
+                <span class="carte__reference">vs début de période</span>
+              </p>
+            }
+          }
+        </header>
+
+        <p class="carte__explication">
+          Ce que la boutique a produit chaque jour, et ce qui a été écarté faute d'un e-mail
+          exploitable.
+        </p>
+
+        <app-graphique-ligne
+          [libelles]="libelles()"
+          [libellesLongs]="libellesLongs()"
+          [series]="serieVolume()"
+          [formateur]="formateEntier"
+          descriptionAccessible="Volume de leads produits et écartés, jour par jour"
+        />
+      </section>
+
+      <section class="carte">
+        <header class="carte__entete">
+          <div>
+            <h2 class="carte__titre">Délai capture → ERP</h2>
+            @if (kpiDelai(); as kpi) {
+              <p class="carte__valeur">
+                {{ kpi.valeur }}<span class="carte__unite">médiane typique</span>
+              </p>
+            } @else {
+              <p class="carte__valeur carte__valeur--absente">—</p>
+            }
+          </div>
+          @if (kpiDelai(); as kpi) {
+            @if (kpi.variation !== null) {
+              <p
+                class="carte__variation"
+                [class.carte__variation--bonne]="kpi.variation < 0"
+                [class.carte__variation--mauvaise]="kpi.variation > 0"
+              >
+                <mat-icon aria-hidden="true">{{
+                  kpi.variation > 0 ? 'trending_up' : kpi.variation < 0 ? 'trending_down' : 'remove'
+                }}</mat-icon>
+                {{ kpi.variation > 0 ? '+' : '' }}{{ kpi.variation }} %
+                <span class="carte__reference">vs début de période</span>
+              </p>
+            }
+          }
+        </header>
+
+        <p class="carte__explication">
+          Médiane et 95<sup>e</sup> centile du temps entre la capture et la synchronisation ERP. Une
+          journée sans lead synchronisé n'a pas de point : la ligne s'interrompt plutôt que de
+          tomber à zéro.
+        </p>
+
+        <app-graphique-ligne
+          [libelles]="libelles()"
+          [libellesLongs]="libellesLongs()"
+          [series]="serieDelais()"
+          [formateur]="formateDuree"
+          descriptionAccessible="Délai entre la capture d'un lead et sa synchronisation ERP, jour par jour"
+        />
+      </section>
+
+      <section class="carte">
+        <header class="carte__entete">
+          <div>
+            <h2 class="carte__titre">Origine de l'analyse d'intention</h2>
+            @if (kpiIntentions(); as kpi) {
+              <p class="carte__valeur">
+                {{ kpi.valeur }}<span class="carte__unite">analysés par le modèle</span>
+              </p>
+            } @else {
+              <p class="carte__valeur carte__valeur--absente">—</p>
+            }
+          </div>
+          @if (kpiIntentions(); as kpi) {
+            @if (kpi.variation !== null) {
+              <p
+                class="carte__variation"
+                [class.carte__variation--bonne]="kpi.variation > 0"
+                [class.carte__variation--mauvaise]="kpi.variation < 0"
+              >
+                <mat-icon aria-hidden="true">{{
+                  kpi.variation > 0 ? 'trending_up' : kpi.variation < 0 ? 'trending_down' : 'remove'
+                }}</mat-icon>
+                {{ kpi.variation > 0 ? '+' : '' }}{{ kpi.variation }} pts
+                <span class="carte__reference">vs début de période</span>
+              </p>
+            }
+          }
+        </header>
+
+        <p class="carte__explication">
+          Part des leads analysés par le modèle Gemini plutôt que retombés sur le lexique de repli.
+          Une bascule durable vers le lexique signale un mode dégradé installé.
+        </p>
+
+        <app-graphique-ligne
+          [libelles]="libelles()"
+          [libellesLongs]="libellesLongs()"
+          [series]="serieIntentions()"
+          [formateur]="formatePourcentage"
+          [noteInfobulle]="effectifIntentions"
+          [empile]="true"
+          descriptionAccessible="Part de l'analyse d'intention faite par le modèle et par le lexique, jour par jour"
+        />
+      </section>
+    </div>
+  }
+}

@@ -1,6 +1,7 @@
 package com.leadflow.common;
 
 import com.leadflow.common.auth.DashboardAuthenticationException;
+import com.leadflow.monitoring.FenetreInvalideException;
 import com.leadflow.monitoring.deadletter.DejaTraiteException;
 import com.leadflow.monitoring.deadletter.RejeuIndisponibleException;
 import com.leadflow.routing.ReattributionImpossibleException;
@@ -66,6 +67,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ReglageManquantException.class)
     ProblemDetail reglageManquant(ReglageManquantException echec) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, echec.getMessage());
+    }
+
+    @ExceptionHandler(FenetreInvalideException.class)
+    ProblemDetail fenetreInvalide(FenetreInvalideException echec) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, echec.getMessage());
     }
 

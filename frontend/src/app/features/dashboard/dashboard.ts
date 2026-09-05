@@ -25,9 +25,9 @@ export interface Part {
 /**
  * Ecran d'accueil : l'etat du pipeline en un coup d'oeil, plus le flux de ce qui bouge.
  *
- * Pas de bibliotheque de graphiques : des compteurs et des `mat-progress-bar` suffisent aux
- * repartitions de cet ecran, et une dependance de plus aurait demande de faire correspondre
- * ses peerDependencies a chaque montee d'Angular.
+ * Chart.js existe depuis F13, mais cet ecran-ci n'en charge aucune instance : des compteurs
+ * et des `mat-progress-bar` suffisent aux repartitions de l'accueil, et c'est ce qui garde
+ * son chunk leger. Les figures vivent dans l'ecran `analyse`, charge a part.
  *
  * Le flux s'ouvre a l'arrivee et se ferme au depart : laisse ouvert apres la navigation, il
  * garderait une connexion et un emetteur serveur pour un ecran que personne ne regarde.

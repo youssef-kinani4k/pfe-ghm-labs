@@ -31,6 +31,45 @@ export interface StatsView {
   nomsDeCommercial: Record<string, string>;
 }
 
+/**
+ * Une journee de capture.
+ *
+ * `jour` est une date ISO `YYYY-MM-DD`, pas un instant : le point represente une journee
+ * entiere du fuseau de l'instance.
+ */
+export interface PointVolume {
+  jour: string;
+  captures: number;
+  ecartes: number;
+}
+
+/**
+ * Le delai capture -> ERP d'une journee, en secondes.
+ *
+ * Les deux mesures sont nullables, et `null` veut dire « aucun lead synchronise ce jour-la ».
+ * Ne jamais le remplacer par zero a l'affichage : la courbe dessinerait une chute vers le bas,
+ * soit l'inverse du sens. Chart.js interrompt la ligne sur un `null`.
+ */
+export interface PointDelai {
+  jour: string;
+  medianeSecondes: number | null;
+  p95Secondes: number | null;
+}
+
+/** Une journee d'analyse, repartie entre le modele et le lexique. */
+export interface PointIntention {
+  jour: string;
+  gemini: number;
+  lexique: number;
+}
+
+/** Les trois series de l'ecran d'analyse. Memes jours, meme ordre, dans les trois listes. */
+export interface SeriesView {
+  volume: PointVolume[];
+  delais: PointDelai[];
+  intentions: PointIntention[];
+}
+
 /** Profondeur et consommateurs d'une file, lus en AMQP. */
 export interface QueueView {
   name: string;

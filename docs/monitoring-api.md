@@ -416,6 +416,42 @@ convertir affichera une valeur cent fois trop petite.
 quoi un écran afficherait des UUID. Chaque mesure est une requête d'agrégation : rien n'est
 compté en mémoire.
 
+### `GET /api/stats/series`
+
+Les trois séries quotidiennes de l'écran d'analyse, en un appel.
+
+| Paramètre | Type | Défaut | Rôle |
+| --- | --- | --- | --- |
+| `clientId` | UUID | absent | Restreint à une boutique. Absent : toutes. |
+| `jours` | entier | `30` | Fenêtre. **7, 30 ou 90 uniquement** — `400` sinon. |
+
+```bash
+curl -s -H "Authorization: Bearer $JETON" \
+  'http://localhost:8090/api/stats/series?jours=7' | jq
+```
+
+```json
+{
+  "volume": [{ "jour": "2026-02-26", "captures": 12, "ecartes": 1 }],
+  "delais": [{ "jour": "2026-02-26", "medianeSecondes": 4.2, "p95Secondes": 31.7 }],
+  "intentions": [{ "jour": "2026-02-26", "gemini": 9, "lexique": 3 }]
+}
+```
+
+Trois choses à savoir en lisant cette réponse.
+
+**Les trois listes portent exactement les mêmes jours, dans le même ordre**, et il y en a
+toujours `jours` — les journées sans donnée sont comblées par le serveur. Une journée absente
+laisserait le client tracer une droite par-dessus.
+
+**`medianeSecondes` et `p95Secondes` peuvent être `null`**, et cela veut dire « aucun lead
+synchronisé ce jour-là ». Ce n'est pas un délai de zéro seconde : afficher zéro dessinerait une
+chute vers le bas, soit l'inverse du sens.
+
+**Le découpage en journées se fait dans le fuseau de l'instance** (`leadflow.analytics.fuseau`,
+`Europe/Paris` par défaut), et non en UTC. Le point du jour J de `delais` agrège les leads
+**synchronisés** ce jour-là, pas ceux capturés.
+
 ---
 
 ## 6. Files
