@@ -545,7 +545,7 @@ prefixe `leadflow.*` et se lisent via un `record`
 `@ConfigurationProperties` place dans `config/` — `@ConfigurationPropertiesScan` est actif
 sur `BackendApplication`, aucun enregistrement manuel n'est necessaire.
 
-Cinq variables gouvernent l'instance, plus celles du relais d'alerte :
+Dix variables gouvernent l'instance :
 
 | Variable                       | Role                                                    |
 | ------------------------------ | ------------------------------------------------------- |
