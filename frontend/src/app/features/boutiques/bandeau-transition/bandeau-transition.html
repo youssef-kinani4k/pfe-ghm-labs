@@ -2,14 +2,14 @@
   <mat-icon aria-hidden="true">schedule</mat-icon>
   <div class="bandeau-transition__contenu">
     <p class="bandeau-transition__ligne bandeau-transition__ligne--principale">
-      Ancien secret encore accepte jusqu'au {{ transition().expireLe | date: 'medium' }}
+      Ancien secret encore accepte jusqu'au {{ transition().expireLe | date: 'dd/MM/yyyy HH:mm' }}
     </p>
     @if (transition().dernierLeadAncienSecret === null) {
       <p class="bandeau-transition__ligne">Plus aucun lead signe avec l'ancien secret</p>
     } @else {
       <p class="bandeau-transition__ligne">
         Dernier lead signe avec l'ancien secret le
-        {{ transition().dernierLeadAncienSecret | date: 'short' }}
+        {{ transition().dernierLeadAncienSecret | date: 'dd/MM/yyyy HH:mm' }}
       </p>
     }
     <button
