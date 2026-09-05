@@ -183,3 +183,7 @@ leadflow:
         enabled: true
         connect-timeout: 5s
         read-timeout: 15s
+  analytics:
+    # Fuseau de regroupement des series quotidiennes. Global a l'instance : l'agence lit ses
+    # graphiques depuis un seul endroit.
+    fuseau: ${LEADFLOW_ANALYTICS_FUSEAU:Europe/Paris}
