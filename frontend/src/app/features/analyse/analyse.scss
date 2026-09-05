@@ -1,0 +1,88 @@
+:host {
+  display: block;
+}
+
+.analyse {
+  &__entete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lf-space-2);
+    margin-bottom: var(--lf-space-3);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1.375rem;
+    letter-spacing: -0.02em;
+  }
+
+  &__periodes {
+    margin-left: auto;
+  }
+
+  &__client {
+    width: 14rem;
+    // Le champ Material reserve la place d'un message d'erreur sous lui : sans ce
+    // rattrapage, il pousserait le reste de l'entete vers le bas.
+    margin-bottom: -1.25rem;
+  }
+
+  &__erreur {
+    margin: 0 0 var(--lf-space-3);
+    color: var(--lf-echec);
+  }
+
+  &__grille {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lf-space-3);
+  }
+
+  &__carte-titre {
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 1rem;
+  }
+
+  &__explication {
+    margin: 0 0 var(--lf-space-3);
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.8125rem;
+    max-width: 60ch;
+  }
+
+  // L'etat vide remplace les trois cartes plutot que d'en montrer une par graphique : un
+  // canvas plat par carte se lirait comme trois pannes, la ou il n'y a qu'un seul fait a
+  // dire — cette periode n'a rien produit.
+  &__vide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--lf-space-1);
+    padding: var(--lf-space-5) var(--lf-space-3);
+    color: var(--mat-sys-on-surface-variant);
+    text-align: center;
+
+    mat-icon {
+      width: 2rem;
+      height: 2rem;
+      font-size: 2rem;
+      color: var(--mat-sys-outline);
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.875rem;
+      max-width: 40ch;
+    }
+  }
+}
+
+@media (min-width: 1100px) {
+  .analyse__grille {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    align-items: start;
+  }
+}

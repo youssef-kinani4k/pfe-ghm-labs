@@ -42,8 +42,8 @@ describe('App', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.app-barre__marque')?.textContent).toContain('LeadFlow');
-    // Six entrees : Parametres rejoint Dashboard, Leads, File d'attente, Boutiques et
-    // Connecteurs. Le compte est asserte pour qu'un ajout de route se decide, pas se subisse.
-    expect(compiled.querySelectorAll('mat-nav-list a').length).toBe(6);
+    // Sept entrees : Analyse rejoint Dashboard, Leads, File d'attente, Boutiques, Connecteurs
+    // et Parametres. Le compte est asserte pour qu'un ajout de route se decide, pas se subisse.
+    expect(compiled.querySelectorAll('mat-nav-list a').length).toBe(7);
   });
 });

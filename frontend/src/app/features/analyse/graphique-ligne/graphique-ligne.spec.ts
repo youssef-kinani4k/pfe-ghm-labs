@@ -37,4 +37,33 @@ describe('GraphiqueLigne', () => {
 
     expect(espion).toHaveBeenCalled();
   });
+
+  it('met a jour le graphique existant quand les entrees changent apres coup', () => {
+    fixture.componentRef.setInput('libelles', ['lun', 'mar', 'mer']);
+    fixture.componentRef.setInput('series', serie);
+    fixture.detectChanges();
+
+    // Meme transtypage que le test de destruction : c'est la seule facon d'observer
+    // l'instance Chart.js privee depuis le test.
+    const instance = fixture.componentInstance;
+    const graphique = (
+      instance as unknown as {
+        graphique?: { data: { labels?: unknown[]; datasets: { data: unknown[] }[] } };
+      }
+    ).graphique;
+    expect(graphique).toBeTruthy();
+
+    const nouvelleSerie: SerieGraphique[] = [
+      { nom: 'Mediane', valeurs: [9, 8, 7], couleur: '#334155', remplie: false },
+    ];
+    fixture.componentRef.setInput('libelles', ['jeu', 'ven', 'sam']);
+    fixture.componentRef.setInput('series', nouvelleSerie);
+    fixture.detectChanges();
+
+    // Ce chemin passe par l'effect() du constructeur, pas par ngAfterViewInit : c'est
+    // exactement ce que l'ecran d'analyse declenche a chaque changement de periode ou de
+    // boutique.
+    expect(graphique!.data.labels).toEqual(['jeu', 'ven', 'sam']);
+    expect(graphique!.data.datasets[0].data).toEqual([9, 8, 7]);
+  });
 });
