@@ -47,4 +47,23 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
             @Param("clientId") String clientId,
             @Param("depuis") Instant depuis,
             @Param("fuseau") String fuseau);
+
+    @Query(
+            value =
+                    """
+                    select (l.created_at at time zone :fuseau)::date        as jour,
+                           count(*) filter (where l.intent_source = 'GEMINI') as gemini,
+                           count(*) filter (where l.intent_source = 'RULES')  as lexique
+                    from lead l
+                    where l.created_at >= :depuis
+                      and (cast(:clientId as uuid) is null
+                           or l.client_id = cast(:clientId as uuid))
+                    group by jour
+                    order by jour
+                    """,
+            nativeQuery = true)
+    List<PointIntentionBrut> intentionsParJour(
+            @Param("clientId") String clientId,
+            @Param("depuis") Instant depuis,
+            @Param("fuseau") String fuseau);
 }

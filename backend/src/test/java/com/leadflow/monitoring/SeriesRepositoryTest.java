@@ -6,8 +6,13 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.qualification.IntentSource;
+import com.leadflow.qualification.Lead;
+import com.leadflow.qualification.LeadRepository;
+import com.leadflow.qualification.LeadStatus;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -21,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
@@ -31,9 +37,12 @@ class SeriesRepositoryTest {
     @Autowired private SeriesRepository series;
     @Autowired private RawLeadEventRepository evenements;
     @Autowired private ClientRepository clients;
+    @Autowired private LeadRepository leads;
+    @Autowired private EntityManager em;
 
     @AfterEach
     void nettoie() {
+        leads.deleteAll();
         evenements.deleteAll();
         clients.deleteAll();
     }
@@ -96,6 +105,29 @@ class SeriesRepositoryTest {
                 .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(2L));
     }
 
+    @Test
+    @Transactional
+    void comptePourChaqueJourLaPartDuModeleEtCelleDuLexique() {
+        Client boutique = boutique("intentions");
+        Instant lundi = instantParisien(2026, 3, 2, 10);
+
+        lead(boutique, lundi, IntentSource.GEMINI);
+        lead(boutique, lundi, IntentSource.GEMINI);
+        lead(boutique, lundi, IntentSource.RULES);
+        // Sans source : ni Gemini ni lexique. La figure dit qui a analyse, pas combien de
+        // leads sont arrives.
+        lead(boutique, lundi, null);
+
+        List<PointIntentionBrut> points = series.intentionsParJour(
+                boutique.getId().toString(), lundi.minusSeconds(3600), PARIS);
+
+        assertThat(points).singleElement().satisfies(p -> {
+            assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
+            assertThat(p.getGemini()).isEqualTo(2L);
+            assertThat(p.getLexique()).isEqualTo(1L);
+        });
+    }
+
     private Client boutique(String suffixe) {
         Client c = new Client();
         c.setName("Boutique " + suffixe);
@@ -116,6 +148,35 @@ class SeriesRepositoryTest {
         e.setReceivedAt(quand);
         e.setStatus(statut);
         evenements.save(e);
+    }
+
+    private Lead lead(Client boutique, Instant quand, IntentSource source) {
+        RawLeadEvent e = new RawLeadEvent();
+        e.setClientId(boutique.getId());
+        e.setSource("formulaire");
+        e.setPayload(new HashMap<>(Map.of("email", "a@b.fr")));
+        e.setSignature("sig-" + UUID.randomUUID());
+        e.setReceivedAt(quand);
+        e.setStatus(RawLeadEventStatus.PUBLISHED);
+        e = evenements.save(e);
+
+        Lead l = new Lead();
+        l.setClientId(boutique.getId());
+        l.setRawEventId(e.getId());
+        l.setEmail("prospect-" + UUID.randomUUID() + "@test.local");
+        l.setScore(50);
+        l.setStatus(LeadStatus.QUALIFIED);
+        l.setIntentSource(source);
+        l = leads.save(l);
+        em.flush();
+
+        em.createNativeQuery("update lead set created_at = :quand where id = :id")
+                .setParameter("quand", quand)
+                .setParameter("id", l.getId())
+                .executeUpdate();
+        em.clear();
+
+        return l;
     }
 
     private static Instant instantParisien(int annee, int mois, int jour, int heure) {
