@@ -67,6 +67,15 @@ export class GraphiqueLigne implements AfterViewInit, OnDestroy {
   readonly libelles = input.required<string[]>();
   readonly series = input.required<SerieGraphique[]>();
   readonly uniteY = input<string>('');
+  /**
+   * Demande un axe empile a 100 %, plutot que des valeurs absolues superposees.
+   *
+   * Pose `scales.y.stacked` et fixe l'axe a `[0, 100]` : c'est la seule forme empilee que
+   * l'ecran d'analyse utilise. Le composant reste generique — il ne sait toujours pas ce que
+   * les series representent — mais cette entree encode que « empile » veut ici dire
+   * « empile a 100 % », pas un empilement en valeurs absolues sans borne connue.
+   */
+  readonly empile = input<boolean>(false);
 
   private readonly toile = viewChild.required<ElementRef<HTMLCanvasElement>>('toile');
   private graphique?: Chart;
@@ -105,7 +114,9 @@ export class GraphiqueLigne implements AfterViewInit, OnDestroy {
             },
           },
         },
-        scales: { y: { beginAtZero: true } },
+        scales: {
+          y: this.empile() ? { stacked: true, min: 0, max: 100 } : { beginAtZero: true },
+        },
       },
     });
   }

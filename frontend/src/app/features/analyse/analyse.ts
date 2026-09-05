@@ -112,21 +112,41 @@ export class Analyse implements OnInit {
     ];
   });
 
+  /**
+   * Aire empilee a 100 % : chaque journee devient une part de Gemini et une part de lexique,
+   * pas un compteur absolu — deux boutiques a 10 et 1000 leads par jour ne sont pas
+   * comparables en valeurs brutes.
+   *
+   * Une journee sans aucune analyse (`gemini` et `lexique` tous deux a zero) rend `null` des
+   * deux cotes, jamais zero : zero pour cent de Gemini serait une affirmation fausse la ou
+   * il n'y a simplement rien a mesurer ce jour-la. Meme regle que celle qui gouverne deja les
+   * delais dans cette feature.
+   */
   readonly serieIntentions = computed<SerieGraphique[]>(() => {
     const d = this.donnees();
     if (!d) {
       return [];
     }
+    const parts = d.intentions.map((p) => {
+      const total = p.gemini + p.lexique;
+      if (total === 0) {
+        return { gemini: null, lexique: null };
+      }
+      return {
+        gemini: Math.round((p.gemini / total) * 1000) / 10,
+        lexique: Math.round((p.lexique / total) * 1000) / 10,
+      };
+    });
     return [
       {
         nom: 'Gemini',
-        valeurs: d.intentions.map((p) => p.gemini),
+        valeurs: parts.map((p) => p.gemini),
         couleur: this.jeton('--lf-succes'),
         remplie: true,
       },
       {
         nom: 'Lexique',
-        valeurs: d.intentions.map((p) => p.lexique),
+        valeurs: parts.map((p) => p.lexique),
         couleur: this.jeton('--lf-neutre'),
         remplie: true,
       },

@@ -38,6 +38,26 @@ describe('GraphiqueLigne', () => {
     expect(espion).toHaveBeenCalled();
   });
 
+  it('empile l axe a 100 % quand empile est demande', () => {
+    // C'est la seule forme empilee de l'ecran d'analyse (l'aire des intentions Gemini /
+    // lexique) : sans stacked et sans borne a 100, l'axe recommencerait a zero pour chaque
+    // serie, exactement le defaut corrige par F13.
+    fixture.componentRef.setInput('libelles', ['lun', 'mar', 'mer']);
+    fixture.componentRef.setInput('series', serie);
+    fixture.componentRef.setInput('empile', true);
+    fixture.detectChanges();
+
+    const instance = fixture.componentInstance;
+    const graphique = (
+      instance as unknown as {
+        graphique?: { options: { scales?: { y?: Record<string, unknown> } } };
+      }
+    ).graphique;
+
+    expect(graphique?.options.scales?.y?.['stacked']).toBe(true);
+    expect(graphique?.options.scales?.y?.['max']).toBe(100);
+  });
+
   it('met a jour le graphique existant quand les entrees changent apres coup', () => {
     fixture.componentRef.setInput('libelles', ['lun', 'mar', 'mer']);
     fixture.componentRef.setInput('series', serie);
