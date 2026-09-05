@@ -83,7 +83,10 @@ public class ClientAdminService {
                 && expiration != null
                 && expiration.isAfter(Instant.now())) {
             transition = new TransitionSecret(
-                    expiration, usageAncienSecret.dernierUsage(client.getId()).orElse(null));
+                    expiration,
+                    usageAncienSecret
+                            .dernierUsage(client.getId(), client.getPreviousSecretSince())
+                            .orElse(null));
         }
         return new ClientDetailAdmin(
                 client.getId(),
@@ -191,14 +194,17 @@ public class ClientAdminService {
      * <p>Une seconde rotation pendant la fenetre est autorisee, et l'ancien devient celui
      * qu'on vient de retirer : il n'y a jamais plus de deux secrets vivants. Le secret
      * d'origine cesse alors immediatement de valoir, et l'ecran l'annonce avant de
-     * confirmer.
+     * confirmer. {@code previousSecretSince} est repose a l'instant de <b>cette</b> rotation,
+     * pour que la fenetre precedente ne fasse pas remonter un vieux retardataire.
      */
     @Transactional
     public SecretRotated tourneLeSecret(UUID id) {
         Client client = trouve(id);
-        Instant expiration = Instant.now().plus(webhook.transitionSecret());
+        Instant maintenant = Instant.now();
+        Instant expiration = maintenant.plus(webhook.transitionSecret());
         client.setPreviousHmacSecret(client.getHmacSecret());
         client.setPreviousSecretExpiresAt(expiration);
+        client.setPreviousSecretSince(maintenant);
         client.setHmacSecret(generateur.secretHmac());
         return new SecretRotated(client.getHmacSecret(), expiration);
     }
@@ -206,7 +212,7 @@ public class ClientAdminService {
     /**
      * Ferme la fenetre de transition sans attendre son terme.
      *
-     * <p>Le geste d'une fuite averee. Les deux colonnes tombent ensemble : un secret
+     * <p>Le geste d'une fuite averee. Les trois colonnes tombent ensemble : un secret
      * precedent sans expiration serait un second secret permanent.
      *
      * <p>Revoquer une transition inexistante est un succes sans effet — l'etat vise est
@@ -218,6 +224,7 @@ public class ClientAdminService {
         Client client = trouve(id);
         client.setPreviousHmacSecret(null);
         client.setPreviousSecretExpiresAt(null);
+        client.setPreviousSecretSince(null);
         return fiche(client.getId());
     }
 

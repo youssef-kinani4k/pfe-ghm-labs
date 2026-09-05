@@ -57,6 +57,21 @@ class TransitionDansLaFicheTest {
     }
 
     @Test
+    void uneFenetreExpireeRendNulMemeAvecLeSecretPrecedentEncoreEnBase() throws Exception {
+        // L'expiration est paresseuse : le secret precedent dort en base jusqu'a la
+        // rotation suivante ou la revocation. La fiche doit distinguer ce cas de « n'a
+        // jamais tourne son secret », sans quoi rien ne prouve que l'expiration cote
+        // lecture est bien testee.
+        Client boutique = creeUneBoutique();
+        boutique.setPreviousHmacSecret("ancien-secret-expire");
+        boutique.setPreviousSecretExpiresAt(Instant.now().minusSeconds(1));
+        boutique.setPreviousSecretSince(Instant.now().minus(25, ChronoUnit.HOURS));
+        clients.save(boutique);
+
+        assertThat(fiche(boutique.getId()).get("transition").isNull()).isTrue();
+    }
+
+    @Test
     void pendantLaTransitionLaFicheDonneLaDateDeFinEtAucunUsage() throws Exception {
         Client boutique = creeUneBoutique();
         mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
@@ -74,11 +89,13 @@ class TransitionDansLaFicheTest {
         Client boutique = creeUneBoutique();
         mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
                 .header("Authorization", "Bearer " + jeton()));
-        Instant quand = Instant.now().minus(2, ChronoUnit.HOURS);
+        // Le lead retardataire doit dater d'apres la rotation : c'est la fenetre courante
+        // qu'il decrit, jamais une fenetre passee.
+        Instant quand = Instant.now().plus(2, ChronoUnit.SECONDS);
         ecritUnLead(boutique.getId(), quand, true);
         // Un lead plus recent signe avec le secret courant ne doit pas deplacer la date :
         // ce qu'on cherche, c'est le dernier retardataire.
-        ecritUnLead(boutique.getId(), Instant.now(), false);
+        ecritUnLead(boutique.getId(), Instant.now().plus(3, ChronoUnit.SECONDS), false);
 
         JsonNode transition = fiche(boutique.getId()).get("transition");
 
@@ -87,12 +104,35 @@ class TransitionDansLaFicheTest {
     }
 
     @Test
+    void unRetardataireDUneFenetrePrecedenteNeRessortPasDansLaFenetreCourante() throws Exception {
+        Client boutique = creeUneBoutique();
+        // Premiere rotation, premiere fenetre : un lead retardataire arrive et la ferme.
+        mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
+                .header("Authorization", "Bearer " + jeton()));
+        ecritUnLead(boutique.getId(), Instant.now(), true);
+        mockMvc.perform(post("/api/admin/clients/" + boutique.getId()
+                        + "/revoke-previous-secret")
+                .header("Authorization", "Bearer " + jeton()));
+
+        // Trois mois plus tard (simules), la meme boutique tourne de nouveau son secret :
+        // le vieux retardataire ne doit pas faire dire « pas encore » a la nouvelle fenetre.
+        mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
+                .header("Authorization", "Bearer " + jeton()));
+
+        JsonNode transition = fiche(boutique.getId()).get("transition");
+
+        assertThat(transition.get("dernierLeadAncienSecret").isNull()).isTrue();
+    }
+
+    @Test
     void parmiPlusieursRetardatairesLaFicheGardeLePlusRecent() throws Exception {
         Client boutique = creeUneBoutique();
         mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
                 .header("Authorization", "Bearer " + jeton()));
-        Instant lePlusAncien = Instant.now().minus(3, ChronoUnit.HOURS);
-        Instant lePlusRecent = Instant.now().minus(1, ChronoUnit.HOURS);
+        // Les deux doivent dater d'apres la rotation, comme tout retardataire de la
+        // fenetre courante.
+        Instant lePlusAncien = Instant.now().plus(1, ChronoUnit.SECONDS);
+        Instant lePlusRecent = Instant.now().plus(2, ChronoUnit.SECONDS);
         // Les deux sont signes avec l'ancien secret : seul le tri distingue lequel remonter.
         ecritUnLead(boutique.getId(), lePlusAncien, true);
         ecritUnLead(boutique.getId(), lePlusRecent, true);

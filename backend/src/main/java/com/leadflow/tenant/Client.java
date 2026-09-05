@@ -55,6 +55,16 @@ public class Client extends BaseEntity {
     @Column(name = "previous_secret_expires_at")
     private Instant previousSecretExpiresAt;
 
+    /**
+     * Debut de la fenetre courante, pose par la rotation qui l'ouvre. Les trois colonnes de
+     * transition vont toujours ensemble, posees et effacees dans la meme transaction : sans
+     * cette borne, un lead retardataire marque lors d'une rotation passee reapparaitrait a la
+     * rotation suivante, et le feu vert « plus aucun lead signe avec l'ancien secret » ne
+     * pourrait plus jamais s'afficher pour cette boutique.
+     */
+    @Column(name = "previous_secret_since")
+    private Instant previousSecretSince;
+
     @Column(name = "crm_provider_id", nullable = false, length = 40)
     private String crmProviderId;
 

@@ -22,10 +22,18 @@ public class UsageAncienSecret {
         this.evenements = evenements;
     }
 
-    /** Vide quand aucun lead de cette boutique n'a jamais ete signe avec l'ancien secret. */
-    public Optional<Instant> dernierUsage(UUID clientId) {
+    /**
+     * Vide quand aucun lead de cette boutique n'a ete signe avec l'ancien secret depuis
+     * {@code depuis}, le debut de la fenetre courante.
+     *
+     * <p>{@code depuis} est fourni par l'appelant, qui tient la colonne {@code client} ou
+     * cette date est rangee : ce port ne connait que {@code raw_lead_event}, jamais
+     * {@code client}, qui appartient a {@code tenant/}.
+     */
+    public Optional<Instant> dernierUsage(UUID clientId, Instant depuis) {
         return evenements
-                .findFirstByClientIdAndSignedWithPreviousSecretTrueOrderByReceivedAtDesc(clientId)
+                .findFirstByClientIdAndSignedWithPreviousSecretTrueAndReceivedAtAfterOrderByReceivedAtDesc(
+                        clientId, depuis)
                 .map(RawLeadEvent::getReceivedAt);
     }
 }
