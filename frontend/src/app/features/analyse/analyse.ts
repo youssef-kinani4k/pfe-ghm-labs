@@ -53,13 +53,25 @@ export class Analyse implements OnInit {
   readonly enCours = signal(false);
   readonly erreur = signal<string | null>(null);
 
-  /** Vide au sens de l'ecran : aucune journee de la fenetre ne porte quoi que ce soit. */
+  /**
+   * Vide au sens de l'ecran : aucune des trois series ne porte quoi que ce soit.
+   *
+   * Le volume seul ne suffit pas : les delais sont ancres sur le jour de la
+   * synchronisation, pas de la capture. Un lead capture il y a quarante jours et
+   * synchronise aujourd'hui (un rejeu apres une panne ERP, par exemple) donne un volume a
+   * zero sur toute une fenetre de sept jours et pourtant un point de delai reel. Juger
+   * l'ecran vide sur le seul volume afficherait alors « Aucune donnee », ce qui est faux et
+   * se lit comme la panne que cet etat vide devait justement eviter.
+   */
   readonly vide = computed(() => {
     const d = this.donnees();
     if (!d) {
       return false;
     }
-    return d.volume.every((p) => p.captures === 0);
+    const volumeVide = d.volume.every((p) => p.captures === 0);
+    const delaisVide = d.delais.every((p) => p.medianeSecondes === null && p.p95Secondes === null);
+    const intentionsVide = d.intentions.every((p) => p.gemini === 0 && p.lexique === 0);
+    return volumeVide && delaisVide && intentionsVide;
   });
 
   readonly libelles = computed(() => (this.donnees()?.volume ?? []).map((p) => p.jour));
