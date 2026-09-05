@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { DOCUMENT } from '@angular/common';
+import { DatePipe, DOCUMENT } from '@angular/common';
 
 /**
  * Le secret HMAC, montre une seule fois.
@@ -18,7 +18,7 @@ import { DOCUMENT } from '@angular/common';
  */
 @Component({
   selector: 'app-secret-revele',
-  imports: [MatCardModule, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [MatCardModule, MatButtonModule, MatIconModule, MatTooltipModule, DatePipe],
   templateUrl: './secret-revele.html',
   styleUrl: './secret-revele.scss',
 })
@@ -28,6 +28,8 @@ export class SecretRevele {
   readonly secret = input.required<string>();
   readonly clePublique = input<string | null>(null);
   readonly cheminWebhook = input<string | null>(null);
+  /** Facultatif : la creation d'une boutique ne rend aucune fenetre de transition. */
+  readonly valideJusquA = input<string | null>(null);
 
   /** Emis au clic sur l'accuse de reception : c'est l'appelant qui decide de la suite. */
   readonly accuse = output<void>();

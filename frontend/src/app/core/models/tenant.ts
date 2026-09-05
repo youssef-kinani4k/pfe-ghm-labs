@@ -44,6 +44,17 @@ export interface ClientDetailAdmin {
   assignmentStrategy: AssignmentStrategy;
   active: boolean;
   salesReps: SalesRepAdminView[];
+  transition: TransitionSecret | null;
+}
+
+/**
+ * Fenetre pendant laquelle l'ancien secret d'une boutique reste accepte. `null` sur la
+ * fiche quand aucune transition ne court, ce qui est le cas ordinaire.
+ */
+export interface TransitionSecret {
+  expireLe: string;
+  /** Nul quand plus aucun lead n'arrive signe avec l'ancien secret : feu vert pour revoquer. */
+  dernierLeadAncienSecret: string | null;
 }
 
 export interface SalesRepAdminView {
@@ -92,6 +103,7 @@ export interface ClientCreated {
 /** Reponse de rotation : le secret en clair, une derniere fois. */
 export interface SecretRotated {
   hmacSecret: string;
+  ancienSecretValideJusquA: string;
 }
 
 /**

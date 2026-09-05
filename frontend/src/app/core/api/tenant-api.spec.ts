@@ -50,4 +50,12 @@ describe('TenantApi', () => {
     expect(requete.request.method).toBe('POST');
     requete.flush({ hmacSecret: 'nouveau' });
   });
+
+  it('revoque le secret precedent par une route dediee', () => {
+    api.revoqueLeSecretPrecedent('abc').subscribe();
+
+    const requete = httpMock.expectOne('/api/admin/clients/abc/revoke-previous-secret');
+    expect(requete.request.method).toBe('POST');
+    requete.flush({});
+  });
 });

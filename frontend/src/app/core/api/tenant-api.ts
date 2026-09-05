@@ -57,6 +57,10 @@ export class TenantApi {
     return this.http.post<SecretRotated>(`/api/admin/clients/${id}/rotate-secret`, {});
   }
 
+  revoqueLeSecretPrecedent(id: string) {
+    return this.http.post<ClientDetailAdmin>(`/api/admin/clients/${id}/revoke-previous-secret`, {});
+  }
+
   tourneLaClePublique(id: string) {
     return this.http.post<ClientDetailAdmin>(`/api/admin/clients/${id}/rotate-public-key`, {});
   }

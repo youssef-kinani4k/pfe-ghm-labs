@@ -297,6 +297,13 @@
       </mat-card-content>
     </mat-card>
 
+    @if (fiche.transition) {
+      <app-bandeau-transition
+        [transition]="fiche.transition"
+        (revoque)="revoqueLeSecretPrecedent()"
+      />
+    }
+
     <mat-card appearance="outlined" class="fiche__bloc">
       <mat-card-header>
         <mat-card-title class="fiche__sous-titre">Integration</mat-card-title>
@@ -348,6 +355,7 @@
             [secret]="secret"
             [clePublique]="fiche.publicKey"
             [cheminWebhook]="fiche.webhookPath"
+            [valideJusquA]="ancienValideJusquA()"
             (accuse)="secretRevele.set(null)"
           />
         }

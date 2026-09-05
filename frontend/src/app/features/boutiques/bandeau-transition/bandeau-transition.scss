@@ -1,0 +1,27 @@
+:host {
+  display: block;
+}
+
+// La classe globale .lf-bandeau (icone + texte, jamais la couleur seule) porte deja le
+// vocabulaire visuel de l'attente ; ce fichier n'ajoute que la mise en page propre a ce
+// bandeau — plusieurs lignes de texte plus une action, la ou .lf-bandeau suppose une phrase
+// unique.
+.bandeau-transition {
+  align-items: flex-start;
+  margin-bottom: var(--lf-space-3);
+
+  &__contenu {
+    display: flex;
+    flex-direction: column;
+    gap: var(--lf-space-1);
+  }
+
+  &__ligne {
+    margin: 0;
+  }
+
+  &__action {
+    align-self: flex-start;
+    margin-top: var(--lf-space-1);
+  }
+}
