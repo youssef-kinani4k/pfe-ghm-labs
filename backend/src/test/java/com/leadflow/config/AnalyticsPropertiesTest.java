@@ -27,9 +27,9 @@ class AnalyticsPropertiesTest {
 
     @Test
     void unFuseauInconnuEchoueAuDemarrageEtNonALaPremiereRequete() {
-        // Construire le ZoneId dans le record fait echouer le demarrage. Le construire a
-        // chaque requete ferait echouer le premier chargement de l'ecran, plusieurs jours
-        // apres le deploiement fautif.
+        // La validation a lieu dans le constructeur compact et fait echouer le demarrage.
+        // La reporter a la premiere requete ferait echouer le premier chargement de l'ecran,
+        // plusieurs jours apres le deploiement fautif.
         assertThatThrownBy(() -> new AnalyticsProperties("Mars/Olympus"))
                 .isInstanceOf(java.time.DateTimeException.class)
                 .hasMessageContaining("Mars/Olympus");
