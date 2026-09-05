@@ -602,7 +602,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Onze migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Douze migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -613,8 +613,9 @@ lie chez Dolibarr, pour que le rejeu repare une attribution manquante au lieu de
 en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial),
 `V8__lead_action.sql` (journal des gestes humains portes par un lead),
 `V9__notification_attempt.sql` (trace des alertes envoyees au commercial),
-`V10__analytics_index.sql` (deux index pour les series quotidiennes de F13) et
-`V11__hmac_secret_transition.sql` (fenetre de transition du secret HMAC de F14).
+`V10__analytics_index.sql` (deux index pour les series quotidiennes de F13),
+`V11__hmac_secret_transition.sql` (fenetre de transition du secret HMAC de F14) et
+`V12__previous_secret_since.sql` (ancrage de la fenetre courante, revue finale de F14).
 
 **`V11` ajoute deux colonnes nullables sur `client`** — `previous_hmac_secret` (chiffree au
 repos comme `hmac_secret`) et `previous_secret_expires_at` — **et un booleen sur
@@ -625,6 +626,15 @@ permanent, l'inverse de la feature. Le booleen se pose a l'insertion de la ligne
 toute facon lieu : le chemin chaud de la capture ne paie aucune ecriture de plus, et c'est
 ce qui permet a la fiche de la boutique de dire quand le dernier lead a l'ancien secret est
 passe, donc quand une revocation est sans risque.
+
+**`V12` ajoute une troisieme colonne nullable sur `client`**, `previous_secret_since` : le
+drapeau `signed_with_previous_secret` est permanent, il decrit une fenetre passee comme la
+fenetre courante, et sans borne le feu vert « plus aucun lead signe avec l'ancien secret » ne
+pouvait plus jamais s'afficher pour une boutique des sa seconde rotation. Cette colonne va
+desormais avec les deux de `V11` — les trois sont posees par la rotation et effacees par la
+revocation, dans la meme transaction — et la lecture de la fiche borne sa recherche du
+dernier retardataire a cette date. Aucun index, comme `V11` : la requete reste `client_id`
+plus tri par `received_at`, servie par `idx_raw_lead_event_client_received` de `V2`.
 
 **`V10` n'ajoute ni colonne ni table** : F13 ne fait que lire ce qui existe, comme la
 chronologie de F9 qui recompose six tables sans en creer aucune. `idx_lead_client_created`
