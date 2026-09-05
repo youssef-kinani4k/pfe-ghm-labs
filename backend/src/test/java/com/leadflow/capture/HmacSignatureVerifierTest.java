@@ -28,7 +28,8 @@ class HmacSignatureVerifierTest {
 
     private final HmacSignatureVerifier verificateur =
             new HmacSignatureVerifier(new WebhookProperties(
-                    "X-Leadflow-Signature", Duration.ofMinutes(5), 65536, null, null));
+                    "X-Leadflow-Signature", Duration.ofMinutes(5), 65536, null, null,
+                    Duration.ofHours(24)));
 
     private static String signe(String secret, long horodatage, String corps) {
         try {

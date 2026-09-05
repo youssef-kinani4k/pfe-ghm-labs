@@ -89,6 +89,10 @@ leadflow:
     # Applique apres lecture du corps : protege la base et la file, pas la memoire du
     # serveur. Un vrai garde-fou memoire releve du reverse-proxy (F7).
     max-payload-bytes: 65536
+    # Duree pendant laquelle l'ancien secret d'une boutique reste accepte apres une
+    # rotation, le temps qu'elle mette son formulaire a jour. Elle doit finir : une fenetre
+    # sans fin, ce sont deux secrets permanents pour la meme porte.
+    transition-secret: 24h
     # Plafond de volume, par cle publique. La signature protege l'authenticite d'une
     # soumission, pas leur nombre. Le compteur ne consulte jamais la base : il cle sur le
     # dernier segment de l'URL, decode, sans quoi le 429 dirait quelles cles publiques

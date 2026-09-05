@@ -13,6 +13,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxPayloadBytes taille de corps au-dela de laquelle la requete est refusee
  * @param relayAfter age minimal d'une ligne non publiee avant que le filet la reprenne
  * @param relayInterval periode de balayage du filet
+ * @param transitionSecret duree pendant laquelle le secret precedent d'une boutique reste
+ *     accepte apres une rotation. Globale a l'instance, comme le fuseau des series de F13 :
+ *     c'est un parametre d'exploitation de l'agence, pas une caracteristique du client.
  */
 @ConfigurationProperties(prefix = "leadflow.webhook")
 public record WebhookProperties(
@@ -20,5 +23,6 @@ public record WebhookProperties(
         Duration tolerance,
         int maxPayloadBytes,
         Duration relayAfter,
-        Duration relayInterval) {
+        Duration relayInterval,
+        Duration transitionSecret) {
 }
