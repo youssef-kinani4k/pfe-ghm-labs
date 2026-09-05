@@ -344,6 +344,9 @@ export class BoutiqueDetail implements OnInit {
     this.api.revoqueLeSecretPrecedent(fiche.id).subscribe({
       next: (mise) => {
         this.applique(mise);
+        // La fenetre vient de se fermer : une date affichee sur le panneau secret-revele
+        // deviendrait une affirmation fausse si elle restait a l ecran.
+        this.ancienValideJusquA.set(null);
         this.message.set('Ancien secret revoque.');
       },
       error: (echec: { status?: number }) => this.message.set(this.explique(echec?.status)),

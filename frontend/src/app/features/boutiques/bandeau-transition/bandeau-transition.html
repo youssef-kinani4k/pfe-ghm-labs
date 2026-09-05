@@ -1,7 +1,7 @@
 <div class="lf-bandeau lf-bandeau--attente bandeau-transition" role="status">
   <mat-icon aria-hidden="true">schedule</mat-icon>
   <div class="bandeau-transition__contenu">
-    <p class="bandeau-transition__ligne">
+    <p class="bandeau-transition__ligne bandeau-transition__ligne--principale">
       Ancien secret encore accepte jusqu'au {{ transition().expireLe | date: 'medium' }}
     </p>
     @if (transition().dernierLeadAncienSecret === null) {

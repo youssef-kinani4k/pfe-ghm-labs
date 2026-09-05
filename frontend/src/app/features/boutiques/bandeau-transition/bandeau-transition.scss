@@ -20,6 +20,12 @@
     margin: 0;
   }
 
+  // Hierarchie inspiree du couple titre/description des bandeaux d'etat : l'echeance est
+  // l'information qui justifie le bandeau, le statut de migration la nuance.
+  &__ligne--principale {
+    font-weight: 600;
+  }
+
   &__action {
     align-self: flex-start;
     margin-top: var(--lf-space-1);
