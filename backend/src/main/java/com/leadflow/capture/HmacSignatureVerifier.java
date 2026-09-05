@@ -10,6 +10,7 @@ import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
@@ -37,21 +38,29 @@ public class HmacSignatureVerifier {
     }
 
     /**
-     * @return la forme <b>canonique</b> de la signature, {@code t=<epoch>,v1=<hex>}, a
-     *     utiliser comme cle d'idempotence. Elle est reconstruite a partir des valeurs
-     *     validees et jamais reprise du texte recu : l'analyse tolere les espaces et les
-     *     parametres inconnus, si bien que {@code t=1,v1=ab}, {@code t=1, v1=ab} et
-     *     {@code t=1,v1=ab,x=9} sont trois textes valides pour une meme soumission. Les
-     *     stocker tels quels laisserait injecter des doublons en repaddant l'en-tete.
+     * @param secrets les secrets acceptables, <b>le courant en premier</b>. L'ordre est
+     *     porteur de sens : le cas normal ne calcule qu'un seul HMAC, et le second n'est
+     *     essaye que si le premier ne correspond pas — c'est-a-dire pendant une fenetre de
+     *     transition, et sur les tentatives reellement fausses.
+     * @return la forme <b>canonique</b> de la signature et le rang du secret qui a repondu.
+     *     La forme canonique est reconstruite a partir des valeurs validees et jamais
+     *     reprise du texte recu : l'analyse tolere les espaces et les parametres inconnus,
+     *     si bien que {@code t=1,v1=ab}, {@code t=1, v1=ab} et {@code t=1,v1=ab,x=9} sont
+     *     trois textes valides pour une meme soumission. Les stocker tels quels laisserait
+     *     injecter des doublons en repaddant l'en-tete.
      * @throws WebhookAuthenticationException si l'en-tete est absent, malforme, hors
-     *     fenetre, ou si la signature ne correspond pas. Le message est destine aux logs.
+     *     fenetre, ou si <b>aucun</b> des secrets ne correspond. Le message est destine aux
+     *     logs : l'appelant rend le meme 401 pour les cinq causes de refus.
      */
-    public String verifie(
-            String secret, String corpsBrut, String enTeteSignature, Instant maintenant) {
+    public SignatureVerifiee verifie(
+            List<String> secrets, String corpsBrut, String enTeteSignature, Instant maintenant) {
         if (enTeteSignature == null || enTeteSignature.isBlank()) {
             throw new WebhookAuthenticationException("En-tete de signature absent");
         }
 
+        // L'horodatage et la forme de l'en-tete ne dependent d'aucun secret : les controler
+        // ici, une seule fois, evite d'essayer deux secrets contre un texte qui n'en
+        // contient pas.
         long horodatage = horodatage(enTeteSignature);
         String signatureFournie = valeur(enTeteSignature, "v1");
 
@@ -61,13 +70,18 @@ public class HmacSignatureVerifier {
                     "Horodatage hors fenetre : ecart de " + ecart.toSeconds() + "s");
         }
 
-        String attendue = calcule(secret, horodatage + "." + corpsBrut);
-        // Comparaison en temps constant : une comparaison de chaines ordinaire s'arrete au
-        // premier octet different et laisse deduire la signature attendue octet par octet.
-        if (!MessageDigest.isEqual(attendue.getBytes(UTF_8), signatureFournie.getBytes(UTF_8))) {
-            throw new WebhookAuthenticationException("Signature invalide");
+        String charge = horodatage + "." + corpsBrut;
+        for (int rang = 0; rang < secrets.size(); rang++) {
+            String attendue = calcule(secrets.get(rang), charge);
+            // Comparaison en temps constant : une comparaison de chaines ordinaire s'arrete
+            // au premier octet different et laisse deduire la signature attendue octet par
+            // octet.
+            if (MessageDigest.isEqual(
+                    attendue.getBytes(UTF_8), signatureFournie.getBytes(UTF_8))) {
+                return new SignatureVerifiee("t=" + horodatage + ",v1=" + attendue, rang > 0);
+            }
         }
-        return "t=" + horodatage + ",v1=" + attendue;
+        throw new WebhookAuthenticationException("Signature invalide");
     }
 
     /**

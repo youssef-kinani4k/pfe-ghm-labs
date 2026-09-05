@@ -22,4 +22,19 @@ public interface RawLeadEventRepository extends JpaRepository<RawLeadEvent, UUID
     /** Ce que le filet de republication doit reprendre : non publie et assez vieux. */
     List<RawLeadEvent> findByStatusInAndReceivedAtBefore(
             Collection<RawLeadEventStatus> statuts, Instant limite);
+
+    /**
+     * Dernier lead d'un client encore signe avec l'ancien secret, <b>depuis le debut de la
+     * fenetre courante</b>, pour repondre a « puis-je revoquer maintenant ? » depuis la fiche
+     * de la boutique.
+     *
+     * <p>Le drapeau {@code signedWithPreviousSecret} est permanent : il decrit une fenetre
+     * passee autant que la fenetre courante. Sans la borne {@code receivedAtAfter}, un lead
+     * retardataire marque lors d'une rotation anterieure remonterait encore a la rotation
+     * suivante, et le feu vert ne pourrait plus jamais s'afficher pour cette boutique des sa
+     * seconde rotation.
+     */
+    Optional<RawLeadEvent>
+            findFirstByClientIdAndSignedWithPreviousSecretTrueAndReceivedAtAfterOrderByReceivedAtDesc(
+                    UUID clientId, Instant receivedAtAfter);
 }

@@ -50,6 +50,14 @@ public class RawLeadEvent {
     @Column(name = "signature", nullable = false, length = 255)
     private String signature;
 
+    /**
+     * Vrai quand c'est le secret precedent de la boutique qui a valide cette soumission.
+     * Pose a l'insertion, donc sans ecriture supplementaire sur le chemin chaud. C'est ce
+     * qui permet de dire a l'operateur si la boutique a fini de migrer.
+     */
+    @Column(name = "signed_with_previous_secret", nullable = false)
+    private boolean signedWithPreviousSecret;
+
     @Column(name = "received_at", nullable = false)
     private Instant receivedAt;
 

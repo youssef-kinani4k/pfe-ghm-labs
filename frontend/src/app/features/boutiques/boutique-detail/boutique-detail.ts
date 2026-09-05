@@ -27,6 +27,7 @@ import {
   SalesRepAdminView,
 } from '../../../core/models/tenant';
 import { SecretRevele } from '../secret-revele/secret-revele';
+import { BandeauTransition } from '../bandeau-transition/bandeau-transition';
 
 const STRATEGIES: { valeur: AssignmentStrategy; libelle: string }[] = [
   { valeur: 'ROUND_ROBIN', libelle: 'Tour de role' },
@@ -61,6 +62,7 @@ const STRATEGIES: { valeur: AssignmentStrategy; libelle: string }[] = [
     MatExpansionModule,
     MatTooltipModule,
     SecretRevele,
+    BandeauTransition,
   ],
   templateUrl: './boutique-detail.html',
   styleUrl: './boutique-detail.scss',
@@ -85,6 +87,9 @@ export class BoutiqueDetail implements OnInit {
 
   /** Rendu une seule fois apres rotation : le backend ne sait plus le redonner ensuite. */
   readonly secretRevele = signal<string | null>(null);
+
+  /** Fin de la fenetre de transition, portee par la reponse de rotation, pas par la fiche. */
+  readonly ancienValideJusquA = signal<string | null>(null);
 
   readonly commercialEnEdition = signal<SalesRepAdminView | null>(null);
 
@@ -296,12 +301,20 @@ export class BoutiqueDetail implements OnInit {
 
   regenereLeSecret(): void {
     const fiche = this.boutique();
+    if (!fiche) {
+      return;
+    }
+    const enTransition = fiche.transition !== null;
+    const avertissement = enTransition
+      ? '\n\nUne rotation est deja en cours : le secret d origine cessera immediatement ' +
+        'd etre accepte.'
+      : '';
     if (
-      !fiche ||
       !confirm(
         'Regenerer le secret HMAC ?\n\n' +
-          'Son formulaire cessera de fonctionner tant qu elle n aura pas mis a jour son ' +
-          'secret. Le secret actuel sera definitivement perdu.',
+          'L ancien secret restera accepte pendant la fenetre de transition, le temps ' +
+          'que la boutique mette son formulaire a jour.' +
+          avertissement,
       )
     ) {
       return;
@@ -309,7 +322,32 @@ export class BoutiqueDetail implements OnInit {
     this.api.tourneLeSecret(fiche.id).subscribe({
       next: (rendu) => {
         this.secretRevele.set(rendu.hmacSecret);
+        this.ancienValideJusquA.set(rendu.ancienSecretValideJusquA);
         this.message.set('Secret regenere. Il n est affiche qu une fois.');
+        this.charge(fiche.id);
+      },
+      error: (echec: { status?: number }) => this.message.set(this.explique(echec?.status)),
+    });
+  }
+
+  revoqueLeSecretPrecedent(): void {
+    const fiche = this.boutique();
+    if (
+      !fiche ||
+      !confirm(
+        'Revoquer l ancien secret ?\n\n' +
+          'Tout lead encore signe avec lui sera refuse immediatement.',
+      )
+    ) {
+      return;
+    }
+    this.api.revoqueLeSecretPrecedent(fiche.id).subscribe({
+      next: (mise) => {
+        this.applique(mise);
+        // La fenetre vient de se fermer : une date affichee sur le panneau secret-revele
+        // deviendrait une affirmation fausse si elle restait a l ecran.
+        this.ancienValideJusquA.set(null);
+        this.message.set('Ancien secret revoque.');
       },
       error: (echec: { status?: number }) => this.message.set(this.explique(echec?.status)),
     });

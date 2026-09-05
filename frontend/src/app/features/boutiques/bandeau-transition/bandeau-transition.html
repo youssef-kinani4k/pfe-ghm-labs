@@ -1,0 +1,26 @@
+<div class="lf-bandeau lf-bandeau--attente bandeau-transition" role="status">
+  <mat-icon aria-hidden="true">schedule</mat-icon>
+  <div class="bandeau-transition__contenu">
+    <p class="bandeau-transition__ligne bandeau-transition__ligne--principale">
+      Ancien secret encore accepte jusqu'au {{ transition().expireLe | date: 'dd/MM/yyyy HH:mm' }}
+    </p>
+    @if (transition().dernierLeadAncienSecret === null) {
+      <p class="bandeau-transition__ligne">Plus aucun lead signe avec l'ancien secret</p>
+    } @else {
+      <p class="bandeau-transition__ligne">
+        Dernier lead signe avec l'ancien secret le
+        {{ transition().dernierLeadAncienSecret | date: 'dd/MM/yyyy HH:mm' }}
+      </p>
+    }
+    <button
+      matButton
+      type="button"
+      class="bandeau-transition__action"
+      data-test="revoquer"
+      (click)="revoque.emit()"
+    >
+      <mat-icon>lock_clock</mat-icon>
+      Revoquer l'ancien secret maintenant
+    </button>
+  </div>
+</div>

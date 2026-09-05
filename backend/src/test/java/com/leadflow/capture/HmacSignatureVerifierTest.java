@@ -10,6 +10,7 @@ import com.leadflow.config.WebhookProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Test;
@@ -21,12 +22,14 @@ import org.junit.jupiter.api.Test;
 class HmacSignatureVerifierTest {
 
     private static final String SECRET = "secret-de-signature";
+    private static final String PRECEDENT = "secret-de-signature-precedent";
     private static final String CORPS = "{\"source\":\"formulaire-devis\"}";
     private static final Instant MAINTENANT = Instant.ofEpochSecond(1755820000L);
 
     private final HmacSignatureVerifier verificateur =
             new HmacSignatureVerifier(new WebhookProperties(
-                    "X-Leadflow-Signature", Duration.ofMinutes(5), 65536, null, null));
+                    "X-Leadflow-Signature", Duration.ofMinutes(5), 65536, null, null,
+                    Duration.ofHours(24)));
 
     private static String signe(String secret, long horodatage, String corps) {
         try {
@@ -44,7 +47,7 @@ class HmacSignatureVerifierTest {
     void accepteUneSignatureValideDansLaFenetre() {
         String enTete = signe(SECRET, MAINTENANT.getEpochSecond(), CORPS);
 
-        assertThatCode(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
+        assertThatCode(() -> verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT))
                 .doesNotThrowAnyException();
     }
 
@@ -55,9 +58,10 @@ class HmacSignatureVerifierTest {
         String enTete = signe(SECRET, MAINTENANT.getEpochSecond(), CORPS);
         String repadde = enTete.replace(",", " , ") + " , x=9";
 
-        String canonique = verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT);
+        String canonique = verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT)
+                .canonique();
 
-        assertThat(verificateur.verifie(SECRET, CORPS, repadde, MAINTENANT))
+        assertThat(verificateur.verifie(List.of(SECRET), CORPS, repadde, MAINTENANT).canonique())
                 .isEqualTo(canonique);
         assertThat(canonique).isEqualTo(enTete);
     }
@@ -67,19 +71,20 @@ class HmacSignatureVerifierTest {
         // Long.parseLong l'accepte, Instant non : sans garde, la seule route ouverte du
         // projet rendrait une erreur serveur sur une entree non authentifiee.
         assertThatThrownBy(() -> verificateur.verifie(
-                        SECRET, CORPS, "t=99999999999999999,v1=abcdef", MAINTENANT))
+                        List.of(SECRET), CORPS, "t=99999999999999999,v1=abcdef", MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
     @Test
     void refuseUnEnTeteAbsent() {
-        assertThatThrownBy(() -> verificateur.verifie(SECRET, CORPS, null, MAINTENANT))
+        assertThatThrownBy(() -> verificateur.verifie(List.of(SECRET), CORPS, null, MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
     @Test
     void refuseUnEnTeteMalforme() {
-        assertThatThrownBy(() -> verificateur.verifie(SECRET, CORPS, "pas-un-en-tete", MAINTENANT))
+        assertThatThrownBy(() -> verificateur.verifie(
+                        List.of(SECRET), CORPS, "pas-un-en-tete", MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
@@ -87,7 +92,7 @@ class HmacSignatureVerifierTest {
     void refuseUneSignatureFausse() {
         String enTete = signe("mauvais-secret", MAINTENANT.getEpochSecond(), CORPS);
 
-        assertThatThrownBy(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
+        assertThatThrownBy(() -> verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
@@ -96,7 +101,7 @@ class HmacSignatureVerifierTest {
         String enTete = signe(SECRET, MAINTENANT.getEpochSecond(), CORPS);
 
         assertThatThrownBy(() -> verificateur.verifie(
-                        SECRET, "{\"source\":\"autre-chose\"}", enTete, MAINTENANT))
+                        List.of(SECRET), "{\"source\":\"autre-chose\"}", enTete, MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
@@ -106,7 +111,7 @@ class HmacSignatureVerifierTest {
         long vieux = MAINTENANT.minus(Duration.ofMinutes(6)).getEpochSecond();
         String enTete = signe(SECRET, vieux, CORPS);
 
-        assertThatThrownBy(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
+        assertThatThrownBy(() -> verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
@@ -116,7 +121,7 @@ class HmacSignatureVerifierTest {
         long futur = MAINTENANT.plus(Duration.ofMinutes(6)).getEpochSecond();
         String enTete = signe(SECRET, futur, CORPS);
 
-        assertThatThrownBy(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
+        assertThatThrownBy(() -> verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT))
                 .isInstanceOf(WebhookAuthenticationException.class);
     }
 
@@ -125,7 +130,49 @@ class HmacSignatureVerifierTest {
         long bord = MAINTENANT.minus(Duration.ofMinutes(5)).getEpochSecond();
         String enTete = signe(SECRET, bord, CORPS);
 
-        assertThatCode(() -> verificateur.verifie(SECRET, CORPS, enTete, MAINTENANT))
+        assertThatCode(() -> verificateur.verifie(List.of(SECRET), CORPS, enTete, MAINTENANT))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void accepteLeSecretPrecedentEtLeDit() {
+        String enTete = signe(PRECEDENT, MAINTENANT.getEpochSecond(), CORPS);
+
+        SignatureVerifiee resultat =
+                verificateur.verifie(List.of(SECRET, PRECEDENT), CORPS, enTete, MAINTENANT);
+
+        assertThat(resultat.secretPrecedent()).isTrue();
+        assertThat(resultat.canonique()).isEqualTo(enTete);
+    }
+
+    @Test
+    void leSecretCourantNEstPasSignaleCommePrecedent() {
+        String enTete = signe(SECRET, MAINTENANT.getEpochSecond(), CORPS);
+
+        SignatureVerifiee resultat =
+                verificateur.verifie(List.of(SECRET, PRECEDENT), CORPS, enTete, MAINTENANT);
+
+        assertThat(resultat.secretPrecedent()).isFalse();
+    }
+
+    @Test
+    void refuseUneSignatureQueAucunSecretNeValide() {
+        String enTete = signe("secret-d-un-tiers", MAINTENANT.getEpochSecond(), CORPS);
+
+        assertThatThrownBy(() -> verificateur.verifie(
+                        List.of(SECRET, PRECEDENT), CORPS, enTete, MAINTENANT))
+                .isInstanceOf(WebhookAuthenticationException.class)
+                .hasMessageContaining("Signature invalide");
+    }
+
+    @Test
+    void unEnTeteMalformeEstRefuseAvantTouteComparaisonDeSecret() {
+        // Deux secrets acceptables, et pourtant un seul refus : l'analyse de l'en-tete et
+        // le controle de l'horodatage ne dependent pas du secret et ne sont faits qu'une
+        // fois. Le message nomme l'en-tete, jamais une signature qui ne correspond pas.
+        assertThatThrownBy(() -> verificateur.verifie(
+                        List.of(SECRET, PRECEDENT), CORPS, "v1=abcdef", MAINTENANT))
+                .isInstanceOf(WebhookAuthenticationException.class)
+                .hasMessageContaining("malforme");
     }
 }

@@ -9,6 +9,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
@@ -36,6 +37,33 @@ public class Client extends BaseEntity {
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "hmac_secret", nullable = false, columnDefinition = "text")
     private String hmacSecret;
+
+    /**
+     * Secret precedent, encore accepte jusqu'a {@code previousSecretExpiresAt}. Nul hors
+     * transition. Chiffre au repos par le meme converter que {@code hmacSecret} : les deux
+     * sont la meme chose a un instant different.
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "previous_hmac_secret", columnDefinition = "text")
+    private String previousHmacSecret;
+
+    /**
+     * Fin de la fenetre de transition. Toujours posee et effacee en meme temps que
+     * {@code previousHmacSecret} : un secret precedent sans expiration serait un second
+     * secret permanent, donc le double de surface d'attaque pour la meme porte.
+     */
+    @Column(name = "previous_secret_expires_at")
+    private Instant previousSecretExpiresAt;
+
+    /**
+     * Debut de la fenetre courante, pose par la rotation qui l'ouvre. Les trois colonnes de
+     * transition vont toujours ensemble, posees et effacees dans la meme transaction : sans
+     * cette borne, un lead retardataire marque lors d'une rotation passee reapparaitrait a la
+     * rotation suivante, et le feu vert « plus aucun lead signe avec l'ancien secret » ne
+     * pourrait plus jamais s'afficher pour cette boutique.
+     */
+    @Column(name = "previous_secret_since")
+    private Instant previousSecretSince;
 
     @Column(name = "crm_provider_id", nullable = false, length = 40)
     private String crmProviderId;

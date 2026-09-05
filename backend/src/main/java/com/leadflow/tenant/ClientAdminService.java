@@ -1,6 +1,8 @@
 package com.leadflow.tenant;
 
+import com.leadflow.capture.UsageAncienSecret;
 import com.leadflow.common.RessourceIntrouvableException;
+import com.leadflow.config.WebhookProperties;
 import com.leadflow.crm.CrmConnectorRegistry;
 import com.leadflow.crm.model.CrmSettingSpec;
 import com.leadflow.tenant.dto.ClientCreated;
@@ -9,6 +11,8 @@ import com.leadflow.tenant.dto.ClientForm;
 import com.leadflow.tenant.dto.ClientSummaryAdmin;
 import com.leadflow.tenant.dto.SecretRotated;
 import com.leadflow.tenant.dto.SalesRepAdminView;
+import com.leadflow.tenant.dto.TransitionSecret;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,16 +39,22 @@ public class ClientAdminService {
     private final SalesRepRepository commerciaux;
     private final CrmConnectorRegistry connecteurs;
     private final CleGenerator generateur;
+    private final WebhookProperties webhook;
+    private final UsageAncienSecret usageAncienSecret;
 
     public ClientAdminService(
             ClientRepository clients,
             SalesRepRepository commerciaux,
             CrmConnectorRegistry connecteurs,
-            CleGenerator generateur) {
+            CleGenerator generateur,
+            WebhookProperties webhook,
+            UsageAncienSecret usageAncienSecret) {
         this.clients = clients;
         this.commerciaux = commerciaux;
         this.connecteurs = connecteurs;
         this.generateur = generateur;
+        this.webhook = webhook;
+        this.usageAncienSecret = usageAncienSecret;
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +75,19 @@ public class ClientAdminService {
         Client client = clients.findById(id)
                 .orElseThrow(() -> new RessourceIntrouvableException(
                         "Aucune boutique avec cet identifiant"));
+        TransitionSecret transition = null;
+        Instant expiration = client.getPreviousSecretExpiresAt();
+        // Une fenetre close ne s'affiche pas : le secret precedent survit en base jusqu'a la
+        // rotation suivante, mais il n'est plus accepte, donc il n'y a plus rien a dire.
+        if (client.getPreviousHmacSecret() != null
+                && expiration != null
+                && expiration.isAfter(Instant.now())) {
+            transition = new TransitionSecret(
+                    expiration,
+                    usageAncienSecret
+                            .dernierUsage(client.getId(), client.getPreviousSecretSince())
+                            .orElse(null));
+        }
         return new ClientDetailAdmin(
                 client.getId(),
                 client.getName(),
@@ -76,7 +99,8 @@ public class ClientAdminService {
                 client.isActive(),
                 commerciaux.findByClientIdOrderByFullName(client.getId()).stream()
                         .map(this::vue)
-                        .toList());
+                        .toList(),
+                transition);
     }
 
     /**
@@ -161,18 +185,47 @@ public class ClientAdminService {
     }
 
     /**
-     * Regenere le secret HMAC.
+     * Regenere le secret HMAC, en laissant l'ancien vivre le temps d'une fenetre.
      *
-     * <p>Irreversible : l'ancien n'est nulle part, et le formulaire de la boutique cessera de
-     * fonctionner tant qu'elle n'aura pas mis a jour son cote. L'ecran l'annonce avant de
-     * confirmer.
+     * <p>Sans cette fenetre, chaque lead de la boutique etait refuse en 401 entre la
+     * rotation et le redeploiement de son site. L'ancien secret <b>doit</b> finir : une
+     * fenetre sans fin, ce sont deux secrets permanents pour la meme porte.
+     *
+     * <p>Une seconde rotation pendant la fenetre est autorisee, et l'ancien devient celui
+     * qu'on vient de retirer : il n'y a jamais plus de deux secrets vivants. Le secret
+     * d'origine cesse alors immediatement de valoir, et l'ecran l'annonce avant de
+     * confirmer. {@code previousSecretSince} est repose a l'instant de <b>cette</b> rotation,
+     * pour que la fenetre precedente ne fasse pas remonter un vieux retardataire.
      */
     @Transactional
     public SecretRotated tourneLeSecret(UUID id) {
         Client client = trouve(id);
-        String secret = generateur.secretHmac();
-        client.setHmacSecret(secret);
-        return new SecretRotated(secret);
+        Instant maintenant = Instant.now();
+        Instant expiration = maintenant.plus(webhook.transitionSecret());
+        client.setPreviousHmacSecret(client.getHmacSecret());
+        client.setPreviousSecretExpiresAt(expiration);
+        client.setPreviousSecretSince(maintenant);
+        client.setHmacSecret(generateur.secretHmac());
+        return new SecretRotated(client.getHmacSecret(), expiration);
+    }
+
+    /**
+     * Ferme la fenetre de transition sans attendre son terme.
+     *
+     * <p>Le geste d'une fuite averee. Les trois colonnes tombent ensemble : un secret
+     * precedent sans expiration serait un second secret permanent.
+     *
+     * <p>Revoquer une transition inexistante est un succes sans effet — l'etat vise est
+     * atteint, et un 404 obligerait l'ecran a distinguer deux cas identiques pour
+     * l'operateur.
+     */
+    @Transactional
+    public ClientDetailAdmin revoqueLeSecretPrecedent(UUID id) {
+        Client client = trouve(id);
+        client.setPreviousHmacSecret(null);
+        client.setPreviousSecretExpiresAt(null);
+        client.setPreviousSecretSince(null);
+        return fiche(client.getId());
     }
 
     /**

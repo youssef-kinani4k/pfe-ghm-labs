@@ -59,24 +59,69 @@ class RotationDesClesTest {
     }
 
     @Test
-    void apresRotationLAncienSecretNeSignePlus() throws Exception {
+    void pendantLaFenetreLAncienSecretSigneEncore() throws Exception {
         Client boutique = creeUneBoutique("Boutique a tourner");
+        String nouveau = tourneLeSecret(boutique.getId());
 
+        // Le defaut repare par F14 : sans fenetre, cette ligne rendait 401 et la boutique
+        // perdait ses leads jusqu'a ce que son developpeur redeploie.
         envoieUnLeadSigne(boutique.getPublicKey(), SECRET_EN_CLAIR)
                 .andExpect(status().isAccepted());
+        envoieUnLeadSigne(boutique.getPublicKey(), nouveau).andExpect(status().isAccepted());
+    }
+
+    @Test
+    void laRevocationTueLAncienSecretImmediatement() throws Exception {
+        Client boutique = creeUneBoutique("Boutique pressee");
+        String nouveau = tourneLeSecret(boutique.getId());
+
+        mockMvc.perform(post("/api/admin/clients/" + boutique.getId()
+                                + "/revoke-previous-secret")
+                        .header("Authorization", "Bearer " + jeton()))
+                .andExpect(status().isOk());
+
+        envoieUnLeadSigne(boutique.getPublicKey(), SECRET_EN_CLAIR)
+                .andExpect(status().isUnauthorized());
+        envoieUnLeadSigne(boutique.getPublicKey(), nouveau).andExpect(status().isAccepted());
+    }
+
+    @Test
+    void uneSecondeRotationRemplaceLAncienSecretParCeluiQuOnRetire() throws Exception {
+        Client boutique = creeUneBoutique("Boutique tournee deux fois");
+        String deuxieme = tourneLeSecret(boutique.getId());
+        String troisieme = tourneLeSecret(boutique.getId());
+
+        // Jamais plus de deux secrets vivants : le tout premier meurt a la seconde
+        // rotation, et l'ecran doit le dire avant de confirmer.
+        envoieUnLeadSigne(boutique.getPublicKey(), SECRET_EN_CLAIR)
+                .andExpect(status().isUnauthorized());
+        envoieUnLeadSigne(boutique.getPublicKey(), deuxieme).andExpect(status().isAccepted());
+        envoieUnLeadSigne(boutique.getPublicKey(), troisieme).andExpect(status().isAccepted());
+    }
+
+    @Test
+    void laRotationRendLaDateDeFinDeFenetre() throws Exception {
+        Client boutique = creeUneBoutique("Boutique informee");
 
         String corps = mockMvc.perform(
                         post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
                                 .header("Authorization", "Bearer " + jeton()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        String nouveau = mapper.readTree(corps).get("hmacSecret").asText();
 
-        // L'ancien secret est mort — c'est toute la raison d'etre du bouton.
-        envoieUnLeadSigne(boutique.getPublicKey(), SECRET_EN_CLAIR)
-                .andExpect(status().isUnauthorized());
-        envoieUnLeadSigne(boutique.getPublicKey(), nouveau)
-                .andExpect(status().isAccepted());
+        // L'ecran a besoin des deux au meme instant : le secret a copier, et jusqu'a quand
+        // l'ancien tient encore.
+        assertThat(mapper.readTree(corps).get("ancienSecretValideJusquA").asText())
+                .isNotBlank();
+    }
+
+    /** Tourne le secret et rend le nouveau, en clair. */
+    private String tourneLeSecret(UUID id) throws Exception {
+        String corps = mockMvc.perform(post("/api/admin/clients/" + id + "/rotate-secret")
+                        .header("Authorization", "Bearer " + jeton()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return mapper.readTree(corps).get("hmacSecret").asText();
     }
 
     @Test

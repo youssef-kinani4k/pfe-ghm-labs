@@ -7,6 +7,7 @@ import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,8 +64,12 @@ public class LeadCaptureService {
 
         // La forme canonique, et non le texte recu : deux en-tetes differemment espaces
         // signent la meme soumission et doivent donc porter la meme cle d'idempotence.
-        String signature = verificateur.verifie(
-                client.getHmacSecret(), corpsBrut, enTeteSignature, Instant.now());
+        SignatureVerifiee verifiee = verificateur.verifie(
+                secretsAcceptables(client, Instant.now()),
+                corpsBrut,
+                enTeteSignature,
+                Instant.now());
+        String signature = verifiee.canonique();
 
         int taille = corpsBrut.getBytes(StandardCharsets.UTF_8).length;
         if (taille > properties.maxPayloadBytes()) {
@@ -85,6 +90,7 @@ public class LeadCaptureService {
         evenement.setSource(canal);
         evenement.setPayload(payload);
         evenement.setSignature(signature);
+        evenement.setSignedWithPreviousSecret(verifiee.secretPrecedent());
         evenement.setReceivedAt(Instant.now());
         evenement.setStatus(RawLeadEventStatus.RECEIVED);
 
@@ -120,5 +126,24 @@ public class LeadCaptureService {
         } catch (JacksonException e) {
             throw new PayloadRejectedException("Corps JSON illisible", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    /**
+     * Le secret courant, plus le precedent tant que sa fenetre court.
+     *
+     * <p>C'est le seul endroit du projet qui connaisse la notion de fenetre de transition :
+     * le verificateur ne recoit qu'une liste de secrets acceptables. L'expiration est
+     * paresseuse — une fenetre close n'est pas balayee, le secret precedent reste en base
+     * jusqu'a la rotation suivante ou la revocation. Le nettoyer ici ferait payer une
+     * ecriture sur {@code client} a des requetes qui n'ont rien a corriger.
+     */
+    private List<String> secretsAcceptables(Client client, Instant maintenant) {
+        String precedent = client.getPreviousHmacSecret();
+        Instant expiration = client.getPreviousSecretExpiresAt();
+        if (precedent == null || expiration == null || !expiration.isAfter(maintenant)) {
+            return List.of(client.getHmacSecret());
+        }
+        // Le courant d'abord : le cas normal ne calcule qu'un seul HMAC.
+        return List.of(client.getHmacSecret(), precedent);
     }
 }

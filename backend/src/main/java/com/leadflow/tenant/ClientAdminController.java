@@ -82,6 +82,16 @@ public class ClientAdminController {
         return service.tourneLeSecret(id);
     }
 
+    /**
+     * Ferme la fenetre de transition ouverte par la derniere rotation. Un POST sur une
+     * sous-ressource nommee par son geste, comme {@code rotate-secret} et
+     * {@code deactivate} : c'est la convention de ce controleur.
+     */
+    @PostMapping("/{id}/revoke-previous-secret")
+    public ClientDetailAdmin revoqueLeSecretPrecedent(@PathVariable UUID id) {
+        return service.revoqueLeSecretPrecedent(id);
+    }
+
     @PostMapping("/{id}/rotate-public-key")
     public ClientDetailAdmin tourneLaClePublique(@PathVariable UUID id) {
         return service.tourneLaClePublique(id);

@@ -11,6 +11,9 @@ import java.util.UUID;
  * <p>{@code crmSettings} ne porte que les reglages <b>non secrets</b> : le formulaire doit
  * pouvoir reafficher l'adresse du serveur, jamais la cle d'API. Le secret HMAC n'y figure
  * a aucun titre — il n'est rendu qu'a la creation et a la rotation.
+ *
+ * <p>{@code transition} est nul hors transition — l'etat de toutes les boutiques qui n'ont
+ * pas tourne leur secret recemment.
  */
 public record ClientDetailAdmin(
         UUID id,
@@ -21,5 +24,6 @@ public record ClientDetailAdmin(
         Map<String, String> crmSettings,
         AssignmentStrategyType assignmentStrategy,
         boolean active,
-        List<SalesRepAdminView> salesReps) {
+        List<SalesRepAdminView> salesReps,
+        TransitionSecret transition) {
 }
