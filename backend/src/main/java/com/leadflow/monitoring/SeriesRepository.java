@@ -37,6 +37,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
                            count(*) filter (where e.status = 'DISCARDED') as ecartes
                     from raw_lead_event e
                     where e.received_at >= :depuis
+                      and e.received_at < :jusqu
                       and (cast(:clientId as uuid) is null
                            or e.client_id = cast(:clientId as uuid))
                     group by jour
@@ -46,6 +47,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
     List<PointVolumeBrut> volumeParJour(
             @Param("clientId") String clientId,
             @Param("depuis") Instant depuis,
+            @Param("jusqu") Instant jusqu,
             @Param("fuseau") String fuseau);
 
     @Query(
@@ -56,6 +58,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
                            count(*) filter (where l.intent_source = 'RULES')  as lexique
                     from lead l
                     where l.created_at >= :depuis
+                      and l.created_at < :jusqu
                       and (cast(:clientId as uuid) is null
                            or l.client_id = cast(:clientId as uuid))
                     group by jour
@@ -65,6 +68,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
     List<PointIntentionBrut> intentionsParJour(
             @Param("clientId") String clientId,
             @Param("depuis") Instant depuis,
+            @Param("jusqu") Instant jusqu,
             @Param("fuseau") String fuseau);
 
     @Query(
@@ -87,6 +91,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
                     join lead l           on l.id = p.lead_id
                     join raw_lead_event e on e.id = l.raw_event_id
                     where p.sync_at >= :depuis
+                      and p.sync_at < :jusqu
                       and (cast(:clientId as uuid) is null
                            or l.client_id = cast(:clientId as uuid))
                     group by jour
@@ -96,5 +101,6 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
     List<PointDelaiBrut> delaisParJour(
             @Param("clientId") String clientId,
             @Param("depuis") Instant depuis,
+            @Param("jusqu") Instant jusqu,
             @Param("fuseau") String fuseau);
 }

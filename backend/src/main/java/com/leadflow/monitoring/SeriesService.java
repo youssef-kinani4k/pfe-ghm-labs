@@ -57,16 +57,21 @@ public class SeriesService {
         LocalDate fin = LocalDate.now(zone);
         LocalDate debut = fin.minusDays(jours - 1L);
         Instant depuis = debut.atStartOfDay(zone).toInstant();
+        // Borne haute exclusive : sans elle, une ligne posterieure au dernier jour du
+        // calendrier serait ramenee par SQL, rangee sous une date absente du calendrier, et
+        // jamais relue -- silencieusement perdue. Le cas est rare (les dates sont posees par
+        // l'application elle-meme) mais la fenetre dure toute la requete.
+        Instant jusqu = fin.plusDays(1).atStartOfDay(zone).toInstant();
         String cle = clientId == null ? null : clientId.toString();
 
         List<LocalDate> calendrier = calendrier(debut, jours);
 
         Map<LocalDate, PointVolumeBrut> volumes =
-                indexe(series.volumeParJour(cle, depuis, fuseau), PointVolumeBrut::getJour);
+                indexe(series.volumeParJour(cle, depuis, jusqu, fuseau), PointVolumeBrut::getJour);
         Map<LocalDate, PointDelaiBrut> delais =
-                indexe(series.delaisParJour(cle, depuis, fuseau), PointDelaiBrut::getJour);
+                indexe(series.delaisParJour(cle, depuis, jusqu, fuseau), PointDelaiBrut::getJour);
         Map<LocalDate, PointIntentionBrut> intentions =
-                indexe(series.intentionsParJour(cle, depuis, fuseau),
+                indexe(series.intentionsParJour(cle, depuis, jusqu, fuseau),
                         PointIntentionBrut::getJour);
 
         return new SeriesView(

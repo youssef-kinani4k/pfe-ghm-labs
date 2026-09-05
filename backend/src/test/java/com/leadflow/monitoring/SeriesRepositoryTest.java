@@ -36,6 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 class SeriesRepositoryTest {
 
     private static final String PARIS = "Europe/Paris";
+    // Loin dans le futur : ces tests exercent les requetes brutes, pas la borne haute
+    // elle-meme (verrouillee cote service dans SeriesServiceTest), donc elle ne doit exclure
+    // aucune des donnees de la fixture.
+    private static final Instant JUSQU_AU_LOIN = Instant.parse("2100-01-01T00:00:00Z");
 
     @Autowired private SeriesRepository series;
     @Autowired private RawLeadEventRepository evenements;
@@ -63,7 +67,7 @@ class SeriesRepositoryTest {
         evenement(boutique, mardi, RawLeadEventStatus.PUBLISHED);
 
         List<PointVolumeBrut> points = series.volumeParJour(
-                boutique.getId().toString(), lundi.minusSeconds(3600), PARIS);
+                boutique.getId().toString(), lundi.minusSeconds(3600), JUSQU_AU_LOIN, PARIS);
 
         assertThat(points).hasSize(2);
         assertThat(points.get(0).getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
@@ -85,6 +89,7 @@ class SeriesRepositoryTest {
         List<PointVolumeBrut> points = series.volumeParJour(
                 boutique.getId().toString(),
                 justeApresMinuitAParis.minusSeconds(86_400),
+                JUSQU_AU_LOIN,
                 PARIS);
 
         assertThat(points).hasSize(1);
@@ -100,12 +105,12 @@ class SeriesRepositoryTest {
         evenement(autre, quand, RawLeadEventStatus.PUBLISHED);
 
         assertThat(series.volumeParJour(
-                        mienne.getId().toString(), quand.minusSeconds(3600), PARIS))
+                        mienne.getId().toString(), quand.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(1L));
 
         // clientId nul = toutes les boutiques. C'est la vue de l'agence.
-        assertThat(series.volumeParJour(null, quand.minusSeconds(3600), PARIS))
+        assertThat(series.volumeParJour(null, quand.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(2L));
     }
@@ -124,7 +129,7 @@ class SeriesRepositoryTest {
         lead(boutique, lundi, null);
 
         List<PointIntentionBrut> points = series.intentionsParJour(
-                boutique.getId().toString(), lundi.minusSeconds(3600), PARIS);
+                boutique.getId().toString(), lundi.minusSeconds(3600), JUSQU_AU_LOIN, PARIS);
 
         assertThat(points).singleElement().satisfies(p -> {
             assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
@@ -148,7 +153,7 @@ class SeriesRepositoryTest {
         tentative(l, rejeuTardif, CrmSyncAttemptStatus.SUCCESS);
 
         List<PointDelaiBrut> points = series.delaisParJour(
-                boutique.getId().toString(), capture.minusSeconds(3600), PARIS);
+                boutique.getId().toString(), capture.minusSeconds(3600), JUSQU_AU_LOIN, PARIS);
 
         assertThat(points).singleElement().satisfies(p -> {
             assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
@@ -169,7 +174,7 @@ class SeriesRepositoryTest {
         // Le delai se compte jusqu'au succes, pas jusqu'a la premiere tentative : un lead
         // que l'ERP a refuse deux fois a bel et bien mis cinq minutes a arriver.
         assertThat(series.delaisParJour(
-                        boutique.getId().toString(), capture.minusSeconds(3600), PARIS))
+                        boutique.getId().toString(), capture.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getMedianeSecondes()).isEqualTo(300.0d));
     }
@@ -190,7 +195,7 @@ class SeriesRepositoryTest {
         tentative(lent, jour.plusSeconds(1000), CrmSyncAttemptStatus.SUCCESS);
 
         PointDelaiBrut point = series.delaisParJour(
-                        boutique.getId().toString(), jour.minusSeconds(3600), PARIS)
+                        boutique.getId().toString(), jour.minusSeconds(3600), JUSQU_AU_LOIN, PARIS)
                 .get(0);
 
         assertThat(point.getMedianeSecondes()).isEqualTo(10.0d);
@@ -211,7 +216,10 @@ class SeriesRepositoryTest {
         // Ancre sur la capture, la courbe s'ameliorerait quand ca va mal : un lead jamais
         // synchronise n'y apparaitrait jamais.
         assertThat(series.delaisParJour(
-                        boutique.getId().toString(), captureLundi.minusSeconds(3600), PARIS))
+                        boutique.getId().toString(),
+                        captureLundi.minusSeconds(3600),
+                        JUSQU_AU_LOIN,
+                        PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getJour()).isEqualTo(LocalDate.of(2026, 3, 3)));
     }

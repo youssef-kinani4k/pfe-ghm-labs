@@ -4,9 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.leadflow.TestcontainersConfiguration;
+import com.leadflow.capture.RawLeadEvent;
+import com.leadflow.capture.RawLeadEventRepository;
+import com.leadflow.capture.RawLeadEventStatus;
 import com.leadflow.monitoring.dto.SeriesView;
 import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -21,14 +27,27 @@ class SeriesServiceTest {
 
     @Autowired private SeriesService service;
     @Autowired private ClientRepository clients;
+    @Autowired private RawLeadEventRepository evenements;
 
     private Client boutiqueVide;
+    private Client boutiqueDemain;
+    private UUID evenementDemainId;
 
     @AfterEach
     void nettoie() {
         if (boutiqueVide != null) {
             clients.deleteById(boutiqueVide.getId());
             boutiqueVide = null;
+        }
+        if (boutiqueDemain != null) {
+            // L'evenement d'abord : raw_lead_event reference client sans cascade, Postgres
+            // refuserait la suppression de la boutique tant qu'il existe.
+            if (evenementDemainId != null) {
+                evenements.deleteById(evenementDemainId);
+                evenementDemainId = null;
+            }
+            clients.deleteById(boutiqueDemain.getId());
+            boutiqueDemain = null;
         }
     }
 
@@ -95,6 +114,30 @@ class SeriesServiceTest {
             assertThatThrownBy(() -> service.calcule(null, jours))
                     .isInstanceOf(FenetreInvalideException.class);
         }
+    }
+
+    @Test
+    void uneLigneDateeDeDemainNApparaitPasDansLaSerie() {
+        // Sans borne haute, une ligne posterieure au dernier jour du calendrier serait
+        // ramenee par SQL, rangee sous une date absente du calendrier, puis jamais relue --
+        // silencieusement perdue. Le seul fait observable depuis le service est que cette
+        // ligne ne doit gonfler aucun jour de la fenetre.
+        boutiqueDemain = boutique("demain");
+        RawLeadEvent e = new RawLeadEvent();
+        e.setClientId(boutiqueDemain.getId());
+        e.setSource("formulaire");
+        e.setPayload(new HashMap<>(Map.of("email", "a@b.fr")));
+        e.setSignature("sig-" + UUID.randomUUID());
+        e.setReceivedAt(Instant.now().plus(Duration.ofDays(2)));
+        e.setStatus(RawLeadEventStatus.PUBLISHED);
+        evenementDemainId = evenements.save(e).getId();
+
+        SeriesView vue = service.calcule(boutiqueDemain.getId(), 7);
+
+        assertThat(vue.volume()).allSatisfy(p -> {
+            assertThat(p.captures()).isZero();
+            assertThat(p.ecartes()).isZero();
+        });
     }
 
     @Test
