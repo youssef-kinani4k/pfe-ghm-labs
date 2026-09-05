@@ -131,7 +131,7 @@ l'instant, et il écrit déjà la ligne.
 
 ## L'API d'administration
 
-**`POST /api/admin/clients/{id}/hmac-secret`** (rotation) rend désormais
+**`POST /api/admin/clients/{id}/rotate-secret`** (rotation, route existante) rend désormais
 `SecretRotated(String hmacSecret, Instant ancienSecretValideJusquA)`. L'écran a besoin des deux
 au même instant : le nouveau secret à copier, et la date jusqu'à laquelle l'ancien tient encore.
 
@@ -142,9 +142,11 @@ les boutiques aujourd'hui, et il ne demande aucune interprétation. **Aucun secr
 pas plus le précédent que le courant : la fiche n'en a jamais rendu, et une transition n'est pas
 une raison de commencer.
 
-**`DELETE /api/admin/clients/{id}/hmac-secret/precedent`** (révocation) met les deux colonnes à
-`null` et rend la fiche. Le verbe porte le sens exact du geste : on retire l'ancien secret, on ne
-touche pas au courant. La révocation d'une transition inexistante est un succès sans effet —
+**`POST /api/admin/clients/{id}/revoke-previous-secret`** (révocation) met les deux colonnes à
+`null` et rend la fiche. Un `POST` sur une sous-ressource nommée par son geste, comme
+`rotate-secret`, `activate` et `deactivate` : c'est la convention déjà tenue par
+`ClientAdminController`, et un `DELETE` sur une colonne que l'API n'expose pas décrirait mal ce
+qui se passe. La révocation d'une transition inexistante est un succès sans effet —
 l'état visé est atteint, et un `404` obligerait l'écran à distinguer deux cas identiques pour
 l'opérateur.
 
@@ -192,6 +194,13 @@ drapeau ; **fenêtre expirée d'une seconde, le même lead est refusé en `401`*
 prouve que l'expiration existe, et il sera **éprouvé en neutralisant la comparaison de date pour
 le voir échouer** — la leçon du faux verrou de la borne haute de F13 : un test qu'on n'a pas vu
 échouer ne prouve rien.
+
+**Un test existant affirme le contraire de la feature, et doit changer.**
+`RotationDesClesTest.apresRotationLAncienSecretNeSignePlus` envoie un lead signé avec l'ancien
+secret juste après la rotation et attend un `401`. C'est précisément le défaut réparé : il
+devient un `202`, et le `401` se vérifie après révocation ou après expiration. Le renommer
+plutôt que le supprimer — la garantie « l'ancien secret finit par mourir » reste, seule sa date
+change.
 
 **Puis la rotation** : la première pose les deux colonnes ; la seconde, pendant la fenêtre,
 remplace le précédent par celui qu'on vient de retirer ; la révocation les vide. Et un test
