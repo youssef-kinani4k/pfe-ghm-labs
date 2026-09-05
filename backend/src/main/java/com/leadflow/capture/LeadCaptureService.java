@@ -7,6 +7,7 @@ import com.leadflow.tenant.Client;
 import com.leadflow.tenant.ClientRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,8 +64,11 @@ public class LeadCaptureService {
 
         // La forme canonique, et non le texte recu : deux en-tetes differemment espaces
         // signent la meme soumission et doivent donc porter la meme cle d'idempotence.
-        String signature = verificateur.verifie(
-                client.getHmacSecret(), corpsBrut, enTeteSignature, Instant.now());
+        // Un seul secret acceptable pour l'instant : la fenetre de transition arrive en
+        // tache 3, et cette tache ne change aucun comportement observable.
+        SignatureVerifiee verifiee = verificateur.verifie(
+                List.of(client.getHmacSecret()), corpsBrut, enTeteSignature, Instant.now());
+        String signature = verifiee.canonique();
 
         int taille = corpsBrut.getBytes(StandardCharsets.UTF_8).length;
         if (taille > properties.maxPayloadBytes()) {
