@@ -2,7 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { Analyse } from './analyse';
+import {
+  Analyse,
+  dateCourte,
+  dateLongue,
+  formateDuree,
+  formateEntier,
+  formatePourcentage,
+} from './analyse';
 import { SeriesView } from '../../core/models/monitoring';
 
 describe('Analyse', () => {
@@ -79,7 +86,7 @@ describe('Analyse', () => {
     repondAuxAppels(vide);
 
     const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(texte).toContain('Aucune donnee');
+    expect(texte).toContain('Aucune donnée');
     expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
   });
 
@@ -97,7 +104,48 @@ describe('Analyse', () => {
     repondAuxAppels(volumeAZeroMaisUnDelaiReel);
 
     const texte = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(texte).not.toContain('Aucune donnee');
+    expect(texte).not.toContain('Aucune donnée');
     expect(fixture.nativeElement.querySelectorAll('canvas').length).toBe(3);
+  });
+});
+
+/**
+ * Les formateurs sont exportes a part et testes sans banc Angular : ce sont des fonctions
+ * pures, et les eprouver a travers le composant couterait un cycle de detection de
+ * changements pour verifier une chaine de caracteres.
+ */
+describe('formateurs de l ecran d analyse', () => {
+  it('rend une duree lisible a l oeil, pas a la microseconde', () => {
+    // La valeur brute que sert le serveur pour cette journee est 4.155809 : c'est elle
+    // qu'un axe afficherait sans formateur.
+    expect(formateDuree(4.155809)).toBe('4,2 s');
+    expect(formateDuree(0.575958)).toBe('0,6 s');
+    expect(formateDuree(42)).toBe('42 s');
+    expect(formateDuree(90)).toBe('1 min 30');
+    expect(formateDuree(120)).toBe('2 min');
+    expect(formateDuree(3600)).toBe('1 h');
+    expect(formateDuree(5400)).toBe('1 h 30');
+  });
+
+  it('groupe les milliers a la francaise', () => {
+    expect(formateEntier(7)).toBe('7');
+    // L'espace des milliers est insecable etroit en fr-FR : comparer au caractere pres
+    // ferait echouer le test pour une raison qui n'a rien a voir avec le formateur.
+    expect(formateEntier(12345).replace(/[^0-9]/g, '')).toBe('12345');
+  });
+
+  it('rend un pourcentage sans decimale superflue', () => {
+    expect(formatePourcentage(62)).toBe('62 %');
+    expect(formatePourcentage(62.54)).toBe('62,5 %');
+    expect(formatePourcentage(100)).toBe('100 %');
+  });
+
+  it('date en francais court pour l axe et en toutes lettres pour l infobulle', () => {
+    // La date est construite en local et non en UTC : `new Date('2026-03-02')` reculerait
+    // d'un jour sous un fuseau negatif.
+    expect(dateCourte('2026-03-02')).toContain('2');
+    expect(dateCourte('2026-03-02').toLowerCase()).toContain('mars');
+    expect(dateLongue('2026-03-02').toLowerCase()).toContain('lundi');
+    expect(dateLongue('2026-03-02')).toContain('2026');
   });
 });

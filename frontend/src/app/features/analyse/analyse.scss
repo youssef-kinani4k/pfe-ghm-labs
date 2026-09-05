@@ -2,87 +2,241 @@
   display: block;
 }
 
+// L'ecran d'analyse respire davantage que le reste de la console : il se regarde, la ou une
+// liste de leads se parcourt. L'echelle dense de `styles.scss` sert donc de base, doublee
+// pour les gouttieres entre cartes.
 .analyse {
   &__entete {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: var(--lf-space-2);
-    margin-bottom: var(--lf-space-3);
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--lf-space-3);
+    margin-bottom: var(--lf-space-5);
+  }
+
+  &__intitule {
+    min-width: 0;
   }
 
   &__titre {
     margin: 0;
     font-family: 'Fira Sans', Roboto, sans-serif;
-    font-size: 1.375rem;
+    font-size: 1.5rem;
+    font-weight: 600;
     letter-spacing: -0.02em;
+    color: var(--mat-sys-on-surface, #0f172a);
   }
 
-  &__periodes {
-    margin-left: auto;
+  &__sous-titre {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  &__commandes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--lf-space-2);
   }
 
   &__client {
-    width: 14rem;
-    // Le champ Material reserve la place d'un message d'erreur sous lui : sans ce
-    // rattrapage, il pousserait le reste de l'entete vers le bas.
-    margin-bottom: -1.25rem;
+    width: 13rem;
   }
 
   &__erreur {
     margin: 0 0 var(--lf-space-3);
+    padding: var(--lf-space-2) var(--lf-space-3);
+    border-radius: 0.625rem;
+    background: var(--lf-echec-fond);
     color: var(--lf-echec);
+    font-size: 0.875rem;
   }
 
+  // Trois cartes de meme largeur minimale : deux colonnes sur un ecran large, une seule des
+  // que la lecture d'une courbe deviendrait etroite.
   &__grille {
-    display: flex;
-    flex-direction: column;
-    gap: var(--lf-space-3);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+    gap: var(--lf-space-4);
   }
 
-  &__carte-titre {
-    font-family: 'Fira Sans', Roboto, sans-serif;
-    font-size: 1rem;
-  }
-
-  &__explication {
-    margin: 0 0 var(--lf-space-3);
-    color: var(--mat-sys-on-surface-variant);
-    font-size: 0.8125rem;
-    max-width: 60ch;
-  }
-
-  // L'etat vide remplace les trois cartes plutot que d'en montrer une par graphique : un
-  // canvas plat par carte se lirait comme trois pannes, la ou il n'y a qu'un seul fait a
-  // dire — cette periode n'a rien produit.
   &__vide {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--lf-space-1);
-    padding: var(--lf-space-5) var(--lf-space-3);
-    color: var(--mat-sys-on-surface-variant);
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    padding: var(--lf-space-5) var(--lf-space-4);
+    border: 1px dashed rgba(15, 23, 42, 0.16);
+    border-radius: 1rem;
+    background: #fbfcfe;
     text-align: center;
 
     mat-icon {
       width: 2rem;
       height: 2rem;
       font-size: 2rem;
-      color: var(--mat-sys-outline);
+      color: #94a3b8;
+      margin-bottom: var(--lf-space-1);
     }
+  }
 
-    p {
-      margin: 0;
-      font-size: 0.875rem;
-      max-width: 40ch;
-    }
+  &__vide-titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-weight: 600;
+    color: var(--mat-sys-on-surface, #0f172a);
+  }
+
+  &__vide-detail {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #64748b;
+    max-width: 34ch;
   }
 }
 
-@media (min-width: 1100px) {
-  .analyse__grille {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
-    align-items: start;
+// La carte est le composant qui donne son caractere a l'ecran : bordure d'un cheveu, ombre
+// juste assez marquee pour decoller du fond, rayon genereux, et de l'air autour du contenu.
+// Tout l'effet vient de la retenue — une ombre portee franche ferait « composant pose sur une
+// page » plutot que « produit ».
+.carte {
+  display: flex;
+  flex-direction: column;
+  padding: var(--lf-space-4);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 1rem;
+  background: #ffffff;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 1px 12px rgba(15, 23, 42, 0.03);
+  transition: box-shadow 200ms ease;
+
+  &:hover {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.05),
+      0 6px 20px rgba(15, 23, 42, 0.06);
+  }
+
+  &__entete {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--lf-space-2);
+  }
+
+  &__titre {
+    margin: 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  // Le chiffre-cle porte toute la hierarchie : c'est lui qu'on lit en premier, de loin, et
+  // les chiffres tabulaires evitent qu'il danse d'une periode a l'autre.
+  &__valeur {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0.375rem 0 0;
+    font-family: 'Fira Sans', Roboto, sans-serif;
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--mat-sys-on-surface, #0f172a);
+
+    &--absente {
+      color: #94a3b8;
+    }
+  }
+
+  &__unite {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #64748b;
+  }
+
+  &__variation {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: var(--lf-neutre-fond);
+    color: var(--lf-neutre);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    mat-icon {
+      width: 1rem;
+      height: 1rem;
+      font-size: 1rem;
+    }
+
+    // La fleche double la couleur : une variation reste lisible sans elle, ce que la
+    // couleur seule ne garantit pas.
+    &--bonne {
+      background: var(--lf-succes-fond);
+      color: var(--lf-succes);
+    }
+
+    &--mauvaise {
+      background: var(--lf-echec-fond);
+      color: var(--lf-echec);
+    }
+  }
+
+  &__reference {
+    font-weight: 400;
+    opacity: 0.8;
+  }
+
+  &__explication {
+    margin: var(--lf-space-2) 0 var(--lf-space-3);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #64748b;
+    max-width: 62ch;
+  }
+}
+
+// Sous 640 px, l'en-tete de carte passe en colonne : la pastille de variation collee au
+// chiffre-cle deviendrait sinon illisible.
+@media (max-width: 40rem) {
+  .analyse__entete,
+  .carte__entete {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analyse__commandes {
+    width: 100%;
+  }
+
+  .analyse__client {
+    flex: 1 1 auto;
+  }
+
+  .carte {
+    padding: var(--lf-space-3);
+  }
+
+  .carte__valeur {
+    font-size: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carte {
+    transition: none;
   }
 }
