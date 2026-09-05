@@ -1,26 +1,33 @@
-# F13 livree, non fusionnee — etat pour la reprise
+# F13 fusionnee et verte en CI — etat pour la reprise
 
-Session du 5 septembre 2026. F13 est **complete, revue et corrigee**, mais **ni recettee a
-l'ecran ni fusionnee** : ces deux gestes reviennent a l'utilisateur.
+Session du 5 septembre 2026. F13 est **complete, revue, corrigee, fusionnee dans `main` en
+`--no-ff` et poussee**. La CI est **verte sur ses quatre jobs**, pour `main` comme pour la
+branche de la feature.
+
+La recette a l'ecran a eu lieu en deux temps, et le second est reste ouvert a la fin de la
+session : l'utilisateur a juge la premiere version « tres simple », l'ecran a ete refondu en
+qualite presentation, et **cette seconde version n'a pas ete parcourue point par point**. C'est
+le seul endroit de la feature qui ne repose sur aucune preuve — un canvas ne se teste pas.
 
 ## L'etat du depot
 
 | | |
 | --- | --- |
-| Branche courante | `feature/f13-analytics-graphiques`, **21 commits** depuis `ac4c9c4` |
-| `main` | inchangee, a `ac4c9c4` |
+| `main` | **`f976433`**, la fusion de F13, poussee sur `origin` |
+| Branche de la feature | `feature/f13-analytics-graphiques`, **24 commits**, poussee et **conservee** |
+| CI | **verte** — `main` et la branche, quatre jobs chacune |
 | Arbre de travail | **propre** |
 | Migrations | **dix** — `V10__analytics_index.sql` est la derniere |
-| Suite backend | `monitoring` **103/103**, `config` et `common` **29/29** |
-| Suite frontend | **72/72**, ESLint et Prettier verts |
+| Suite backend | **entiere et verte en CI** (`./mvnw verify`) ; en local, `monitoring` 103/103 et `config`+`common` 29/29 |
+| Suite frontend | **76/76**, ESLint et Prettier verts |
 | Build | reussi, chunk `analyse` **paresseux** a 200,69 ko brut / 59,20 ko compresse |
 
-**La suite backend n'a pas ete rejouee en entier**, et c'est assume : aucun commit de la
-branche ne touche `capture`, `qualification`, `routing`, `crm`, `tenant` ni `notification` —
-`git diff --stat ac4c9c4..HEAD -- backend/src/main/java` ne montre que `monitoring/`, plus
-`AnalyticsProperties` dans `config/` et une methode ajoutee a `ApiExceptionHandler` dans
-`common/`. Le job `backend` de la CI joue `./mvnw verify` entier au push, y compris sur les
-branches `feature/**`.
+La suite backend n'avait pas ete rejouee en entier en local — la machine ne le supporte pas —
+et cette reserve est **levee** : le job `backend` de la CI a joue `./mvnw verify` entier au
+push, avec succes. Le job de fumee a par ailleurs monte la pile de production complete et l'a
+traversee, ce qui eprouve le seul risque reel que portait cette feature : **une bibliotheque
+tierce sous une CSP `script-src 'self'`**, exactement la configuration qui avait fait echouer
+les polices en silence pendant F11.2. Chart.js etant empaquete par le build, il passe.
 
 ## Ce que F13 livre
 
@@ -80,9 +87,9 @@ l'absence de bibliotheque.
 `var(--...)` : passer un jeton CSS directement aurait rendu les series invisibles, en echec
 muet. L'ecran les resout par `getComputedStyle` et ne passe que des valeurs litterales.
 
-## Ce que la recette doit eprouver — elle reste a faire
+## La recette de la version refondue — elle reste a faire
 
-Monter la pile, puis regarder :
+C'est le seul point ouvert de F13. Monter la pile, puis regarder :
 
 ```bash
 docker compose up -d
@@ -128,7 +135,7 @@ C'est le defaut que seule une revue de branche pouvait voir.
 **La re-revue de la correction.** Le test cense verrouiller la borne haute des requetes est un
 **faux verrou** : il passerait a l'identique sans le correctif. Voir la section suivante.
 
-## Trois dettes nommees, et un constat ouvert
+## Une dette nommee, et deux constats depuis regles
 
 **La CTE des delais n'est pas bornee.** `premier_succes` fait `min(attempted_at) group by
 lead_id` **sans aucun filtre** ; le predicat de date porte sur le resultat de l'agregat et
@@ -141,20 +148,41 @@ l'est **pas** dans `V10`, dont le commentaire surestime encore ce que l'index ap
 calcule son empreinte sur le contenu brut du fichier, commentaires compris, et modifier une
 migration appliquee ferait echouer le demarrage.
 
-**Le constat ouvert, a traiter avant ou juste apres la fusion.** Le test
-`uneLigneDateeDeDemainNApparaitPasDansLaSerie` n'eprouve pas ce qu'il pretend :
-`SeriesService` construit sa sortie par `calendrier.stream().map(j -> volumes.get(j))`, donc
-une ligne datee de J+2 est rangee sous une cle absente du calendrier et ignoree, **borne haute
-ou pas**. Retirer la clause `< :jusqu` ne ferait pas echouer ce test, et le message du commit
-`8c9cdb3` affirme donc une garantie que le code ne donne pas. Le code livre est bon — la borne
-empeche un balayage illimite vers le futur — mais il faut soit deplacer le test au niveau du
-repository, ou il discriminerait reellement, soit cesser d'affirmer qu'il verrouille la regle.
+**Le faux verrou de la borne haute est corrige** (`9aef78c`), et la maniere de le verifier
+merite d'etre retenue. Le test porte par `SeriesServiceTest` pretendait verrouiller la borne
+haute des requetes ; il passait a l'identique sans elle, `SeriesService` ne relisant que les
+jours de son calendrier. Le controle est descendu au repository, ou la clause est la seule
+chose qui puisse ecarter la ligne — et il a ete **eprouve en neutralisant la borne dans le
+SQL** : le test echoue alors sur « Expected size: 1 but was: 2 ». Un test qu'on n'a pas vu
+echouer ne prouve rien.
 
-**L'aire empilee a 100 % masque la taille de l'echantillon.** Une journee ou une seule analyse
-a eu lieu affiche « 100 % Gemini », visuellement indiscernable d'une journee a 500 leads, et
-aucun total absolu n'apparait sur cette carte. La forme demandee par la spec corrige bien le
-mensonge du libelle, mais introduit le defaut classique de cette forme sur les petits
-echantillons. Porter le total du jour dans l'infobulle le reglerait.
+**L'aire empilee a 100 % masquait la taille de l'echantillon ; c'est regle.** Une journee ou
+une seule analyse a eu lieu affiche « 100 % Gemini », visuellement indiscernable d'une journee
+a 500 leads. L'infobulle porte desormais l'effectif du jour — « Sur 1 lead analyse » — servi
+par l'entree generique `noteInfobulle` du composant, qui ignore ce que cette ligne dit.
+
+## La refonte visuelle, apres la premiere recette
+
+La premiere version de l'ecran a ete jugee « tres simple » : le rendu par defaut de Chart.js.
+L'ecran a ete refondu en qualite presentation, **les graphiques etant la partie la plus
+importante de la soutenance**. Ce qui a change, et pourquoi :
+
+- **Chaque carte s'ouvre sur son chiffre-cle** — total de leads, mediane typique, part du
+  modele — avec sa variation. Celle-ci compare la seconde moitie de la fenetre a la premiere,
+  et non la periode precedente : l'endpoint ne sert qu'une fenetre a la fois, et le libelle le
+  dit plutot que de laisser croire a une comparaison qui n'a pas lieu.
+- **La legende et l'infobulle ont quitte le canvas** pour du HTML. Une legende dessinee n'est
+  ni focalisable ni lisible par un lecteur d'ecran ; une infobulle dessinee ne peut porter ni
+  ombre ni rayon.
+- **Un tableau cache double chaque graphique** : un canvas est opaque pour un lecteur d'ecran.
+- **Chaque seconde serie est en pointille**, et la fleche de variation double sa couleur : deux
+  courbes qui ne different que par la teinte sont indistinguables en deuteranopie comme sur un
+  videoprojecteur delave.
+- Les dates sortent en francais (« 22 aout », « lundi 2 mars 2026 ») et les delais formates
+  (« 4,2 s ») au lieu de `4.155809`.
+
+**Le composant est reste generique** : il recoit des formateurs, des libelles longs et un
+drapeau de style de trait. Aucun terme propre aux intentions ou aux delais n'y est entre.
 
 ## La suite
 
@@ -170,5 +198,6 @@ la feuille de route avait ete pris par la notification du commercial, decalant t
 - Puis, hors feuille de route : le TLS, le nonce CSP, le passage multi-instance, un second
   canal de notification, le recalcul retroactif des scores.
 
-Et, plus petit : le vrai bornage de la CTE des delais, et le total du jour dans l'infobulle de
-la carte des intentions.
+Et, plus petit : **le vrai bornage de la CTE des delais**, seule dette technique que F13
+laisse derriere elle, plus le commentaire de `V10` qui la decrit encore faussement et qu'une
+migration deja appliquee interdit de corriger sur place.
