@@ -1,0 +1,125 @@
+package com.leadflow.monitoring;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.leadflow.TestcontainersConfiguration;
+import com.leadflow.capture.RawLeadEvent;
+import com.leadflow.capture.RawLeadEventRepository;
+import com.leadflow.capture.RawLeadEventStatus;
+import com.leadflow.tenant.Client;
+import com.leadflow.tenant.ClientRepository;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+
+@SpringBootTest
+@Import(TestcontainersConfiguration.class)
+class SeriesRepositoryTest {
+
+    private static final String PARIS = "Europe/Paris";
+
+    @Autowired private SeriesRepository series;
+    @Autowired private RawLeadEventRepository evenements;
+    @Autowired private ClientRepository clients;
+
+    @AfterEach
+    void nettoie() {
+        evenements.deleteAll();
+        clients.deleteAll();
+    }
+
+    @Test
+    void compteLesCapturesEtLaPartEcarteeParJour() {
+        Client boutique = boutique("volume");
+        Instant lundi = instantParisien(2026, 3, 2, 10);
+        Instant mardi = instantParisien(2026, 3, 3, 10);
+
+        evenement(boutique, lundi, RawLeadEventStatus.PUBLISHED);
+        evenement(boutique, lundi, RawLeadEventStatus.DISCARDED);
+        evenement(boutique, mardi, RawLeadEventStatus.PUBLISHED);
+
+        List<PointVolumeBrut> points = series.volumeParJour(
+                boutique.getId().toString(), lundi.minusSeconds(3600), PARIS);
+
+        assertThat(points).hasSize(2);
+        assertThat(points.get(0).getJour()).isEqualTo(LocalDate.of(2026, 3, 2));
+        assertThat(points.get(0).getCaptures()).isEqualTo(2L);
+        assertThat(points.get(0).getEcartes()).isEqualTo(1L);
+        assertThat(points.get(1).getJour()).isEqualTo(LocalDate.of(2026, 3, 3));
+        assertThat(points.get(1).getCaptures()).isEqualTo(1L);
+        assertThat(points.get(1).getEcartes()).isZero();
+    }
+
+    @Test
+    void leDecoupageTombeDansLeFuseauDemande() {
+        // 00 h 30 a Paris le 3 mars, soit 23 h 30 UTC le 2 mars. En UTC ce lead compterait
+        // pour la veille ; c'est exactement le decalage que le fuseau explicite corrige.
+        Client boutique = boutique("minuit");
+        Instant justeApresMinuitAParis = instantParisien(2026, 3, 3, 0).plusSeconds(1800);
+        evenement(boutique, justeApresMinuitAParis, RawLeadEventStatus.PUBLISHED);
+
+        List<PointVolumeBrut> points = series.volumeParJour(
+                boutique.getId().toString(),
+                justeApresMinuitAParis.minusSeconds(86_400),
+                PARIS);
+
+        assertThat(points).hasSize(1);
+        assertThat(points.get(0).getJour()).isEqualTo(LocalDate.of(2026, 3, 3));
+    }
+
+    @Test
+    void leFiltreDeBoutiqueIsoleLesInstances() {
+        Client mienne = boutique("mienne");
+        Client autre = boutique("autre");
+        Instant quand = instantParisien(2026, 3, 2, 10);
+        evenement(mienne, quand, RawLeadEventStatus.PUBLISHED);
+        evenement(autre, quand, RawLeadEventStatus.PUBLISHED);
+
+        assertThat(series.volumeParJour(
+                        mienne.getId().toString(), quand.minusSeconds(3600), PARIS))
+                .singleElement()
+                .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(1L));
+
+        // clientId nul = toutes les boutiques. C'est la vue de l'agence.
+        assertThat(series.volumeParJour(null, quand.minusSeconds(3600), PARIS))
+                .singleElement()
+                .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(2L));
+    }
+
+    private Client boutique(String suffixe) {
+        Client c = new Client();
+        c.setName("Boutique " + suffixe);
+        c.setPublicKey("pk-" + suffixe + "-" + UUID.randomUUID());
+        c.setHmacSecret("secret-" + suffixe);
+        c.setCrmProviderId("dolibarr");
+        c.setCrmConfig(Map.of());
+        c.setActive(true);
+        return clients.save(c);
+    }
+
+    private void evenement(Client boutique, Instant quand, RawLeadEventStatus statut) {
+        RawLeadEvent e = new RawLeadEvent();
+        e.setClientId(boutique.getId());
+        e.setSource("formulaire");
+        e.setPayload(new HashMap<>(Map.of("email", "a@b.fr")));
+        e.setSignature("sig-" + UUID.randomUUID());
+        e.setReceivedAt(quand);
+        e.setStatus(statut);
+        evenements.save(e);
+    }
+
+    private static Instant instantParisien(int annee, int mois, int jour, int heure) {
+        return ZonedDateTime.of(annee, mois, jour, heure, 0, 0, 0, ZoneId.of(PARIS))
+                .toInstant();
+    }
+}
