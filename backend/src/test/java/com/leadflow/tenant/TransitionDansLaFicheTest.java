@@ -87,6 +87,23 @@ class TransitionDansLaFicheTest {
     }
 
     @Test
+    void parmiPlusieursRetardatairesLaFicheGardeLePlusRecent() throws Exception {
+        Client boutique = creeUneBoutique();
+        mockMvc.perform(post("/api/admin/clients/" + boutique.getId() + "/rotate-secret")
+                .header("Authorization", "Bearer " + jeton()));
+        Instant lePlusAncien = Instant.now().minus(3, ChronoUnit.HOURS);
+        Instant lePlusRecent = Instant.now().minus(1, ChronoUnit.HOURS);
+        // Les deux sont signes avec l'ancien secret : seul le tri distingue lequel remonter.
+        ecritUnLead(boutique.getId(), lePlusAncien, true);
+        ecritUnLead(boutique.getId(), lePlusRecent, true);
+
+        JsonNode transition = fiche(boutique.getId()).get("transition");
+
+        assertThat(Instant.parse(transition.get("dernierLeadAncienSecret").asText()))
+                .isCloseTo(lePlusRecent, within(1, ChronoUnit.SECONDS));
+    }
+
+    @Test
     void aucunSecretNeSortDeLaFiche() throws Exception {
         Client boutique = creeUneBoutique();
         String corps = mockMvc.perform(
