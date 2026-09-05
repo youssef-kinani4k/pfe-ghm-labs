@@ -22,4 +22,11 @@ public interface RawLeadEventRepository extends JpaRepository<RawLeadEvent, UUID
     /** Ce que le filet de republication doit reprendre : non publie et assez vieux. */
     List<RawLeadEvent> findByStatusInAndReceivedAtBefore(
             Collection<RawLeadEventStatus> statuts, Instant limite);
+
+    /**
+     * Dernier lead d'un client encore signe avec l'ancien secret, pour repondre a « puis-je
+     * revoquer maintenant ? » depuis la fiche de la boutique.
+     */
+    Optional<RawLeadEvent> findFirstByClientIdAndSignedWithPreviousSecretTrueOrderByReceivedAtDesc(
+            UUID clientId);
 }
