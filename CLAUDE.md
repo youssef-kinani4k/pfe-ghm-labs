@@ -601,10 +601,16 @@ sur `lead (client_id, created_at DESC)` sert le regroupement par jour des series
 d'intention — l'index existant sur `lead` porte `email` en deuxieme colonne, ce qui le rend
 inutilisable des qu'on saute cette colonne pour grouper par date. `idx_crm_sync_attempt_success_at`
 sur `crm_sync_attempt (attempted_at DESC)` est **partiel**, `WHERE status = 'SUCCESS'`, comme
-`uq_dead_letter_lead_pending` de `V8` : la serie des delais ne lit que les succes, et un index
-global ferait payer les echecs, qui sont l'essentiel du volume quand un ERP tombe. Un troisieme
-index avait ete envisage pour la courbe de volume, mais `idx_raw_lead_event_client_received`
-sur `raw_lead_event (client_id, received_at DESC)` existe deja depuis `V2` et la sert.
+`uq_dead_letter_lead_pending` de `V8` : un index global ferait payer les echecs, qui sont
+l'essentiel du volume quand un ERP tombe. **Il ne sert cependant pas la requete des delais** :
+sa CTE `premier_succes` fait un `group by lead_id`, qu'un index trie par date n'accelere pas,
+et elle agrege **sans aucun filtre de date** — le predicat `depuis`/`jusqu` porte sur le
+resultat de l'agregat, apres coup, pas sur les lignes lues. Le cout de cette requete est donc
+proportionnel a tous les succes depuis toujours, pas a `jours` ; le vrai bornage demande un
+`where` dans la CTE plus un `not exists` de succes anterieur, dette documentee dans le Javadoc
+de `SeriesRepository` et volontairement non corrigee. Un troisieme index avait ete envisage
+pour la courbe de volume, mais `idx_raw_lead_event_client_received` sur
+`raw_lead_event (client_id, received_at DESC)` existe deja depuis `V2` et la sert.
 
 **`V8` porte deux choses.** La table `lead_action` d'abord — qui a change quoi, quand, et
 **pourquoi** : `dead_letter` ne retenait d'un rejeu que `replayed_by` et `replayed_at`, jamais

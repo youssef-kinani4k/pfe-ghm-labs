@@ -71,6 +71,24 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
             @Param("jusqu") Instant jusqu,
             @Param("fuseau") String fuseau);
 
+    /**
+     * Le delai capture -&gt; ERP, par jour de synchronisation.
+     *
+     * <p><strong>Dette connue et deliberement non corrigee ici</strong> : la CTE
+     * {@code premier_succes} calcule {@code min(attempted_at)} sur <em>tous</em> les succes
+     * de {@code crm_sync_attempt}, sans aucun filtre de date -- le predicat {@code :depuis} /
+     * {@code :jusqu} porte sur le resultat de l'agregat, apres coup, et n'est pas poussable
+     * dans la CTE. Le cout de cette requete est donc proportionnel a tous les succes depuis
+     * toujours, independamment de {@code jours} : a volume constant, l'ecran ralentira avec
+     * l'age de l'instance.
+     *
+     * <p>Corollaire : {@code idx_crm_sync_attempt_success_at (attempted_at DESC) WHERE status
+     * = 'SUCCESS'} (voir {@code V10__analytics_index.sql}) ne sert pas cette requete. Un index
+     * trie par date sert un balayage par plage de dates ; cette CTE fait un {@code group by
+     * lead_id}, que cet index n'accelere pas. Le vrai bornage demande un {@code where} dans la
+     * CTE plus un {@code not exists} de succes anterieur -- ce n'est pas une correction de
+     * trois lignes, et cela merite sa propre tache.
+     */
     @Query(
             value =
                     """
