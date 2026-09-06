@@ -254,4 +254,29 @@ class DolibarrConnectorTest {
         assertThat(reference).isEqualTo("9");
         assertThat(transport.appels).containsExactly("utilisateur");
     }
+
+    @Test
+    void reaffecteRelieLeResponsableAuProjetExistant() {
+        TransportFactice transport = new TransportFactice();
+        DolibarrConnector connecteur = new DolibarrConnector(transport);
+
+        connecteur.reaffecte(new CrmSyncState("42", "77", "301", "7"), "9", CIBLE);
+
+        assertThat(transport.responsableLie).isEqualTo("9");
+        // Aucun appel de creation : le seul appel effectue est le rattachement du
+        // responsable. Le TransportFactice trace "responsable" dans lieResponsable meme
+        // pendant sync(), donc l'assertion porte sur l'ABSENCE de creation, pas sur une
+        // liste vide.
+        assertThat(transport.appels).containsExactly("responsable");
+    }
+
+    @Test
+    void reaffecteRefuseUnLeadSansOpportunite() {
+        TransportFactice transport = new TransportFactice();
+        DolibarrConnector connecteur = new DolibarrConnector(transport);
+
+        assertThatThrownBy(() ->
+                        connecteur.reaffecte(CrmSyncState.VIERGE, "9", CIBLE))
+                .isInstanceOf(CrmSyncException.class);
+    }
 }

@@ -78,6 +78,22 @@ public class OdooConnector implements CrmConnector {
                 target, client.authentifie(target), assignee.email());
     }
 
+    /**
+     * Odoo porte le responsable directement sur le {@code crm.lead}, par {@code user_id} :
+     * un seul write suffit, la ou Dolibarr demande un appel de rattachement. C'est
+     * exactement le genre de divergence qui se resout dans l'adaptateur et jamais en amont.
+     */
+    @Override
+    public void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible) {
+        if (references.opportunityRef() == null) {
+            throw new CrmSyncException(
+                    providerId(), "Aucune opportunite connue : rien a reaffecter", null);
+        }
+        int uid = client.authentifie(cible);
+        client.ecrit(cible, uid, OPPORTUNITE, references.opportunityRef(),
+                Map.of("user_id", assigneeRef));
+    }
+
     @Override
     public List<CrmSettingSpec> reglagesAttendus() {
         return List.of(

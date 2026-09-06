@@ -31,6 +31,9 @@ class OdooConnectorTest {
         private final Map<String, Map<String, Object>> corpsParModele = new LinkedHashMap<>();
         private boolean echoueSurOpportunite;
         private int authentifications;
+        private String modeleEcrit;
+        private String identifiantEcrit;
+        private Map<String, Object> champsEcrits;
 
         private TransportFactice() {
             super(RestClient.builder());
@@ -59,6 +62,15 @@ class OdooConnectorTest {
         public String chercheUtilisateurParEmail(CrmTarget target, int uid, String email) {
             appels.add("res.users");
             return "9";
+        }
+
+        @Override
+        public void ecrit(CrmTarget target, int uid, String modele, String identifiant,
+                Map<String, Object> champs) {
+            appels.add("ecrit");
+            modeleEcrit = modele;
+            identifiantEcrit = identifiant;
+            champsEcrits = champs;
         }
     }
 
@@ -150,5 +162,27 @@ class OdooConnectorTest {
     void resoutLeCommercialParSonEmail() {
         assertThat(connecteur.resolveAssignee(
                 new CrmAssignee("Amina Bensalem", "amina@demo.test"), CIBLE)).isEqualTo("9");
+    }
+
+    @Test
+    void reaffecteEcritUserIdSurLOpportunite() {
+        TransportFactice transport = new TransportFactice();
+        OdooConnector connecteur = new OdooConnector(transport);
+
+        connecteur.reaffecte(new CrmSyncState("5", "6", "88", null), "9", CIBLE);
+
+        assertThat(transport.modeleEcrit).isEqualTo("crm.lead");
+        assertThat(transport.identifiantEcrit).isEqualTo("88");
+        assertThat(transport.champsEcrits).containsEntry("user_id", "9");
+    }
+
+    @Test
+    void reaffecteRefuseUnLeadSansOpportunite() {
+        TransportFactice transport = new TransportFactice();
+        OdooConnector connecteur = new OdooConnector(transport);
+
+        assertThatThrownBy(() ->
+                        connecteur.reaffecte(CrmSyncState.VIERGE, "9", CIBLE))
+                .isInstanceOf(CrmSyncException.class);
     }
 }

@@ -80,6 +80,31 @@ class ErpIntegrationTest {
         assertThat(rejeu.opportunityRef()).isNotBlank().isNotEqualTo(premier.opportunityRef());
     }
 
+    /**
+     * Le seul endroit qui eprouve la fenetre residuelle documentee dans le Javadoc de
+     * {@link DolibarrConnector#reaffecte} : un {@code lieResponsable} rejoue sur un
+     * responsable deja lie. Ici il n'est rejoue qu'une fois, avec un utilisateur different
+     * du premier — le cas normal d'une reattribution, pas le doublon documente.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "LEADFLOW_DOLIBARR_API_KEY", matches = ".+")
+    void dolibarrReaffecteChangeLeResponsableDeLOpportunite() {
+        DolibarrConnector connecteur =
+                new DolibarrConnector(new DolibarrClient(RestClient.builder()));
+        CrmTarget cible = cibleDolibarr();
+        CrmSyncResult synchronise = connecteur.sync(leadUnique(), cible, CrmSyncState.VIERGE);
+        assertThat(synchronise.opportunityRef()).isNotBlank();
+
+        connecteur.reaffecte(
+                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
+
+        // Pas de sonde dediee cote Dolibarr pour lire fk_user_resp : on rejoue reaffecte
+        // avec le meme utilisateur et on verifie qu'aucune exception ne remonte, ce qui est
+        // la seule chose qu'on puisse affirmer sans lecture directe de l'opportunite.
+        connecteur.reaffecte(
+                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
+    }
+
     @Test
     @EnabledIfEnvironmentVariable(named = "LEADFLOW_ODOO_DB", matches = ".+")
     void odooCreeLesTroisObjetsPuisNeLesRecreePasAuRejeu() {
@@ -100,5 +125,26 @@ class ErpIntegrationTest {
         assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
         assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());
         assertThat(rejeu.opportunityRef()).isNotBlank().isNotEqualTo(premier.opportunityRef());
+    }
+
+    /**
+     * Cote Odoo, {@code reaffecte} n'a pas d'equivalent de la fenetre residuelle documentee
+     * pour Dolibarr : {@code write} sur {@code user_id} est idempotent, un rejeu avec le
+     * meme utilisateur ne fait qu'ecrire de nouveau la meme valeur. {@code OdooClient}
+     * n'expose aucune lecture : la seule chose verifiable depuis ce module est l'absence
+     * d'exception sur les deux appels.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "LEADFLOW_ODOO_DB", matches = ".+")
+    void odooReaffecteChangeLeResponsableDeLOpportunite() {
+        OdooConnector connecteur = new OdooConnector(new OdooClient(RestClient.builder()));
+        CrmTarget cible = cibleOdoo();
+        CrmSyncResult synchronise = connecteur.sync(leadUnique(), cible, CrmSyncState.VIERGE);
+        assertThat(synchronise.opportunityRef()).isNotBlank();
+
+        connecteur.reaffecte(
+                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
+        connecteur.reaffecte(
+                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
     }
 }

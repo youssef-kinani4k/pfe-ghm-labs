@@ -109,6 +109,21 @@ public class DolibarrConnector implements CrmConnector {
         return client.chercheUtilisateurParEmail(target, assignee.email());
     }
 
+    /**
+     * Dolibarr rattache le responsable au projet par un appel dedie — {@code fk_user_resp}
+     * est ignore a la creation comme en modification, la sonde de F5 l'a verifie dans les
+     * deux sens. C'est le meme appel que l'etape d'attribution de {@link #sync}, ce qui rend
+     * la propagation gratuite en surface d'API.
+     */
+    @Override
+    public void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible) {
+        if (references.opportunityRef() == null) {
+            throw new CrmSyncException(
+                    providerId(), "Aucune opportunite connue : rien a reaffecter", null);
+        }
+        client.lieResponsable(cible, references.opportunityRef(), assigneeRef);
+    }
+
     @Override
     public List<CrmSettingSpec> reglagesAttendus() {
         return List.of(
