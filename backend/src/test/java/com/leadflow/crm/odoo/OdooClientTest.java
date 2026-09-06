@@ -134,8 +134,13 @@ class OdooClientTest {
                 .andExpect(jsonPath("$.params.method").value("execute_kw"))
                 .andExpect(jsonPath("$.params.args[3]").value("crm.lead"))
                 .andExpect(jsonPath("$.params.args[4]").value("write"))
-                .andExpect(jsonPath("$.params.args[5][0]").value(31))
-                .andExpect(jsonPath("$.params.args[6].user_id").value("9"))
+                // Les deux arguments positionnels de write() — la liste d'identifiants, puis
+                // la carte des champs — doivent tenir TOUS DEUX dans args[5] : c'est la forme
+                // que execute_kw etale correctement. Une carte des champs en args[6], comme
+                // avant ce correctif, decrit le defaut observe contre une vraie instance Odoo
+                // (« write() got an unexpected keyword argument »).
+                .andExpect(jsonPath("$.params.args[5][0][0]").value(31))
+                .andExpect(jsonPath("$.params.args[5][1].user_id").value("9"))
                 .andRespond(withSuccess("{\"result\": true}", MediaType.APPLICATION_JSON));
 
         client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9"));

@@ -18,12 +18,14 @@ import org.springframework.stereotype.Component;
  * {@link CrmReassignService} en transaction propre, donc elle survit.
  *
  * <p><b>Le rejeu depuis le journal des morts est moins risque qu'une republication de
- * {@code lead.qualified}</b>, dont le rejeu decale le tour de role. Ce n'est cependant pas
+ * {@code lead.qualified}</b>, dont le rejeu decale le tour de role. Ce n'etait cependant pas
  * une idempotence garantie pour tous les ERP : {@link com.leadflow.crm.dolibarr.DolibarrConnector}
  * documente qu'aucune sonde Dolibarr ne permet de savoir si un responsable est deja lie, si
- * bien qu'un rejeu peut y tenter un doublon que l'ERP refuse — auquel cas un lead par
- * ailleurs correctement synchronise part en DLQ. Vrai en revanche pour Odoo, ou l'ecriture
- * de {@code user_id} est un simple remplacement.
+ * bien qu'un rejeu peut y tenter un doublon. Depuis F15, ce doublon precis — le {@code 500}
+ * au corps distinctif que Dolibarr rend sur un lien deja pose — est reconnu et traite comme
+ * le succes qu'il decrit par {@code DolibarrClient.lieResponsable}, si bien qu'un rejeu n'y
+ * envoie plus en DLQ un lead par ailleurs correctement synchronise. Vrai de longue date pour
+ * Odoo, ou l'ecriture de {@code user_id} est un simple remplacement.
  *
  * <p>Bean conditionnel comme les autres consommateurs du projet : la suite de tests le
  * retire, et un contexte remis en marche par le cache de tests redemarrerait ses beans

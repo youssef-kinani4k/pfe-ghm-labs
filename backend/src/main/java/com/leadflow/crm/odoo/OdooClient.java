@@ -95,8 +95,15 @@ public class OdooClient {
                     PROVIDER_ID, "Reference Odoo illisible sur " + modele + " : " + identifiant,
                     erreur);
         }
-        Map<String, Object> reponse =
-                executeKw(target, uid, modele, "write", List.of(List.of(id), champs));
+        // execute_kw etale sa liste d'arguments dans le tableau d'appel : pour que Odoo lise
+        // les identifiants et les champs comme les deux arguments positionnels de write(),
+        // il faut lui passer une liste d'UN SEUL element, cet element etant lui-meme la paire
+        // [identifiants, champs]. Passer List.of(List.of(id), champs) etale les deux au lieu
+        // d'un seul, et Odoo lit alors la carte des champs comme des arguments nommes — c'est
+        // exactement le defaut observe contre une vraie instance (« write() got an unexpected
+        // keyword argument »).
+        Map<String, Object> reponse = executeKw(
+                target, uid, modele, "write", List.of(List.of(List.of(id), champs)));
         Object resultat = resultat(reponse, modele + ".write");
         if (!Boolean.TRUE.equals(resultat)) {
             throw new CrmSyncException(

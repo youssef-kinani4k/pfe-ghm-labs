@@ -54,19 +54,22 @@ public class DolibarrConnector implements CrmConnector {
      * <p>La limitation sur la {@code ref} d'opportunite est levee depuis F3 : elle est
      * derivee du lead et donc stable, et la recherche prealable rend le rejeu inoffensif.
      *
-     * <p><b>Fenetre residuelle, honnetement : le rejeu repare une attribution absente, pas
-     * une attribution dont la confirmation s'est perdue.</b> {@code chercheOpportuniteParRef}
-     * offre a la creation d'opportunite un moyen de retrouver ce qui existe deja ; l'appel a
-     * {@code lieResponsable} n'a pas d'equivalent — aucune sonde ne permet de demander a
-     * Dolibarr « ce responsable est-il deja lie ? ». Si le lien reussit cote ERP mais que la
-     * trace de {@code assigneeRef} n'est pas ecrite, le rejeu retente {@code lieResponsable}
-     * avec le meme utilisateur ; si Dolibarr refuse ce doublon, un lead par ailleurs
-     * entierement synchronise part en DLQ apres trois tentatives — recuperable par rejeu
-     * depuis le journal des morts, pas perdu. C'est un echec bruyant plutot que silencieux, ce
-     * qui reste une amelioration stricte par rapport a l'etat pre-F11.2, ou l'attribution
-     * manquante ne se signalait pas du tout. Tolerer une reponse de doublon comme un succes
-     * sera la reparation naturelle le jour ou ce comportement sera eprouvable contre une
-     * vraie instance Dolibarr plutot que suppose.
+     * <p><b>Fenetre residuelle, refermee depuis F15 : le rejeu repare une attribution absente
+     * comme une attribution dont la confirmation s'est perdue.</b> {@code
+     * chercheOpportuniteParRef} offre a la creation d'opportunite un moyen de retrouver ce
+     * qui existe deja ; l'appel a {@code lieResponsable} n'a toujours pas d'equivalent —
+     * aucune sonde ne permet de demander a Dolibarr « ce responsable est-il deja lie ? ». Si
+     * le lien reussit cote ERP mais que la trace de {@code assigneeRef} n'est pas ecrite, le
+     * rejeu retente {@code lieResponsable} avec le meme utilisateur, et ce doublon n'est plus
+     * suppose mais observe : contre une vraie instance, Dolibarr le refuse par un
+     * {@code 500} au corps {@code "Internal Server Error: Error : result :0"}, source
+     * {@code api_projects.class.php}. {@code DolibarrClient.lieResponsable} reconnait cette
+     * signature precise et la traite comme le succes qu'elle est — un lien deja pose est
+     * l'etat recherche, pas un echec — si bien que le rejeu n'envoie plus un lead par
+     * ailleurs entierement synchronise en DLQ. Le residu qui subsiste est etroit : la
+     * reconnaissance porte sur ce message d'erreur precis, et une version future de Dolibarr
+     * qui le reformulerait ferait a nouveau lever ce cas — au pire au meme niveau qu'avant ce
+     * correctif, un echec bruyant plutot que silencieux.
      */
     @Override
     public CrmSyncResult sync(CrmLead lead, CrmTarget target, CrmSyncState previous) {

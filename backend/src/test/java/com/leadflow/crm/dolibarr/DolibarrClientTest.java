@@ -137,6 +137,34 @@ class DolibarrClientTest {
     }
 
     @Test
+    void lieLeResponsableToleeUnLienDejaPoseCommeUnSucces() {
+        // Signature observee contre une vraie instance Dolibarr en rejouant le meme lien :
+        // un 500 dont le corps porte "result :0" et pour source api_projects.class.php. Un
+        // lien deja pose est l'etat recherche, pas un echec — ne doit pas lever.
+        serveur.expect(requestTo(Matchers.containsString("/projects/99/contacts")))
+                .andRespond(withServerError().body(
+                        "{\"error\":{\"code\":500,"
+                                + "\"message\":\"Internal Server Error: Error : result :0\"},"
+                                + "\"debug\":{\"source\":\"api_projects.class.php:1098 at call stage\"}}"));
+
+        client.lieResponsable(CIBLE, "99", "9");
+
+        serveur.verify();
+    }
+
+    @Test
+    void lieLeResponsableLeveEncoreSurUnAutre500() {
+        // Un 500 qui ne porte pas cette signature precise reste un echec : la reconnaissance
+        // ne doit avaler que le doublon observe, rien d'autre.
+        serveur.expect(requestTo(Matchers.containsString("/projects/99/contacts")))
+                .andRespond(withServerError().body("{\"error\":{\"message\":\"champ manquant\"}}"));
+
+        assertThatThrownBy(() -> client.lieResponsable(CIBLE, "99", "9"))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("champ manquant");
+    }
+
+    @Test
     void envoieUnCorpsJson() {
         serveur.expect(requestTo("http://erp.test/api/index.php/contacts"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
