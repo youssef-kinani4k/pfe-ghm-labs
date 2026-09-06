@@ -175,6 +175,11 @@ leadflow:
       # Presence du consommateur de leadflow.leads.routed. Toujours vrai en production ;
       # la suite de tests le retire pour ne pas appeler d'ERP sans le vouloir.
       enabled: true
+    reassign:
+      listener:
+        # Presence du consommateur de leadflow.leads.reassigned. Toujours vrai en
+        # production ; la suite de tests le retire, sauf la ou elle l'eprouve.
+        enabled: true
     # Reglages techniques uniquement. L'URL et les identifiants de chaque instance ERP
     # vivent sur la ligne client, chiffres.
     providers:
