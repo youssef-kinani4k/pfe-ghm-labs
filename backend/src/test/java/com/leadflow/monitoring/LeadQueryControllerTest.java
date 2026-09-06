@@ -8,6 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
+import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptNature;
+import com.leadflow.crm.CrmSyncAttemptRepository;
+import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
@@ -47,6 +51,7 @@ class LeadQueryControllerTest {
     @Autowired private LeadRepository leadRepository;
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
     @Autowired private ClientRepository clientRepository;
+    @Autowired private CrmSyncAttemptRepository attemptRepository;
 
     private UUID clientId;
 
@@ -81,6 +86,7 @@ class LeadQueryControllerTest {
 
     @AfterEach
     void nettoyage() {
+        attemptRepository.deleteAll();
         leadRepository.deleteAll();
         rawLeadEventRepository.deleteAll();
         clientRepository.deleteAll();
@@ -132,11 +138,26 @@ class LeadQueryControllerTest {
                 .getContentAsString();
         String leadId = mapper.readTree(id).get("content").get(0).get("id").asText();
 
+        CrmSyncAttempt reaffectation = new CrmSyncAttempt();
+        reaffectation.setLeadId(UUID.fromString(leadId));
+        reaffectation.setProviderId("dolibarr");
+        reaffectation.setNature(CrmSyncAttemptNature.REAFFECTATION);
+        reaffectation.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        reaffectation.setAssigneeRef("9");
+        reaffectation.setAttemptedAt(Instant.now());
+        attemptRepository.saveAndFlush(reaffectation);
+
+        // C'est le corps JSON, et non le DTO, qui prouve que la reaffectation et sa
+        // reference de responsable traversent la frontiere HTTP — et que taskRef n'y figure
+        // plus.
         mockMvc.perform(get("/api/leads/" + leadId)
                         .header("Authorization", "Bearer " + jeton()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rawEvent.payload.email").exists())
-                .andExpect(jsonPath("$.syncAttempts").isArray());
+                .andExpect(jsonPath("$.syncAttempts").isArray())
+                .andExpect(jsonPath("$.syncAttempts[0].nature").value("REAFFECTATION"))
+                .andExpect(jsonPath("$.syncAttempts[0].assigneeRef").value("9"))
+                .andExpect(jsonPath("$.syncAttempts[0].taskRef").doesNotExist());
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptNature;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.monitoring.deadletter.DeadLetter;
@@ -83,7 +84,10 @@ public class LeadTimelineService {
             entrees.add(attribution(lead, journal, noms));
         }
         tentatives.findByLeadIdOrderByAttemptedAtDesc(leadId)
-                .forEach(tentative -> entrees.add(synchronisation(tentative)));
+                .forEach(tentative -> entrees.add(
+                        tentative.getNature() == CrmSyncAttemptNature.REAFFECTATION
+                                ? reaffectationErp(tentative)
+                                : synchronisation(tentative)));
         notifications.findByLeadIdOrderByAttemptedAtAsc(leadId)
                 .forEach(tentative -> entrees.add(notification(tentative)));
 
@@ -334,6 +338,31 @@ public class LeadTimelineService {
                 tentative.getStatus() == NotificationStatus.ECHEC
                         ? TimelineOutcome.ECHEC
                         : TimelineOutcome.NEUTRE,
+                Map.copyOf(details));
+    }
+
+    /**
+     * Une reaffectation : elle corrige le responsable d'un lead deja present dans l'ERP, et
+     * ne cree rien. Une ligne {@code SUCCESS} portant un message decrit une propagation
+     * restee sans effet, pas un echec — le mot change, la colonne {@code errorMessage} non.
+     */
+    private TimelineEntry reaffectationErp(CrmSyncAttempt tentative) {
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("connecteur", tentative.getProviderId());
+        if (tentative.getAssigneeRef() != null) {
+            details.put("responsable", tentative.getAssigneeRef());
+        }
+        if (tentative.getErrorMessage() != null) {
+            details.put(
+                    tentative.getStatus() == CrmSyncAttemptStatus.SUCCESS ? "raison" : "erreur",
+                    tentative.getErrorMessage());
+        }
+        return new TimelineEntry(
+                TimelineEventType.REAFFECTATION_ERP,
+                tentative.getAttemptedAt(),
+                tentative.getStatus() == CrmSyncAttemptStatus.SUCCESS
+                        ? TimelineOutcome.SUCCES
+                        : TimelineOutcome.ECHEC,
                 Map.copyOf(details));
     }
 
