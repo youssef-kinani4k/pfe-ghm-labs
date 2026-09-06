@@ -7,7 +7,7 @@ engage tout le projet et pas seulement ce repertoire.
 
 ```
 crm/
-├── CrmConnector.java          port : providerId(), sync(...), resolveAssignee, reglagesAttendus, verifieAcces
+├── CrmConnector.java          port : providerId(), sync(...), resolveAssignee, reglagesAttendus, verifieAcces, reaffecte
 ├── CrmConnectorRegistry.java  resout l'adaptateur par providerId, applique `enabled`
 ├── CrmSyncService.java        orchestration : cible, etat anterieur, trace
 ├── CrmSyncTraceWriter.java    ecriture de la trace en transaction propre
@@ -68,6 +68,13 @@ porte cette quatrieme reference au meme titre que les trois autres, l'attributio
 etape a part entiere tentee tant qu'elle n'est pas deja faite, et le rejeu repare. Une carte
 de references par etape, plutot qu'un quatrieme champ, ne redeviendra la bonne reponse que
 si un ERP apporte un jour une cinquieme etape.
+
+**Le port porte une troisieme methode obligatoire depuis F15.** `reaffecte(references,
+assigneeRef, cible)` corrige le responsable d'un lead deja present dans l'ERP, sans rien
+creer. Sans `default`, pour la meme raison que `verifieAcces` : un ERP incapable de
+reaffecter doit le declarer en levant, pas l'omettre. Dolibarr y rattache le responsable au
+projet par `lieResponsable`, Odoo y ecrit `user_id` sur le `crm.lead` — la divergence se
+resout dans l'adaptateur, comme celle du Tiers et du Contact.
 
 Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
 `docs/erp-integration-setup.md`.

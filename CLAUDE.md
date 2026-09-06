@@ -338,12 +338,16 @@ du client se voie.
 puis DLQ. C'est le seul echec du routage qui merite la DLQ, parce qu'un humain peut le
 reparer : activer un commercial, puis rejouer.
 
-**La reattribution manuelle vit ici, et elle ne publie aucun message.** `ReattributionService`
-ecrit directement — le tour de role n'etant pas idempotent, republier sur `lead.routed`
-decalerait la rotation et renverrait vers l'ERP un lead deja synchronise. Elle **ne touche ni
-le statut ni `routed_at`** : un lead `SYNCED` reattribue reste `SYNCED`, et la date d'origine
-de son attribution reste vraie. Elle **deplace en revanche le tour de role**, puisque celui-ci
-se lit dans `lead` et non dans un compteur — le nouveau titulaire vient d'etre servi.
+**La reattribution manuelle vit ici, et elle ne publie aucun message de routage.**
+`ReattributionService` ecrit directement — le tour de role n'etant pas idempotent, republier
+sur `lead.routed` decalerait la rotation et renverrait vers l'ERP un lead deja synchronise en
+entier. Elle **ne touche ni le statut ni `routed_at`** : un lead `SYNCED` reattribue reste
+`SYNCED`, et la date d'origine de son attribution reste vraie. Elle **deplace en revanche le
+tour de role**, puisque celui-ci se lit dans `lead` et non dans un compteur — le nouveau
+titulaire vient d'etre servi. Depuis F15, une cle distincte part malgre tout, apres le journal :
+`lead.reassigned` ne transporte qu'un changement de responsable, jamais une attribution
+complete, et poser un responsable est idempotent — la propagation vers l'ERP, en aval, vit
+dans `crm/`.
 
 Quatre refus, tous en `409` (`ReattributionImpossibleException`) : lead sans commercial,
 commercial deja en place, commercial desactive, commercial d'une autre boutique. Le dernier
@@ -602,7 +606,7 @@ par un nouveau fichier `src/main/resources/db/migration/V<n>__description.sql`. 
 migration deja appliquee fait echouer Flyway au demarrage (checksum) — il faut soit ajouter
 une migration, soit `docker compose down -v` en dev.
 
-Douze migrations existent : `V1__raw_lead_event.sql` (journal de capture),
+Treize migrations existent : `V1__raw_lead_event.sql` (journal de capture),
 `V2__multi_tenant_schema.sql` (schema metier complet — `client`, `sales_rep`, `lead`,
 `crm_sync_attempt`, et l'ajout de `client_id` sur `raw_lead_event`),
 `V3__raw_lead_event_idempotence.sql` (index unique `(client_id, signature)`),
@@ -614,8 +618,9 @@ en silence), `V7__lead_routed_at.sql` (date d'attribution au commercial),
 `V8__lead_action.sql` (journal des gestes humains portes par un lead),
 `V9__notification_attempt.sql` (trace des alertes envoyees au commercial),
 `V10__analytics_index.sql` (deux index pour les series quotidiennes de F13),
-`V11__hmac_secret_transition.sql` (fenetre de transition du secret HMAC de F14) et
-`V12__previous_secret_since.sql` (ancrage de la fenetre courante, revue finale de F14).
+`V11__hmac_secret_transition.sql` (fenetre de transition du secret HMAC de F14),
+`V12__previous_secret_since.sql` (ancrage de la fenetre courante, revue finale de F14) et
+`V13__crm_sync_attempt_nature.sql` (nature d'une tentative de synchronisation, F15).
 
 **`V11` ajoute deux colonnes nullables sur `client`** — `previous_hmac_secret` (chiffree au
 repos comme `hmac_secret`) et `previous_secret_expires_at` — **et un booleen sur
@@ -635,6 +640,14 @@ desormais avec les deux de `V11` — les trois sont posees par la rotation et ef
 revocation, dans la meme transaction — et la lecture de la fiche borne sa recherche du
 dernier retardataire a cette date. Aucun index, comme `V11` : la requete reste `client_id`
 plus tri par `received_at`, servie par `idx_raw_lead_event_client_received` de `V2`.
+
+**`V13` ajoute une colonne non nulle sur `crm_sync_attempt`**, `nature`
+(`SYNCHRONISATION` / `REAFFECTATION`), parce que F15 fait ecrire cette table pour une raison
+nouvelle : corriger le responsable d'un lead deja synchronise, sans rien creer chez l'ERP. Le
+defaut `SYNCHRONISATION` remplit l'historique et **dit vrai**, contrairement au `routed_at`
+de `V7` — la propagation n'existait pas avant F15, donc toute ligne anterieure est bien une
+synchronisation. Aucun index : la table se lit toujours par `lead_id`, servie par l'existant,
+et la nature ne filtre jamais une requete a elle seule.
 
 **`V10` n'ajoute ni colonne ni table** : F13 ne fait que lire ce qui existe, comme la
 chronologie de F9 qui recompose six tables sans en creer aucune. `idx_lead_client_created`
@@ -872,7 +885,11 @@ boutiques de F7. F13 ajoute l'ecran d'analyse et ses trois series quotidiennes. 
 la rotation du secret HMAC** : regenerer le secret d'une boutique n'interrompt plus sa
 capture — une fenetre de transition, `leadflow.webhook.transition-secret` (defaut `24h`),
 laisse l'ancien secret valoir le temps que le site de la boutique redeploie, et l'ecran des
-boutiques montre l'etat de cette migration jusqu'a sa revocation.
+boutiques montre l'etat de cette migration jusqu'a sa revocation. **F15 propage une
+reattribution manuelle vers l'ERP** : corriger le responsable d'un lead deja synchronise ne
+corrige plus LeadFlow seul. La propagation est asynchrone — `lead.reassigned`, une file de
+plus derriere le port `CrmConnector` — tracee dans `crm_sync_attempt` au meme titre qu'une
+synchronisation, et rejouable comme le reste du pipeline en cas d'ERP injoignable.
 
 Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et onze ecrans Angular
 couvrent l'exploitation comme l'administration.
@@ -893,11 +910,14 @@ Ce qui n'existe pas :
   Et rien ne previent l'operateur qu'une alerte a echoue, sinon le journal des morts.
 - **Aucun recalcul retroactif des scores** : changer un bareme ne touche pas les leads deja
   qualifies. Le badge se deplace, le score non — c'est voulu, mais cela surprend.
-- **Une reattribution ne remonte pas jusqu'a l'ERP** : elle corrige LeadFlow, pas Dolibarr
-  ni Odoo. Un lead deja `SYNCED` garde son ancien responsable chez l'ERP, et le dialogue de
-  reattribution le dit a l'operateur plutot que de le laisser croire a une correction qui
-  n'a pas lieu. Propager demanderait une methode de mise a jour sur le port `CrmConnector`,
-  que le pivot n'expose pas.
+- **La propagation d'une reattribution ne corrige que le responsable** : `reaffecte` ne
+  touche ni le compte, ni le contact, ni l'opportunite deja crees chez l'ERP — seule
+  l'affectation change, comme cote LeadFlow. Une carte de references plus riche redeviendrait
+  la bonne reponse si un ERP apportait un jour une cinquieme etape de synchronisation.
+- **Rien ne rattrape retroactivement les leads reattribues avant F15** : la propagation ne
+  vaut que pour les reattributions posterieures a la migration. Un lead deja corrige dans
+  LeadFlow avant F15 garde son ancien responsable chez l'ERP, sans qu'aucun rejeu ne le
+  sache — il n'existe pas de trace d'une reattribution qui n'avait alors rien a propager.
 - **Le modele de l'analyse d'intention est un reglage, pas une constante** : Google retire
   des modeles au fil du temps, et l'ancien nom se met a rendre `404`. Le libelle vit sous
   `leadflow.intent.gemini.model` pour que ce retrait se repare sans toucher au code. La
