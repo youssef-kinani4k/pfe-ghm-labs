@@ -62,7 +62,7 @@ public class CrmSyncService {
 
         CrmConnector connector = registry.forProvider(client.getCrmProviderId());
         CrmTarget cible = new CrmTarget(client.getCrmProviderId(), client.getCrmConfig());
-        CrmSyncState anterieur = etatAnterieur(leadId, client.getCrmProviderId());
+        CrmSyncState anterieur = etatAnterieurPour(leadId, client.getCrmProviderId());
 
         try {
             // Dans le try : resolveAssignee appelle l'ERP, et une instance injoignable doit
@@ -93,8 +93,11 @@ public class CrmSyncService {
      * Prend, champ par champ, la valeur non nulle la plus recente. On ne peut pas se
      * contenter de la derniere ligne : une tentative echouee tot n'a que le compte, alors
      * qu'une tentative plus ancienne avait deja obtenu le contact.
+     *
+     * <p>Package-private et non privee depuis F15 : {@link CrmReassignService} reconstruit le
+     * meme etat, et le dupliquer ferait diverger les deux lectures a la premiere evolution.
      */
-    private CrmSyncState etatAnterieur(UUID leadId, String providerId) {
+    CrmSyncState etatAnterieurPour(UUID leadId, String providerId) {
         List<CrmSyncAttempt> tentatives =
                 attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, providerId);
         String compte = null;
