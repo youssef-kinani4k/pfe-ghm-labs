@@ -39,6 +39,10 @@ public class RabbitMQConfig {
     public static final String ROUTED_QUEUE = "leadflow.leads.routed";
     public static final String ROUTED_ROUTING_KEY = "lead.routed";
 
+    /** F15 : la correction manuelle d'un responsable, a pousser vers l'ERP. */
+    public static final String REASSIGNED_QUEUE = "leadflow.leads.reassigned";
+    public static final String REASSIGNED_ROUTING_KEY = "lead.reassigned";
+
     /**
      * Sortie de la synchronisation ERP. <b>Deux files y sont liees</b> depuis F12 : celle du
      * monitoring, qui observe, et celle de la notification, qui previent le commercial. Un
@@ -101,6 +105,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Queue reassignedQueue() {
+        return QueueBuilder.durable(REASSIGNED_QUEUE)
+                .deadLetterExchange(DLX_EXCHANGE)
+                .deadLetterRoutingKey(DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue notifyQueue() {
         return QueueBuilder.durable(NOTIFY_QUEUE)
                 .deadLetterExchange(DLX_EXCHANGE)
@@ -137,6 +149,11 @@ public class RabbitMQConfig {
      * notification n'a demande aucune modification de la synchronisation ERP ni de son
      * publieur.
      */
+    @Bean
+    Binding reassignedBinding(Queue reassignedQueue, DirectExchange leadsExchange) {
+        return BindingBuilder.bind(reassignedQueue).to(leadsExchange).with(REASSIGNED_ROUTING_KEY);
+    }
+
     @Bean
     Binding notifyBinding(Queue notifyQueue, DirectExchange leadsExchange) {
         return BindingBuilder.bind(notifyQueue).to(leadsExchange).with(SYNCED_ROUTING_KEY);
