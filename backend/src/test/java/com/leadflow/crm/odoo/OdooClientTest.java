@@ -126,6 +126,36 @@ class OdooClientTest {
     }
 
     @Test
+    void ecritEnvoieUnWriteAvecIdentifiantEtChamps() {
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andExpect(method(HttpMethod.POST))
+                // Le corps exact, pas seulement le code retour : c'est la forme de l'appel
+                // qui casse quand Odoo change, et un 200 ne l'aurait pas vue.
+                .andExpect(jsonPath("$.params.method").value("execute_kw"))
+                .andExpect(jsonPath("$.params.args[3]").value("crm.lead"))
+                .andExpect(jsonPath("$.params.args[4]").value("write"))
+                .andExpect(jsonPath("$.params.args[5][0]").value(31))
+                .andExpect(jsonPath("$.params.args[6].user_id").value("9"))
+                .andRespond(withSuccess("{\"result\": true}", MediaType.APPLICATION_JSON));
+
+        client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9"));
+
+        serveur.verify();
+    }
+
+    @Test
+    void ecritRefuseUnResultatQuiNestPasVrai() {
+        // Odoo repond 200 meme en cas de refus : l'echec vit dans le corps. Un « false »
+        // avale silencieusement ferait croire a une correction qui n'a pas eu lieu.
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andRespond(withSuccess("{\"result\": false}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("crm.lead.write");
+    }
+
+    @Test
     void refuseUneCibleIncomplete() {
         CrmTarget sansBase = new CrmTarget("odoo", Map.of("baseUrl", "http://odoo.test"));
 
