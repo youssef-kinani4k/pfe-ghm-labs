@@ -12,6 +12,8 @@ import com.leadflow.tenant.ClientRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.crypto.Mac;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -41,11 +44,25 @@ class FenetreDeTransitionTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ClientRepository clients;
     @Autowired private RawLeadEventRepository evenements;
+    @Autowired private JdbcTemplate jdbc;
 
+    /** Les boutiques creees par cette classe, et elles seules. */
+    private final List<UUID> creees = new ArrayList<>();
+
+    /**
+     * Ne supprime que ce que cette classe a cree.
+     *
+     * <p>La base Testcontainers est partagee par toutes les classes de test, et le schema
+     * enchaine {@code lead} vers {@code raw_lead_event} vers {@code client} sans cascade. Un
+     * {@code deleteAll()} global echoue donc des qu'une autre classe a laisse une ligne
+     * derriere elle, et l'echec depend de l'ordre d'execution — vert en local, rouge en
+     * integration continue.
+     */
     @AfterEach
     void nettoie() {
-        evenements.deleteAll();
-        clients.deleteAll();
+        creees.forEach(id -> jdbc.update("delete from raw_lead_event where client_id = ?", id));
+        clients.deleteAllById(creees);
+        creees.clear();
     }
 
     @Test
@@ -101,7 +118,9 @@ class FenetreDeTransitionTest {
         client.setCrmConfig(Map.of("baseUrl", "http://erp.test", "apiKey", "cle-api"));
         client.setAssignmentStrategy(AssignmentStrategyType.ROUND_ROBIN);
         client.setActive(true);
-        return clients.save(client);
+        Client sauvegardee = clients.save(client);
+        creees.add(sauvegardee.getId());
+        return sauvegardee;
     }
 
     private ResultActions envoieUnLeadSigne(String clePublique, String secret) throws Exception {

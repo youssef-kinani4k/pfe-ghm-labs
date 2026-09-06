@@ -4,9 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.leadflow.TestcontainersConfiguration;
-import com.leadflow.capture.RawLeadEventRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -27,21 +28,32 @@ class TransitionSecretPersistenceTest {
     private static final String ANCIEN = "ancien-secret-tres-reconnaissable";
 
     @Autowired private ClientRepository clients;
-    @Autowired private RawLeadEventRepository evenementsBruts;
     @Autowired private JdbcTemplate jdbc;
 
+    /** Les boutiques creees par cette classe, et elles seules. */
+    private final List<UUID> creees = new ArrayList<>();
+
     /**
-     * Les evenements bruts partent en premier, comme dans le reste de la suite :
-     * {@code raw_lead_event} reference {@code client} sans cascade, et la base Testcontainers
-     * est partagee par toutes les classes de test. Supprimer les boutiques seules fait donc
-     * echouer ce nettoyage des qu'une autre classe a laisse une ligne de capture derriere
-     * elle — un echec qui depend de l'ordre d'execution, donc invisible en local et rouge en
-     * integration continue.
+     * Ne supprime que ce que cette classe a cree.
+     *
+     * <p>La base Testcontainers est partagee par toutes les classes de test, et le schema
+     * enchaine {@code lead} vers {@code raw_lead_event} vers {@code client} sans cascade. Un
+     * {@code deleteAll()} global echoue donc des qu'une autre classe a laisse une ligne
+     * derriere elle, et remonter la chaine table par table ne ferait que deplacer l'echec
+     * d'un cran — c'est arrive deux fois. Ces boutiques-ci n'ont ni lead ni evenement, donc
+     * les effacer par identifiant est a la fois sur et suffisant.
      */
     @AfterEach
     void nettoie() {
-        evenementsBruts.deleteAll();
-        clients.deleteAll();
+        clients.deleteAllById(creees);
+        creees.clear();
+    }
+
+    /** Enregistre la boutique et retient son identifiant pour le nettoyage. */
+    private Client enregistre(Client boutique) {
+        Client sauvegardee = clients.save(boutique);
+        creees.add(sauvegardee.getId());
+        return sauvegardee;
     }
 
     @Test
@@ -57,7 +69,7 @@ class TransitionSecretPersistenceTest {
         boutique.setCrmConfig(Map.of("baseUrl", "http://erp.test", "apiKey", "cle-api"));
         boutique.setAssignmentStrategy(AssignmentStrategyType.ROUND_ROBIN);
         boutique.setActive(true);
-        UUID id = clients.save(boutique).getId();
+        UUID id = enregistre(boutique).getId();
 
         Client relu = clients.findById(id).orElseThrow();
         assertThat(relu.getPreviousHmacSecret()).isEqualTo(ANCIEN);
@@ -80,7 +92,7 @@ class TransitionSecretPersistenceTest {
         boutique.setAssignmentStrategy(AssignmentStrategyType.ROUND_ROBIN);
         boutique.setActive(true);
 
-        Client relu = clients.findById(clients.save(boutique).getId()).orElseThrow();
+        Client relu = clients.findById(enregistre(boutique).getId()).orElseThrow();
 
         assertThat(relu.getPreviousHmacSecret()).isNull();
         assertThat(relu.getPreviousSecretExpiresAt()).isNull();
