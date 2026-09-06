@@ -40,15 +40,18 @@ export interface SalesRepView {
   crmRef: string | null;
 }
 
+export type SyncAttemptNature = 'SYNCHRONISATION' | 'REAFFECTATION';
+
 /** Une tentative de synchronisation ERP : la trace append-only de `crm_sync_attempt`. */
 export interface SyncAttemptView {
   id: string;
   providerId: string;
   status: SyncAttemptStatus;
+  nature: SyncAttemptNature;
   accountRef: string | null;
   contactRef: string | null;
   opportunityRef: string | null;
-  taskRef: string | null;
+  assigneeRef: string | null;
   errorMessage: string | null;
   attemptedAt: string;
 }
@@ -89,11 +92,14 @@ export interface LeadDetail {
 }
 
 /**
- * Les huit faits que la chronologie sait porter, dans l'ordre du pipeline — le meme que
+ * Les dix faits que la chronologie sait porter, dans l'ordre du pipeline — le meme que
  * celui de l'enumeration backend, qui s'en sert pour placer une entree non datee.
  *
  * `REATTRIBUTION` suit `ATTRIBUTION` et `ECART` suit `REJEU` : ecarter n'est pas rejouer,
  * et confondre les deux dirait un message republie la ou il a ete abandonne.
+ * `REAFFECTATION_ERP` suit `SYNC_ERP` : corriger un responsable chez l'ERP n'est pas le
+ * synchroniser, et confondre les deux dirait un lead pousse la ou seul son responsable a
+ * ete corrige.
  */
 export type TimelineEventType =
   | 'CAPTURE'
@@ -101,6 +107,7 @@ export type TimelineEventType =
   | 'ATTRIBUTION'
   | 'REATTRIBUTION'
   | 'SYNC_ERP'
+  | 'REAFFECTATION_ERP'
   | 'NOTIFICATION'
   | 'MORT'
   | 'REJEU'

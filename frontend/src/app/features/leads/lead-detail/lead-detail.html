@@ -124,8 +124,9 @@
                 </div>
                 <p class="tentatives__refs lf-mono">
                   tiers {{ tentative.accountRef || '—' }} · contact
-                  {{ tentative.contactRef || '—' }} · opportunite
-                  {{ tentative.opportunityRef || '—' }} · tache {{ tentative.taskRef || '—' }}
+                  {{ tentative.contactRef || '—' }} · opportunité
+                  {{ tentative.opportunityRef || '—' }} · responsable
+                  {{ tentative.assigneeRef || '—' }}
                 </p>
                 @if (tentative.errorMessage) {
                   <p class="tentatives__erreur">{{ tentative.errorMessage }}</p>

@@ -69,4 +69,40 @@ describe('LeadTimeline', () => {
     expect(entree.textContent).toContain('Echec');
     expect(entree.textContent).toContain('Synchronisation ERP');
   });
+
+  it('nomme une reaffectation autrement qu une synchronisation', async () => {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/leads/abc/timeline').flush([
+      {
+        type: 'REAFFECTATION_ERP',
+        at: '2026-09-06T10:00:05Z',
+        outcome: 'SUCCES',
+        details: { connecteur: 'dolibarr', responsable: '9' },
+      },
+    ]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const entree = fixture.nativeElement.querySelector('[data-entree]');
+    // Corriger un responsable n'est pas synchroniser : confondre les deux ferait lire
+    // « Synchronisation ERP » la ou rien n'a ete pousse.
+    expect(entree.textContent).toContain('Responsable corrigé');
+    expect(entree.textContent).not.toContain('Synchronisation ERP');
+  });
+
+  it('explique une propagation restee sans effet', async () => {
+    fixture.detectChanges();
+    httpMock.expectOne('/api/leads/abc/timeline').flush([
+      {
+        type: 'REAFFECTATION_ERP',
+        at: '2026-09-06T10:00:05Z',
+        outcome: 'SUCCES',
+        details: { connecteur: 'dolibarr', raison: 'Lead jamais synchronise' },
+      },
+    ]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Lead jamais synchronise');
+  });
 });
