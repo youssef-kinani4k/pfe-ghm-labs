@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.leadflow.TestcontainersConfiguration;
+import com.leadflow.capture.RawLeadEventRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -26,10 +27,20 @@ class TransitionSecretPersistenceTest {
     private static final String ANCIEN = "ancien-secret-tres-reconnaissable";
 
     @Autowired private ClientRepository clients;
+    @Autowired private RawLeadEventRepository evenementsBruts;
     @Autowired private JdbcTemplate jdbc;
 
+    /**
+     * Les evenements bruts partent en premier, comme dans le reste de la suite :
+     * {@code raw_lead_event} reference {@code client} sans cascade, et la base Testcontainers
+     * est partagee par toutes les classes de test. Supprimer les boutiques seules fait donc
+     * echouer ce nettoyage des qu'une autre classe a laisse une ligne de capture derriere
+     * elle — un echec qui depend de l'ordre d'execution, donc invisible en local et rouge en
+     * integration continue.
+     */
     @AfterEach
     void nettoie() {
+        evenementsBruts.deleteAll();
         clients.deleteAll();
     }
 
