@@ -156,6 +156,32 @@ class OdooClientTest {
     }
 
     @Test
+    void ecritRefuseUneReponseSansResultat() {
+        // Reponse tronquee ou proxy intercale : ni result, ni error. Meme chemin que le
+        // « false » ci-dessus, mais cree() a son propre test dedie a ce cas
+        // (refuseUneCreationSansIdentifiant) : l'asymetrie n'a pas de raison d'etre.
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("crm.lead.write");
+    }
+
+    @Test
+    void ecritRefuseUnIdentifiantIllisibleSansAppelHttp() {
+        // Aucun serveur.expect(...) n'est pose : le controle du format de l'identifiant se
+        // fait avant l'envoi. Si ecrit(...) tentait malgre tout une requete, elle serait
+        // rejetee comme non attendue par MockRestServiceServer, et l'assertion ci-dessous
+        // echouerait sur le mauvais type d'exception plutot que de passer silencieusement.
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "abc", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("abc");
+
+        serveur.verify();
+    }
+
+    @Test
     void refuseUneCibleIncomplete() {
         CrmTarget sansBase = new CrmTarget("odoo", Map.of("baseUrl", "http://odoo.test"));
 
