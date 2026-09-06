@@ -169,7 +169,43 @@ class CrmReassignServiceTest {
         service.propage(leadId);
 
         assertThat(connecteurFactice.appels).doesNotContain("reaffecte");
-        assertThat(derniereTentative(leadId).getErrorMessage()).contains("inconnu de l ERP");
+        CrmSyncAttempt ligne = derniereTentative(leadId);
+        assertThat(ligne.getErrorMessage()).contains("inconnu de l ERP");
+        // L'invariant de reaffectationSansEffet : aucune des quatre references n'est posee.
+        // Une seule suffirait a faire croire a etatAnterieurPour que l'ERP connait ce lead,
+        // et une resynchronisation ulterieure sauterait l'etape correspondante.
+        assertThat(ligne.getAccountRef()).isNull();
+        assertThat(ligne.getContactRef()).isNull();
+        assertThat(ligne.getOpportunityRef()).isNull();
+        assertThat(ligne.getAssigneeRef()).isNull();
+    }
+
+    @Test
+    void distingueLeLeadSansCommercialDuCommercialInconnuDeLErp() {
+        // Deux causes, deux messages : « inconnu de l ERP » enverrait l'operateur chercher un
+        // utilisateur manquant chez son ERP, alors qu'aucun commercial n'a ete demande.
+        UUID leadId = unLeadSynchroniseSansCommercial();
+
+        service.propage(leadId);
+
+        assertThat(connecteurFactice.appels).isEmpty();
+        CrmSyncAttempt ligne = derniereTentative(leadId);
+        assertThat(ligne.getStatus()).isEqualTo(CrmSyncAttemptStatus.SUCCESS);
+        assertThat(ligne.getErrorMessage()).contains("sans commercial");
+        assertThat(ligne.getErrorMessage()).doesNotContain("inconnu de l ERP");
+    }
+
+    @Test
+    void memoriseLaReferenceDuCommercialCommeLaSynchronisation() {
+        // La resolution est partagee avec CrmSyncService, effet de bord compris : une seule
+        // implementation, donc un seul comportement de memorisation a eprouver.
+        UUID leadId = unLeadSynchronise();
+        UUID salesRepId = leadRepository.findById(leadId).orElseThrow().getAssignedSalesRepId();
+
+        service.propage(leadId);
+
+        assertThat(salesRepRepository.findById(salesRepId).orElseThrow().getCrmRef())
+                .isEqualTo("9");
     }
 
     @Test
@@ -246,6 +282,15 @@ class CrmReassignServiceTest {
         trace.succes(
                 leadId,
                 new CrmSyncResult("factice", "A-1", "C-1", "O-1", "7", null, Instant.now()));
+        return leadId;
+    }
+
+    /** Le meme, mais sans titulaire : le cas ou il n'y a personne a poser chez l'ERP. */
+    private UUID unLeadSynchroniseSansCommercial() {
+        UUID leadId = unLeadSynchronise();
+        Lead lead = leadRepository.findById(leadId).orElseThrow();
+        lead.setAssignedSalesRepId(null);
+        leadRepository.saveAndFlush(lead);
         return leadId;
     }
 

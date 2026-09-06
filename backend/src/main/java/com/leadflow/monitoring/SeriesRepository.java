@@ -88,6 +88,13 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
      * lead_id}, que cet index n'accelere pas. Le vrai bornage demande un {@code where} dans la
      * CTE plus un {@code not exists} de succes anterieur -- ce n'est pas une correction de
      * trois lignes, et cela merite sa propre tache.
+     *
+     * <p><strong>Le filtre sur {@code nature} n'est pas facultatif</strong> depuis F15 :
+     * {@code status = 'SUCCESS'} ne suffit plus a designer une synchronisation. La
+     * propagation d'une reattribution ecrit elle aussi des lignes {@code SUCCESS} -- dont
+     * celles, « sans effet », d'un lead qui n'a jamais ete pousse vers l'ERP. Sans ce
+     * predicat, un tel lead se verrait attribuer une date de synchronisation et entrerait
+     * dans la mediane des delais, alors que rien n'est jamais parti.
      */
     @Query(
             value =
@@ -96,6 +103,7 @@ public interface SeriesRepository extends Repository<Lead, UUID> {
                         select a.lead_id, min(a.attempted_at) as sync_at
                         from crm_sync_attempt a
                         where a.status = 'SUCCESS'
+                          and a.nature = 'SYNCHRONISATION'
                         group by a.lead_id
                     )
                     select (p.sync_at at time zone :fuseau)::date as jour,
