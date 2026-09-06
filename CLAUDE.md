@@ -161,18 +161,18 @@ classpath de test :
   connexion au dashboard echoue par « Identifiants invalides »**. `R__demo_data.sql` n'est
   pas charge non plus, donc la base est vide. Ajouter `-Dspring-boot.run.profiles=dev`
   repare ces deux points.
-- **`src/test/resources/application.properties` eteint les cinq consommateurs** —
-  qualification, routage, CRM, journal des morts, flux temps reel. Le profil n'y change
-  rien, et **le pipeline reste inerte** : un lead capture reste dans la file, aucune ligne
-  `lead` n'est ecrite. Le symptome est un webhook qui rend `202` et un dashboard qui reste
-  a zero.
+- **`src/test/resources/application.properties` eteint les sept consommateurs** —
+  qualification, routage, CRM, reattribution ERP (F15), journal des morts, flux temps reel,
+  notification. Le profil n'y change rien, et **le pipeline reste inerte** : un lead capture
+  reste dans la file, aucune ligne `lead` n'est ecrite. Le symptome est un webhook qui rend
+  `202` et un dashboard qui reste a zero.
 
 **Pour lancer le produit — recette a l'ecran, verification manuelle du pipeline — c'est donc
 `docker compose up -d` puis `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`**, qui ne
 voit que le classpath principal. `test-run` reste utile pour eprouver le demarrage lui-meme
 sans preparer d'infrastructure. Le controle qui tranche en une commande, une fois le backend
 leve : `docker exec leadflow-rabbitmq rabbitmqctl list_queues name messages consumers` doit
-montrer **cinq files avec un consommateur chacune**.
+montrer **sept files avec un consommateur chacune**.
 
 Corollaire : la base de `docker compose` est **persistante d'une session a l'autre**, la
 qu'un lancement Testcontainers repart d'une base vierge. Une clef publique ou un secret HMAC

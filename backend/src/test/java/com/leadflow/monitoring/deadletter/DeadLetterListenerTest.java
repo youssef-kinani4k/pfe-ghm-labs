@@ -70,6 +70,55 @@ class DeadLetterListenerTest {
     }
 
     @Test
+    void deduitLaFileDOrigineDUneMortDeReattributionOuDeSynchronisation() {
+        UUID leadReattribue = UUID.randomUUID();
+        String corpsReattribution = """
+                {"leadId":"%s","clientId":"%s"}
+                """.formatted(leadReattribue, UUID.randomUUID());
+
+        MessageProperties proprietesReattribution = new MessageProperties();
+        proprietesReattribution.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        // Volontairement pas de x-first-death-queue, comme les autres tests de cette
+        // classe : la deduction doit reposer sur la cle de routage.
+        proprietesReattribution.setHeader(
+                "x-original-routingKey", RabbitMQConfig.REASSIGNED_ROUTING_KEY);
+        Message messageReattribution = MessageBuilder.withBody(corpsReattribution.getBytes())
+                .andProperties(proprietesReattribution).build();
+
+        UUID leadSynchronise = UUID.randomUUID();
+        String corpsSynchronisation = """
+                {"leadId":"%s","clientId":"%s"}
+                """.formatted(leadSynchronise, UUID.randomUUID());
+
+        MessageProperties proprietesSynchronisation = new MessageProperties();
+        proprietesSynchronisation.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        proprietesSynchronisation.setHeader(
+                "x-original-routingKey", RabbitMQConfig.SYNCED_ROUTING_KEY);
+        Message messageSynchronisation = MessageBuilder.withBody(corpsSynchronisation.getBytes())
+                .andProperties(proprietesSynchronisation).build();
+
+        rabbitTemplate.send(
+                RabbitMQConfig.DLX_EXCHANGE, RabbitMQConfig.DLQ_ROUTING_KEY, messageReattribution);
+        rabbitTemplate.send(
+                RabbitMQConfig.DLX_EXCHANGE, RabbitMQConfig.DLQ_ROUTING_KEY,
+                messageSynchronisation);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertThat(repository.findAll()).hasSize(2);
+            assertThat(repository.findFirstByLeadIdAndStatus(
+                            leadReattribue, DeadLetterStatus.PENDING))
+                    .get()
+                    .extracting(DeadLetter::getOriginQueue)
+                    .isEqualTo(RabbitMQConfig.REASSIGNED_QUEUE);
+            assertThat(repository.findFirstByLeadIdAndStatus(
+                            leadSynchronise, DeadLetterStatus.PENDING))
+                    .get()
+                    .extracting(DeadLetter::getOriginQueue)
+                    .isEqualTo(RabbitMQConfig.NOTIFY_QUEUE);
+        });
+    }
+
+    @Test
     void journaliseQuandMemeUneChargeUtileIllisible() {
         MessageProperties proprietes = new MessageProperties();
         proprietes.setContentType(MessageProperties.CONTENT_TYPE_JSON);

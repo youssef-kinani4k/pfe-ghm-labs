@@ -3,10 +3,9 @@
 <mat-dialog-content class="reattribution">
   @if (avertitSurERP()) {
     <!-- L'icone double le mot et la couleur ne porte jamais seule l'information : ce
-         message doit rester lisible sur un ecran imprime en noir et blanc.
-         lf-bandeau--info n'existe pas dans les styles partages (seuls --attente et --echec
-         y sont definis) : on garde --attente plutot que d'inventer une classe. -->
-    <p class="lf-bandeau lf-bandeau--attente">
+         message doit rester lisible sur un ecran imprime en noir et blanc. C'est une
+         annonce et non un avertissement : lf-bandeau--info, au ton neutre. -->
+    <p class="lf-bandeau lf-bandeau--info">
       <mat-icon aria-hidden="true">info</mat-icon>
       <span>
         Ce lead est déjà synchronisé : la correction sera transmise à l'ERP dans la foulée. En cas

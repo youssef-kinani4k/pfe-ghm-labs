@@ -145,7 +145,7 @@ public class RabbitMQConfig {
     }
 
     /**
-     * Delibrement liee a aucune des cles observees par {@link #MONITORING_QUEUE} : le flux
+     * Deliberement liee a aucune des cles observees par {@link #MONITORING_QUEUE} : le flux
      * temps reel du monitoring montre les leads qui avancent dans le pipeline, et une
      * reattribution manuelle n'en est pas une, c'est une correction. Elle ne doit donc rien
      * a la file d'observation, contrairement a {@code notifyBinding} ci-dessous.

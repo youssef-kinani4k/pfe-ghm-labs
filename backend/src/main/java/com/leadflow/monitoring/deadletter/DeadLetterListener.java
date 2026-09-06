@@ -117,6 +117,8 @@ public class DeadLetterListener {
             case RabbitMQConfig.LEADS_ROUTING_KEY -> RabbitMQConfig.LEADS_QUEUE;
             case RabbitMQConfig.QUALIFIED_ROUTING_KEY -> RabbitMQConfig.QUALIFIED_QUEUE;
             case RabbitMQConfig.ROUTED_ROUTING_KEY -> RabbitMQConfig.ROUTED_QUEUE;
+            case RabbitMQConfig.REASSIGNED_ROUTING_KEY -> RabbitMQConfig.REASSIGNED_QUEUE;
+            case RabbitMQConfig.SYNCED_ROUTING_KEY -> RabbitMQConfig.NOTIFY_QUEUE;
             default -> "inconnue";
         };
     }

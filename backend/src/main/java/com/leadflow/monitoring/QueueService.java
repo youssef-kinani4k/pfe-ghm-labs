@@ -31,6 +31,8 @@ public class QueueService {
             RabbitMQConfig.LEADS_QUEUE,
             RabbitMQConfig.QUALIFIED_QUEUE,
             RabbitMQConfig.ROUTED_QUEUE,
+            RabbitMQConfig.REASSIGNED_QUEUE,
+            RabbitMQConfig.NOTIFY_QUEUE,
             RabbitMQConfig.DLQ_QUEUE);
 
     private final RabbitAdmin admin;

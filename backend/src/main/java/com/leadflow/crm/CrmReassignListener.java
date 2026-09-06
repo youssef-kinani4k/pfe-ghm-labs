@@ -17,8 +17,13 @@ import org.springframework.stereotype.Component;
  * comportement voulu, et la ligne {@code crm_sync_attempt} en echec est deja ecrite par
  * {@link CrmReassignService} en transaction propre, donc elle survit.
  *
- * <p><b>Le rejeu depuis le journal des morts est inoffensif</b> : poser un responsable est
- * une ecriture idempotente, contrairement au tour de role que rejoue {@code lead.qualified}.
+ * <p><b>Le rejeu depuis le journal des morts est moins risque qu'une republication de
+ * {@code lead.qualified}</b>, dont le rejeu decale le tour de role. Ce n'est cependant pas
+ * une idempotence garantie pour tous les ERP : {@link com.leadflow.crm.dolibarr.DolibarrConnector}
+ * documente qu'aucune sonde Dolibarr ne permet de savoir si un responsable est deja lie, si
+ * bien qu'un rejeu peut y tenter un doublon que l'ERP refuse — auquel cas un lead par
+ * ailleurs correctement synchronise part en DLQ. Vrai en revanche pour Odoo, ou l'ecriture
+ * de {@code user_id} est un simple remplacement.
  *
  * <p>Bean conditionnel comme les autres consommateurs du projet : la suite de tests le
  * retire, et un contexte remis en marche par le cache de tests redemarrerait ses beans
