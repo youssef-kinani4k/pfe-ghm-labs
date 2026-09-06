@@ -37,6 +37,7 @@ public class CrmSyncTraceWriter {
         tentative.setLeadId(leadId);
         tentative.setProviderId(resultat.providerId());
         tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setNature(CrmSyncAttemptNature.SYNCHRONISATION);
         tentative.setAccountRef(resultat.accountRef());
         tentative.setContactRef(resultat.contactRef());
         tentative.setOpportunityRef(resultat.opportunityRef());
@@ -53,6 +54,7 @@ public class CrmSyncTraceWriter {
         tentative.setLeadId(leadId);
         tentative.setProviderId(providerId);
         tentative.setStatus(CrmSyncAttemptStatus.FAILED);
+        tentative.setNature(CrmSyncAttemptNature.SYNCHRONISATION);
         tentative.setAccountRef(partiel.accountRef());
         tentative.setContactRef(partiel.contactRef());
         tentative.setOpportunityRef(partiel.opportunityRef());
