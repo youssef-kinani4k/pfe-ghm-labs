@@ -109,6 +109,30 @@ public class CrmSyncTraceWriter {
         attemptRepository.save(tentative);
     }
 
+    /**
+     * Trace d'une propagation qui n'avait rien a faire — lead absent de l'ERP, commercial
+     * inconnu, connecteur desactive.
+     *
+     * <p>{@code SUCCESS} et non {@code FAILED}, avec la raison dans {@code error_message} :
+     * rien n'a echoue. C'est le pendant du statut {@code IGNOREE} de la notification, qui
+     * ecrit une ligne plutot que de ne rien laisser — sans elle, la chronologie ne saurait
+     * pas repondre a « pourquoi l'ERP n'a-t-il pas ete corrige ? ».
+     *
+     * <p>Aucune reference n'est posee : la ligne ne doit rien apprendre a
+     * {@code etatAnterieurPour}.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void reaffectationSansEffet(UUID leadId, String providerId, String raison) {
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId(providerId);
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setNature(CrmSyncAttemptNature.REAFFECTATION);
+        tentative.setErrorMessage(raison);
+        tentative.setAttemptedAt(Instant.now());
+        attemptRepository.save(tentative);
+    }
+
     private void changeStatut(UUID leadId, LeadStatus statut) {
         Lead lead = leadRepository.findById(leadId).orElseThrow();
         lead.setStatus(statut);
