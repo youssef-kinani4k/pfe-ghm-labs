@@ -889,7 +889,15 @@ boutiques montre l'etat de cette migration jusqu'a sa revocation. **F15 propage 
 reattribution manuelle vers l'ERP** : corriger le responsable d'un lead deja synchronise ne
 corrige plus LeadFlow seul. La propagation est asynchrone — `lead.reassigned`, une file de
 plus derriere le port `CrmConnector` — tracee dans `crm_sync_attempt` au meme titre qu'une
-synchronisation, et rejouable comme le reste du pipeline en cas d'ERP injoignable.
+synchronisation, et rejouable comme le reste du pipeline en cas d'ERP injoignable. Cote
+Dolibarr, elle retire aussi l'ancien chef de projet : `lieResponsable` ajoutant un contact sans
+en retirer aucun, la fiche aurait sinon porte deux responsables, et l'ambiguite que la feature
+devait lever aurait seulement change de place.
+
+**F15 fusionnee, la feuille de route des features est close.** Ce qui suit ci-dessous n'est
+donc plus une liste d'etapes en attente : ce sont des choix de perimetre assumes et des
+chantiers qui demanderaient chacun leur propre session. Une demande qui tombe dans cette liste
+est une nouvelle decision de produit, pas la suite du plan.
 
 Un lead traverse `QUALIFIED` -> `ROUTED` -> `SYNCED` sans intervention, et onze ecrans Angular
 couvrent l'exploitation comme l'administration.
@@ -901,7 +909,7 @@ le secret n'a jamais a etre chiffre a la main —, **regler un bareme non plus**
 `psql`. Le meme motif est desormais exige du rejeu et de l'ecart d'un message mort : les trois
 gestes humains laissent une trace dans `lead_action`, et la chronologie du lead les montre.
 
-Ce qui n'existe pas :
+Ce qui n'existe pas, et qui n'est plus prevu :
 
 - **L'alerte du commercial ne passe que par l'e-mail** : depuis F12 un lead au-dessus du
   seuil de notification de sa boutique declenche un envoi SMTP, mais **aucune tache d'agenda
