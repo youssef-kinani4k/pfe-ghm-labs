@@ -59,7 +59,7 @@ qui isole ce test.**
 | Classe de preuve — ancien nettoyage rouge, nouveau vert | vert |
 | `./mvnw test-compile` après la dernière retouche | vert |
 | Frontend : 84 tests, `build`, ESLint, Prettier | vert (aucun fichier frontend touché) |
-| **`./mvnw verify` complet sur le correctif final** | **non exécuté** |
+| **`./mvnw verify` complet sur le correctif final** | **vert en CI** — run `34285181405`, les quatre jobs en succès, `Tests run: 586, Failures: 0, Errors: 0` |
 
 Les 586 tests sont bien passés en début de session, mais sur la **première** version du
 correctif, celle qui a été annulée. Le run complet sur la version finale n'a jamais abouti.
@@ -89,5 +89,9 @@ cd backend && ./mvnw verify
 git push -u origin fix/f13-nettoyage-series-repository-test
 ```
 
-La branche est conservée dans les deux cas, comme toutes les branches du projet. Tant que le
-run complet n'a pas parlé, **la dette n°1 est corrigée mais non validée**.
+La branche est conservée dans les deux cas, comme toutes les branches du projet.
+
+**Le second chemin a été pris : la branche est poussée et la CI a tranché — les quatre jobs
+sont verts sur le run `34285181405`. La dette n°1 est corrigée et validée ; seule la fusion
+`--no-ff` dans `main` reste à faire.** Le blocage décrit ci-dessus était bien d'environnement
+et non de code, et les conteneurs orphelins du poste n'ont toujours pas été nettoyés.
