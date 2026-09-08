@@ -7,6 +7,7 @@ import com.leadflow.TestcontainersConfiguration;
 import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.common.RessourceIntrouvableException;
+import com.leadflow.config.RabbitMQConfig;
 import com.leadflow.qualification.Lead;
 import com.leadflow.qualification.LeadRepository;
 import com.leadflow.qualification.LeadStatus;
@@ -21,6 +22,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -39,6 +42,8 @@ class ReattributionServiceTest {
     @Autowired private RawLeadEventRepository evenements;
     @Autowired private ClientRepository clients;
     @Autowired private SalesRepRepository commerciaux;
+    @Autowired private RabbitTemplate rabbitTemplate;
+    @Autowired private RabbitAdmin rabbitAdmin;
 
     @AfterEach
     void nettoyage() {
@@ -67,6 +72,24 @@ class ReattributionServiceTest {
         assertThat(journal.get(0).getPreviousSalesRepId()).isEqualTo(premier);
         assertThat(journal.get(0).getNewSalesRepId()).isEqualTo(second);
         assertThat(journal.get(0).getOutcome()).isEqualTo(LeadActionOutcome.SUCCES);
+    }
+
+    @Test
+    void publieUnMessageDeReaffectationApresLeJournal() {
+        rabbitAdmin.purgeQueue(RabbitMQConfig.REASSIGNED_QUEUE);
+        Client boutique = uneBoutique("Agence Nord");
+        UUID premier = unCommercial(boutique, "Sonia Merbah");
+        UUID second = unCommercial(boutique, "Yanis Roux");
+        UUID leadId = unLead(boutique, premier, LeadStatus.SYNCED);
+
+        service.reattribue(leadId, second, "Secteur mal decoupe", "admin");
+
+        Object recu = rabbitTemplate.receiveAndConvert(RabbitMQConfig.REASSIGNED_QUEUE, 5000);
+        assertThat(recu).isInstanceOf(LeadReassignedMessage.class);
+        LeadReassignedMessage message = (LeadReassignedMessage) recu;
+        assertThat(message.leadId()).isEqualTo(leadId);
+        assertThat(message.previousSalesRepId()).isEqualTo(premier);
+        assertThat(message.newSalesRepId()).isEqualTo(second);
     }
 
     @Test

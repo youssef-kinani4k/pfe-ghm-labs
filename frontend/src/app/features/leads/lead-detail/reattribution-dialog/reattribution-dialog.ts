@@ -28,9 +28,9 @@ export interface ReattributionData {
  * obligatoire, un `confirm()` du navigateur — la solution retenue jusqu'ici par le journal
  * des morts — ne suffisait plus.
  *
- * L'avertissement sur un lead `SYNCED` n'est pas cosmetique : la reattribution ne touche pas
- * l'ERP, ou le lead reste rattache a l'ancien responsable. Le taire ferait croire a une
- * correction qui n'a pas lieu.
+ * L'avertissement sur un lead `SYNCED` n'est pas cosmetique : depuis F15, la reattribution
+ * propage la correction du responsable vers l'ERP, de facon asynchrone. Le message annonce
+ * cette transmission, il n'avoue pas une limitation qui n'existe plus.
  */
 @Component({
   selector: 'app-reattribution-dialog',

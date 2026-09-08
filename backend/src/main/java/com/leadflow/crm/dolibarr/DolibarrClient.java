@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -99,6 +100,16 @@ public class DolibarrClient {
      * <p>Appel distinct parce que Dolibarr ignore {@code fk_user_resp}, a la creation comme
      * en modification : la sonde de la tache 1 l'a verifie dans les deux sens. C'est le seul
      * endroit de F5 ou une etape de {@code sync} compte deux appels.
+     *
+     * <p>Rejouer ce lien — un rejeu depuis le journal des morts, la livraison at-least-once
+     * de la synchronisation — heurte Dolibarr non pas sur un doublon propre mais sur un
+     * {@code 500} : prouve contre une vraie instance, reposter le meme
+     * {@code fk_socpeople}/{@code type_contact} sur une opportunite qui le porte deja rend
+     * {@code "Internal Server Error: Error : result :0"}, source
+     * {@code api_projects.class.php}. Un lien deja pose est l'etat recherche, pas un echec :
+     * {@link #lienDejaPose(HttpServerErrorException.InternalServerError)} reconnait cette
+     * signature precise et le traite comme un succes plutot que de le relancer — voir
+     * {@link DolibarrConnector} pour la fenetre que ce refus refermait.
      */
     public void lieResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
         String chemin = "/projects/" + opportuniteRef + "/contacts";
@@ -112,6 +123,58 @@ public class DolibarrClient {
                             .build())
                     .retrieve()
                     .toBodilessEntity();
+        } catch (HttpServerErrorException.InternalServerError e) {
+            if (!lienDejaPose(e)) {
+                throw echec(chemin, e);
+            }
+            // Lien deja pose : l'etat recherche est atteint, rien a lever.
+        } catch (RestClientException e) {
+            throw echec(chemin, e);
+        }
+    }
+
+    /**
+     * Reconnait la signature precise du doublon de lien responsable, observee contre une
+     * vraie instance Dolibarr : {@code result :0} dans le message d'erreur et
+     * {@code api_projects.class.php} comme source. Les deux sont exiges pour ne reconnaitre
+     * que ce cas — un autre {@code 500} doit continuer de lever.
+     *
+     * <p>La reconnaissance porte sur un message d'erreur et un nom de fichier source, pas sur
+     * un code documente par Dolibarr : une version future qui reformulerait ce message ferait
+     * a nouveau lever ce cas, au pire au meme niveau qu'avant ce correctif.
+     */
+    private boolean lienDejaPose(HttpServerErrorException.InternalServerError e) {
+        String corps = e.getResponseBodyAsString();
+        return corps != null
+                && corps.contains("result :0")
+                && corps.contains("api_projects.class.php");
+    }
+
+    /**
+     * Retire le lien de chef de projet d'un utilisateur sur une opportunite.
+     *
+     * <p>Symetrique de {@link #lieResponsable}, et indispensable avec lui : ce dernier
+     * <em>ajoute</em> un contact sans en retirer aucun, si bien qu'une reaffectation laissait
+     * la fiche Dolibarr avec deux {@code PROJECTLEADER}, dont un qui n'a plus rien a voir avec
+     * le lead. Odoo n'a pas besoin de ce geste — son {@code write} sur {@code user_id} remplace
+     * la valeur.
+     *
+     * <p>Le segment {@code contactid} attend l'identifiant de l'<strong>utilisateur</strong>,
+     * pas le {@code rowid} de la ligne de liaison. Le Javadoc de Dolibarr affirme l'inverse
+     * (« Row key of the contact in the array contact_ids ») et se trompe : la route compare
+     * {@code $contact['id']}, releve dans {@code projet/class/api_projects.class.php} d'une
+     * vraie instance. C'est ce qui permet a {@link DolibarrConnector#reaffecte} de passer
+     * directement l'ancienne reference sans lire d'abord les contacts du projet.
+     *
+     * <p>Contrairement a la pose, ce retrait est <strong>idempotent chez Dolibarr lui-meme</strong> :
+     * eprouve contre une vraie instance, retirer un lien deja absent rend {@code 200} et non le
+     * {@code 500} de {@link #lienDejaPose}. La route parcourt ses contacts et sort sans rien
+     * faire quand aucun ne correspond. Aucun traitement particulier n'est donc necessaire ici.
+     */
+    public void retireResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
+        String chemin = "/projects/" + opportuniteRef + "/contact/" + utilisateurRef + "/PROJECTLEADER";
+        try {
+            restClient(target).delete().uri(chemin).retrieve().toBodilessEntity();
         } catch (RestClientException e) {
             throw echec(chemin, e);
         }

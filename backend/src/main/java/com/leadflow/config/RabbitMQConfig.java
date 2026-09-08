@@ -39,6 +39,10 @@ public class RabbitMQConfig {
     public static final String ROUTED_QUEUE = "leadflow.leads.routed";
     public static final String ROUTED_ROUTING_KEY = "lead.routed";
 
+    /** F15 : la correction manuelle d'un responsable, a pousser vers l'ERP. */
+    public static final String REASSIGNED_QUEUE = "leadflow.leads.reassigned";
+    public static final String REASSIGNED_ROUTING_KEY = "lead.reassigned";
+
     /**
      * Sortie de la synchronisation ERP. <b>Deux files y sont liees</b> depuis F12 : celle du
      * monitoring, qui observe, et celle de la notification, qui previent le commercial. Un
@@ -101,6 +105,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    Queue reassignedQueue() {
+        return QueueBuilder.durable(REASSIGNED_QUEUE)
+                .deadLetterExchange(DLX_EXCHANGE)
+                .deadLetterRoutingKey(DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
     Queue notifyQueue() {
         return QueueBuilder.durable(NOTIFY_QUEUE)
                 .deadLetterExchange(DLX_EXCHANGE)
@@ -130,6 +142,19 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(routedLeadsQueue)
                 .to(leadsExchange)
                 .with(ROUTED_ROUTING_KEY);
+    }
+
+    /**
+     * Deliberement liee a aucune des cles observees par {@link #MONITORING_QUEUE} : le flux
+     * temps reel du monitoring montre les leads qui avancent dans le pipeline, et une
+     * reattribution manuelle n'en est pas une, c'est une correction. Elle ne doit donc rien
+     * a la file d'observation, contrairement a {@code notifyBinding} ci-dessous.
+     */
+    @Bean
+    Binding reassignedBinding(Queue reassignedQueue, DirectExchange leadsExchange) {
+        return BindingBuilder.bind(reassignedQueue)
+                .to(leadsExchange)
+                .with(REASSIGNED_ROUTING_KEY);
     }
 
     /**

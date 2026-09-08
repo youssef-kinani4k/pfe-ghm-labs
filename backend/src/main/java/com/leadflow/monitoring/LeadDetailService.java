@@ -90,8 +90,8 @@ public class LeadDetailService {
     private SyncAttemptView vue(CrmSyncAttempt tentative) {
         return new SyncAttemptView(
                 tentative.getId(), tentative.getProviderId(), tentative.getStatus(),
-                tentative.getAccountRef(), tentative.getContactRef(),
-                tentative.getOpportunityRef(), tentative.getTaskRef(),
+                tentative.getNature(), tentative.getAccountRef(), tentative.getContactRef(),
+                tentative.getOpportunityRef(), tentative.getAssigneeRef(),
                 tentative.getErrorMessage(), tentative.getAttemptedAt());
     }
 

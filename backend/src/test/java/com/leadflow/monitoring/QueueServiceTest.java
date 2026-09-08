@@ -29,13 +29,15 @@ class QueueServiceTest {
     }
 
     @Test
-    void listeLesQuatreFilesDuPipeline() {
+    void listeLesSixFilesDuPipeline() {
         QueuesView vue = service.etatDesFiles();
 
         assertThat(vue.queues()).extracting(QueueView::name).containsExactlyInAnyOrder(
                 RabbitMQConfig.LEADS_QUEUE,
                 RabbitMQConfig.QUALIFIED_QUEUE,
                 RabbitMQConfig.ROUTED_QUEUE,
+                RabbitMQConfig.REASSIGNED_QUEUE,
+                RabbitMQConfig.NOTIFY_QUEUE,
                 RabbitMQConfig.DLQ_QUEUE);
     }
 

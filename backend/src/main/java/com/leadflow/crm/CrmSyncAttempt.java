@@ -45,6 +45,10 @@ public class CrmSyncAttempt {
     @Column(name = "status", nullable = false, length = 32)
     private CrmSyncAttemptStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "nature", nullable = false, length = 20)
+    private CrmSyncAttemptNature nature = CrmSyncAttemptNature.SYNCHRONISATION;
+
     @Column(name = "account_ref", length = 64)
     private String accountRef;
 

@@ -59,6 +59,11 @@ class CrmConnectorRegistryTest {
         public CrmCheck verifieAcces(CrmTarget cible) {
             return CrmCheck.joignable(null);
         }
+
+        @Override
+        public void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible) {
+            throw new UnsupportedOperationException("Hors sujet pour ce test");
+        }
     }
 
     private static CrmProperties proprietes(boolean odooActive) {

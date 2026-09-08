@@ -62,7 +62,7 @@ public class CrmSyncService {
 
         CrmConnector connector = registry.forProvider(client.getCrmProviderId());
         CrmTarget cible = new CrmTarget(client.getCrmProviderId(), client.getCrmConfig());
-        CrmSyncState anterieur = etatAnterieur(leadId, client.getCrmProviderId());
+        CrmSyncState anterieur = etatAnterieurPour(leadId, client.getCrmProviderId());
 
         try {
             // Dans le try : resolveAssignee appelle l'ERP, et une instance injoignable doit
@@ -93,8 +93,11 @@ public class CrmSyncService {
      * Prend, champ par champ, la valeur non nulle la plus recente. On ne peut pas se
      * contenter de la derniere ligne : une tentative echouee tot n'a que le compte, alors
      * qu'une tentative plus ancienne avait deja obtenu le contact.
+     *
+     * <p>Package-private et non privee depuis F15 : {@link CrmReassignService} reconstruit le
+     * meme etat, et le dupliquer ferait diverger les deux lectures a la premiere evolution.
      */
-    private CrmSyncState etatAnterieur(UUID leadId, String providerId) {
+    CrmSyncState etatAnterieurPour(UUID leadId, String providerId) {
         List<CrmSyncAttempt> tentatives =
                 attemptRepository.findByLeadIdAndProviderIdOrderByAttemptedAtDesc(leadId, providerId);
         String compte = null;
@@ -121,8 +124,19 @@ public class CrmSyncService {
                 partiel.assigneeRef() != null ? partiel.assigneeRef() : anterieur.assigneeRef());
     }
 
-    /** Resolu une seule fois par commercial et par instance : le resultat est memorise. */
-    private String referenceDuCommercial(Lead lead, CrmConnector connector, CrmTarget cible) {
+    /**
+     * Resolu une seule fois par commercial et par instance : le resultat est memorise.
+     *
+     * <p>Package-private et non privee depuis F15, comme {@link #etatAnterieurPour} : {@link
+     * CrmReassignService} a besoin de la meme reference, et cette methode <b>ecrit</b> —
+     * {@code setCrmRef} puis {@code save}. Deux copies d'une methode a effet de bord
+     * divergeraient a la premiere evolution, et l'une des deux se mettrait a memoriser ce que
+     * l'autre reresout a chaque appel.
+     *
+     * @return {@code null} si le lead n'a pas de commercial, ou si l'ERP ne le connait pas ;
+     *     l'appelant qui doit distinguer les deux teste {@code assignedSalesRepId} lui-meme
+     */
+    String referenceDuCommercial(Lead lead, CrmConnector connector, CrmTarget cible) {
         if (lead.getAssignedSalesRepId() == null) {
             return null;
         }

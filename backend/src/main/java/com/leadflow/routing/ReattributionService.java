@@ -13,10 +13,11 @@ import org.springframework.stereotype.Service;
 /**
  * Reattribution manuelle d'un lead deja attribue.
  *
- * <p><b>Aucun message n'est publie.</b> Le tour de role n'est pas idempotent — rejouer une
- * attribution decale la rotation — et republier sur {@code lead.routed} renverrait vers
- * l'ERP un lead deja synchronise. La reattribution est une ecriture directe assumee par
- * l'operateur, tracee ; pas un rejeu de file.
+ * <p><b>Aucun message de routage n'est publie.</b> Le tour de role n'est pas idempotent —
+ * rejouer une attribution decale la rotation — et republier sur {@code lead.routed}
+ * renverrait vers l'ERP un lead deja synchronise en entier. Depuis F15, une cle distincte
+ * part en revanche : {@code lead.reassigned} ne transporte qu'un changement de responsable,
+ * et poser un responsable est idempotent.
  *
  * <p><b>Non transactionnel</b>, comme {@link LeadRoutingService} : l'ecriture porte sa
  * propre transaction ({@link RoutedLeadWriter}), et le journal la sienne. C'est ce qui
@@ -35,16 +36,19 @@ public class ReattributionService {
     private final SalesRepRepository commerciaux;
     private final RoutedLeadWriter writer;
     private final LeadActionJournal journal;
+    private final LeadReassignedPublisher publieur;
 
     public ReattributionService(
             LeadRepository leads,
             SalesRepRepository commerciaux,
             RoutedLeadWriter writer,
-            LeadActionJournal journal) {
+            LeadActionJournal journal,
+            LeadReassignedPublisher publieur) {
         this.leads = leads;
         this.commerciaux = commerciaux;
         this.writer = writer;
         this.journal = journal;
+        this.publieur = publieur;
     }
 
     public Lead reattribue(UUID leadId, UUID salesRepId, String motif, String operateur) {
@@ -86,6 +90,10 @@ public class ReattributionService {
         action.setNewSalesRepId(salesRepId);
         action.setOutcome(LeadActionOutcome.SUCCES);
         journal.enregistre(action);
+
+        // Apres le journal, jamais avant : l'ordre inverse annoncerait a l'ERP un changement
+        // dont la trace peut encore manquer.
+        publieur.publie(leadId, lead.getClientId(), ancien, salesRepId);
 
         log.info("Lead {} reattribue de {} a {} par {}", leadId, ancien, salesRepId, operateur);
         return reattribue;

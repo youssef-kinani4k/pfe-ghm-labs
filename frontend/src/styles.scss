@@ -97,6 +97,13 @@ code,
     background: var(--lf-echec-fond);
     color: var(--lf-echec);
   }
+
+  // Une annonce, pas un avertissement : reprend le jeton neutre deja utilise pour l'etat
+  // informatif ailleurs dans l'ecran (statut, chronologie), plutot qu'une nouvelle couleur.
+  &--info {
+    background: var(--lf-neutre-fond);
+    color: var(--lf-neutre);
+  }
 }
 
 // Le focus visible n'est jamais retire : c'est le seul reperage au clavier, et l'ecran se

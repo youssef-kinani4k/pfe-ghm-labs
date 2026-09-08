@@ -5,7 +5,7 @@ import { LeadApi } from '../../../../core/api/lead-api';
 import { TimelineEntry, TimelineEventType, TimelineOutcome } from '../../../../core/models/lead';
 
 /**
- * Libelle et icone de chacun des huit faits, en un seul endroit — meme parti que
+ * Libelle et icone de chacun des dix faits, en un seul endroit — meme parti que
  * `StatusBadge` : le vocabulaire d'interface ne se repete pas dans un template.
  *
  * Les icones sont des ligatures Material Symbols Outlined, police servie par l'origine :
@@ -18,6 +18,8 @@ const FAITS: Record<TimelineEventType, { libelle: string; icone: string }> = {
   ATTRIBUTION: { libelle: 'Attribution', icone: 'person_add' },
   REATTRIBUTION: { libelle: 'Reattribution', icone: 'swap_horiz' },
   SYNC_ERP: { libelle: 'Synchronisation ERP', icone: 'sync' },
+  // Corriger n'est pas synchroniser : l'icone dit la personne changee, pas le transfert.
+  REAFFECTATION_ERP: { libelle: 'Responsable corrigé', icone: 'manage_accounts' },
   NOTIFICATION: { libelle: 'Notification', icone: 'notifications' },
   MORT: { libelle: 'Message mort', icone: 'report' },
   REJEU: { libelle: 'Rejeu', icone: 'replay' },

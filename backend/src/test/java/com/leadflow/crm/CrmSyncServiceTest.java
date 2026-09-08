@@ -91,6 +91,11 @@ class CrmSyncServiceTest {
         public CrmCheck verifieAcces(CrmTarget cible) {
             return CrmCheck.joignable(null);
         }
+
+        @Override
+        public void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible) {
+            throw new UnsupportedOperationException("Hors sujet pour ce test");
+        }
     }
 
     @TestConfiguration
@@ -108,6 +113,7 @@ class CrmSyncServiceTest {
     @Autowired private LeadRepository leadRepository;
     @Autowired private RawLeadEventRepository rawLeadEventRepository;
     @Autowired private CrmSyncAttemptRepository attemptRepository;
+    @Autowired private CrmSyncTraceWriter trace;
 
     private UUID leadId;
     private UUID salesRepId;
@@ -259,5 +265,73 @@ class CrmSyncServiceTest {
         assertThat(connecteur.etatRecu.accountRef()).isEqualTo("A-1");
         assertThat(connecteur.etatRecu.contactRef()).isEqualTo("C-1");
         assertThat(connecteur.etatRecu.opportunityRef()).isNull();
+    }
+
+    @Test
+    void uneReaffectationEnEchecNeFaitPasRegresserLeStatutDuLead() {
+        UUID leadId = unLeadSynchronise();
+
+        trace.reaffectationEchouee(leadId, "dolibarr", "ERP injoignable");
+
+        assertThat(leadRepository.findById(leadId).orElseThrow().getStatus())
+                .as("une propagation ratee ne desynchronise pas le lead")
+                .isEqualTo(LeadStatus.SYNCED);
+        CrmSyncAttempt ligne = derniereTentative(leadId);
+        assertThat(ligne.getNature()).isEqualTo(CrmSyncAttemptNature.REAFFECTATION);
+        assertThat(ligne.getStatus()).isEqualTo(CrmSyncAttemptStatus.FAILED);
+        assertThat(ligne.getErrorMessage()).isEqualTo("ERP injoignable");
+    }
+
+    @Test
+    void etatAnterieurRendLeNouveauResponsableApresUneReaffectation() {
+        UUID leadId = unLeadSynchronise(); // laisse une ligne SUCCESS avec assigneeRef "7"
+
+        trace.reaffectationReussie(leadId, "dolibarr", "9");
+
+        // Le coeur de F15 : sans cette assertion, une resynchronisation ulterieure relirait
+        // "7" depuis la vieille ligne et retablirait chez l'ERP ce qu'on vient de corriger.
+        assertThat(service.etatAnterieurPour(leadId, "dolibarr").assigneeRef()).isEqualTo("9");
+    }
+
+    /**
+     * Cree un lead deja synchronise chez "dolibarr", avec une ligne SUCCESS portant
+     * assigneeRef "7" : le point de depart des tests de reaffectation, qui ne passent pas
+     * par le connecteur espion.
+     */
+    private UUID unLeadSynchronise() {
+        Client client = new Client();
+        client.setPublicKey("cle-" + UUID.randomUUID());
+        client.setName("Boutique de test");
+        client.setHmacSecret("secret");
+        client.setCrmProviderId("dolibarr");
+        client.setCrmConfig(Map.of("baseUrl", "http://erp.test", "apiKey", "cle-erp"));
+        client = clientRepository.saveAndFlush(client);
+
+        RawLeadEvent evenement = new RawLeadEvent();
+        evenement.setClientId(client.getId());
+        evenement.setSource("test");
+        evenement.setPayload(Map.of("email", "deja-synchronise@acme.test"));
+        evenement.setSignature("sig-" + UUID.randomUUID());
+        evenement.setReceivedAt(Instant.now());
+        UUID rawEventId = rawLeadEventRepository.saveAndFlush(evenement).getId();
+
+        Lead lead = new Lead();
+        lead.setClientId(client.getId());
+        lead.setRawEventId(rawEventId);
+        lead.setCompanyName("Acme");
+        lead.setFirstName("Karim");
+        lead.setLastName("Haddad");
+        lead.setEmail("deja-synchronise@acme.test");
+        lead.setScore(72);
+        lead.setStatus(LeadStatus.ROUTED);
+        UUID id = leadRepository.saveAndFlush(lead).getId();
+
+        trace.succes(id, new CrmSyncResult("dolibarr", "A-1", "C-1", "O-1", "7", null, Instant.now()));
+        return id;
+    }
+
+    /** La ligne la plus recente d'un lead, tous fournisseurs confondus. */
+    private CrmSyncAttempt derniereTentative(UUID leadId) {
+        return attemptRepository.findByLeadIdOrderByAttemptedAtDesc(leadId).getFirst();
     }
 }

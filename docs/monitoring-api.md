@@ -186,6 +186,64 @@ qualification ferait mentir la liste dès le lendemain.
 curl -s "http://localhost:8090/api/leads/6f1c..." -H "Authorization: Bearer $JETON" | jq
 ```
 
+```json
+{
+  "id": "6f1c...",
+  "createdAt": "2026-08-24T09:12:44Z",
+  "updatedAt": "2026-08-31T11:40:12Z",
+  "clientId": "b21e...",
+  "clientName": "Acme Maroc",
+  "companyName": "Acme",
+  "firstName": "Karim",
+  "lastName": "Haddad",
+  "email": "karim@acme.test",
+  "phone": "+212600000000",
+  "message": "Interesse par un devis",
+  "detectedIntent": "DEVIS",
+  "intentSource": "GEMINI",
+  "score": 72,
+  "status": "SYNCED",
+  "countryCode": "MA",
+  "sector": "industrie",
+  "salesRep": { "id": "3a90...", "fullName": "Sara Bennani", "email": "sara@acme.test", "sector": null, "zone": null, "crmRef": "4" },
+  "syncAttempts": [
+    {
+      "id": "9c02...",
+      "providerId": "dolibarr",
+      "status": "SUCCESS",
+      "nature": "SYNCHRONISATION",
+      "accountRef": "12",
+      "contactRef": "7",
+      "opportunityRef": "31",
+      "assigneeRef": "4",
+      "errorMessage": null,
+      "attemptedAt": "2026-08-24T09:12:46Z"
+    },
+    {
+      "id": "9c05...",
+      "providerId": "dolibarr",
+      "status": "SUCCESS",
+      "nature": "REAFFECTATION",
+      "accountRef": "12",
+      "contactRef": "7",
+      "opportunityRef": "31",
+      "assigneeRef": "9",
+      "errorMessage": null,
+      "attemptedAt": "2026-08-31T11:40:14Z"
+    }
+  ],
+  "rawEvent": { "...": "voir la charge utile brute plus haut" },
+  "chaud": true
+}
+```
+
+**Depuis F15, chaque ligne de `syncAttempts` porte `nature`** (`SYNCHRONISATION` ou
+`REAFFECTATION`) **et `assigneeRef`** : une correction de responsable écrit une ligne de plus
+sans toucher aux autres références, et `nature` dit laquelle des deux raisons a produit la
+ligne. `taskRef` n'y figure plus — la colonne existe depuis `V2` mais aucun adaptateur ne l'a
+jamais remplie, et l'écran affichait « tâche — » sur chaque tentative de chaque lead depuis
+F5 tout en taisant `assigneeRef`, la seule référence qui ait bougé depuis.
+
 Un identifiant inconnu rend `404` en `ProblemDetail` (RFC 7807).
 
 ### Chronologie d'un lead
@@ -201,9 +259,10 @@ tables : `raw_lead_event` (la capture), `lead` (la qualification et l'attributio
 table d'événements.
 
 Chaque entrée porte quatre champs — `type` parmi `CAPTURE`, `QUALIFICATION`, `ATTRIBUTION`,
-`REATTRIBUTION`, `SYNC_ERP`, `NOTIFICATION`, `MORT`, `REJEU`, `ECART` ; `at` ; `outcome` parmi `SUCCES`,
-`ECHEC`, `NEUTRE` ; et un `details` de chaînes. **Aucune phrase n'est composée côté serveur** :
-l'API rend des faits typés, le dashboard les met en français.
+`REATTRIBUTION`, `SYNC_ERP`, `REAFFECTATION_ERP`, `NOTIFICATION`, `MORT`, `REJEU`, `ECART` ;
+`at` ; `outcome` parmi `SUCCES`, `ECHEC`, `NEUTRE` ; et un `details` de chaînes. **Aucune
+phrase n'est composée côté serveur** : l'API rend des faits typés, le dashboard les met en
+français.
 
 **Les commerciaux sont nommes, pas identifies.** `commercial`, `ancienCommercial` et
 `nouveauCommercial` portent le nom complet : c'est un fait au meme titre que l'identifiant, et
@@ -228,6 +287,14 @@ l'historique de ses notifications.
 **`ECART` n'est pas un `REJEU`.** Les deux suivent la même mort, mais l'un abandonne le
 message et l'autre le republie : les confondre annoncerait un traitement là où il y a eu
 renoncement.
+
+**Depuis F15, `REAFFECTATION_ERP` distingue trois cas sur la même colonne `outcome`.** Une
+ligne `SUCCES` sans détail `raison` est une correction de responsable réussie chez l'ERP.
+Une ligne `SUCCES` **avec** un détail `raison` est une propagation restée sans effet — un
+lead jamais synchronisé, sans commercial, ou un commercial que l'ERP ne connaît pas : rien
+ne s'est cassé, il n'y avait simplement rien à corriger, et aucune de ces trois causes ne
+part en DLQ. Une ligne `ECHEC` est le seul vrai échec technique, celui d'un ERP injoignable
+au moment de l'appel, avec l'erreur dans son détail `erreur`.
 
 **Un rejeu n'apparaît qu'une fois.** Il est lisible à deux endroits — `dead_letter.replayed_at`
 et la ligne `lead_action` qui porte son motif — et le service exclut la mort dont une action
@@ -301,6 +368,12 @@ curl -s "http://localhost:8090/api/leads/6f1c.../timeline" -H "Authorization: Be
       "ancienCommercial": "Karim Haddad",
       "nouveauCommercial": "Amina Bensalem"
     }
+  },
+  {
+    "type": "REAFFECTATION_ERP",
+    "at": "2026-08-31T11:40:14.552Z",
+    "outcome": "SUCCES",
+    "details": { "connecteur": "dolibarr", "responsable": "9" }
   }
 ]
 ```
@@ -336,11 +409,16 @@ Ce que le geste fait, et surtout ce qu'il ne fait pas :
 - il pose le nouveau commercial et écrit une ligne `lead_action` avec son motif ;
 - il **ne change ni le statut ni `routed_at`** — un lead `SYNCED` réattribué reste `SYNCED`,
   et la date de sa première attribution reste vraie ;
-- il **ne publie aucun message** : le tour de rôle n'est pas idempotent, et republier sur
-  `lead.routed` renverrait vers l'ERP un lead déjà synchronisé ;
-- il **ne touche pas l'ERP**. Chez Dolibarr ou Odoo, le lead garde son ancien responsable. Le
-  dashboard avertit l'opérateur quand le lead est `SYNCED` ; un client qui appelle l'API
-  directement doit le savoir.
+- il **ne publie aucun message de routage** : le tour de rôle n'est pas idempotent, et
+  republier sur `lead.routed` renverrait vers l'ERP un lead déjà synchronisé en entier ;
+- **depuis F15, il propage en revanche le seul responsable vers l'ERP**, de façon
+  asynchrone : une ligne `lead.reassigned` part après le journal, et une file dédiée
+  corrige `assigneeRef` chez Dolibarr ou Odoo sans rien recréer. Sur un lead `SYNCED`, le
+  dashboard annonce cette transmission ; sur un lead resté `ROUTED`, il ne promet rien,
+  l'ERP n'ayant encore rien à corriger. Un lead jamais synchronisé, sans commercial, ou un
+  commercial que l'ERP ne connaît pas n'écrit qu'une trace neutre, sans repartir en DLQ ;
+  seul un ERP injoignable au moment de l'appel y part, et le rejeu répare une fois l'ERP
+  relevé ;
 - il **déplace le tour de rôle** en revanche, puisque celui-ci se lit dans `lead` : le nouveau
   titulaire vient d'être servi et passera en dernier.
 

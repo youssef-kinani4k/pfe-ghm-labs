@@ -62,4 +62,27 @@ public interface CrmConnector {
      * faite a l'ecran de creation.
      */
     CrmCheck verifieAcces(CrmTarget cible);
+
+    /**
+     * Corrige le responsable d'un lead deja present dans l'ERP.
+     *
+     * <p><b>Obligatoire, sans implementation par defaut</b>, comme {@link #verifieAcces} :
+     * un {@code default} qui ne ferait rien laisserait un futur adaptateur degrader en
+     * silence une promesse faite a l'ecran de reattribution. Un ERP incapable de reaffecter
+     * doit le declarer en levant, pas l'omettre.
+     *
+     * <p>Ne recoit pas de {@link com.leadflow.crm.model.CrmLead} : la reaffectation ne
+     * touche aucune donnee du prospect, et passer le lead entier inviterait un adaptateur a
+     * en profiter pour mettre autre chose a jour.
+     *
+     * <p>Ne rend rien : le nouveau {@code assigneeRef} est celui qu'on vient de passer, il
+     * n'y a rien a apprendre de l'ERP.
+     *
+     * @param references ce que l'ERP connait deja de ce lead ; l'adaptateur y prend la
+     *     reference a laquelle il rattache le responsable — l'opportunite pour les deux
+     *     adaptateurs actuels, mais rien ne l'impose
+     * @throws com.leadflow.crm.model.CrmSyncException si l'ERP refuse, est injoignable, ou
+     *     si {@code references} ne porte pas ce dont l'adaptateur a besoin
+     */
+    void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible);
 }

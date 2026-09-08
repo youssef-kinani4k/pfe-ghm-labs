@@ -141,4 +141,36 @@ class CrmSyncAttemptPersistenceTest {
                 .extracting(CrmSyncAttempt::getAssigneeRef)
                 .isEqualTo("44");
     }
+
+    @Test
+    void uneTentativeEstUneSynchronisationParDefaut() {
+        UUID leadId = leadEnregistre("cle-sync-5");
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("dolibarr");
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setNature(CrmSyncAttemptNature.SYNCHRONISATION);
+        tentative.setAttemptedAt(Instant.now());
+
+        CrmSyncAttempt relue = attemptRepository.saveAndFlush(tentative);
+
+        assertThat(relue.getNature()).isEqualTo(CrmSyncAttemptNature.SYNCHRONISATION);
+    }
+
+    @Test
+    void uneReaffectationSeRelitCommeTelle() {
+        UUID leadId = leadEnregistre("cle-sync-6");
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("odoo");
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setNature(CrmSyncAttemptNature.REAFFECTATION);
+        tentative.setAssigneeRef("12");
+        tentative.setAttemptedAt(Instant.now());
+
+        CrmSyncAttempt relue = attemptRepository.saveAndFlush(tentative);
+
+        assertThat(relue.getNature()).isEqualTo(CrmSyncAttemptNature.REAFFECTATION);
+        assertThat(relue.getAssigneeRef()).isEqualTo("12");
+    }
 }

@@ -126,6 +126,67 @@ class OdooClientTest {
     }
 
     @Test
+    void ecritEnvoieUnWriteAvecIdentifiantEtChamps() {
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andExpect(method(HttpMethod.POST))
+                // Le corps exact, pas seulement le code retour : c'est la forme de l'appel
+                // qui casse quand Odoo change, et un 200 ne l'aurait pas vue.
+                .andExpect(jsonPath("$.params.method").value("execute_kw"))
+                .andExpect(jsonPath("$.params.args[3]").value("crm.lead"))
+                .andExpect(jsonPath("$.params.args[4]").value("write"))
+                // Les deux arguments positionnels de write() — la liste d'identifiants, puis
+                // la carte des champs — doivent tenir TOUS DEUX dans args[5] : c'est la forme
+                // que execute_kw etale correctement. Une carte des champs en args[6], comme
+                // avant ce correctif, decrit le defaut observe contre une vraie instance Odoo
+                // (« write() got an unexpected keyword argument »).
+                .andExpect(jsonPath("$.params.args[5][0][0]").value(31))
+                .andExpect(jsonPath("$.params.args[5][1].user_id").value("9"))
+                .andRespond(withSuccess("{\"result\": true}", MediaType.APPLICATION_JSON));
+
+        client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9"));
+
+        serveur.verify();
+    }
+
+    @Test
+    void ecritRefuseUnResultatQuiNestPasVrai() {
+        // Odoo repond 200 meme en cas de refus : l'echec vit dans le corps. Un « false »
+        // avale silencieusement ferait croire a une correction qui n'a pas eu lieu.
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andRespond(withSuccess("{\"result\": false}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("crm.lead.write");
+    }
+
+    @Test
+    void ecritRefuseUneReponseSansResultat() {
+        // Reponse tronquee ou proxy intercale : ni result, ni error. Meme chemin que le
+        // « false » ci-dessus, mais cree() a son propre test dedie a ce cas
+        // (refuseUneCreationSansIdentifiant) : l'asymetrie n'a pas de raison d'etre.
+        serveur.expect(requestTo("http://odoo.test/jsonrpc"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "31", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("crm.lead.write");
+    }
+
+    @Test
+    void ecritRefuseUnIdentifiantIllisibleSansAppelHttp() {
+        // Aucun serveur.expect(...) n'est pose : le controle du format de l'identifiant se
+        // fait avant l'envoi. Si ecrit(...) tentait malgre tout une requete, elle serait
+        // rejetee comme non attendue par MockRestServiceServer, et l'assertion ci-dessous
+        // echouerait sur le mauvais type d'exception plutot que de passer silencieusement.
+        assertThatThrownBy(() -> client.ecrit(CIBLE, 2, "crm.lead", "abc", Map.of("user_id", "9")))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("abc");
+
+        serveur.verify();
+    }
+
+    @Test
     void refuseUneCibleIncomplete() {
         CrmTarget sansBase = new CrmTarget("odoo", Map.of("baseUrl", "http://odoo.test"));
 

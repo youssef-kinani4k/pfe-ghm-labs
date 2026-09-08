@@ -3,6 +3,7 @@ package com.leadflow.monitoring;
 import com.leadflow.config.CrmProperties;
 import com.leadflow.crm.CrmConnector;
 import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptNature;
 import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.monitoring.dto.ConnectorClientActivity;
 import com.leadflow.monitoring.dto.ConnectorView;
@@ -110,8 +111,10 @@ public class ConnectorHealthService {
 
     private String dernierMessageDEchec(String providerId) {
         return activite
-                .findTop1ByProviderIdAndStatusOrderByAttemptedAtDesc(
-                        providerId, CrmSyncAttemptStatus.FAILED)
+                .findTop1ByProviderIdAndStatusAndNatureOrderByAttemptedAtDesc(
+                        providerId,
+                        CrmSyncAttemptStatus.FAILED,
+                        CrmSyncAttemptNature.SYNCHRONISATION)
                 .stream()
                 .findFirst()
                 .map(CrmSyncAttempt::getErrorMessage)

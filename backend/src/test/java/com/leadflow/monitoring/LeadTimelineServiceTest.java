@@ -8,6 +8,7 @@ import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.common.RessourceIntrouvableException;
 import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptNature;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.monitoring.deadletter.DeadLetter;
@@ -585,6 +586,57 @@ class LeadTimelineServiceTest {
 
         assertThat(entrees.stream().filter(e -> e.type() == TimelineEventType.REJEU))
                 .hasSize(1);
+    }
+
+    @Test
+    void uneReaffectationApparaitCommeTelleEtNonCommeUneSynchronisation() {
+        UUID leadId = leadAvec(
+                base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.MINUTES),
+                LeadStatus.SYNCED);
+
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("dolibarr");
+        tentative.setNature(CrmSyncAttemptNature.REAFFECTATION);
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setAssigneeRef("9");
+        tentative.setAttemptedAt(base.plus(5, ChronoUnit.MINUTES));
+        tentatives.saveAndFlush(tentative);
+
+        List<TimelineEntry> chronologie = service.timeline(leadId);
+
+        TimelineEntry entree = chronologie.stream()
+                .filter(e -> e.type() == TimelineEventType.REAFFECTATION_ERP)
+                .findFirst()
+                .orElseThrow();
+        assertThat(entree.outcome()).isEqualTo(TimelineOutcome.SUCCES);
+        assertThat(entree.details()).containsEntry("responsable", "9");
+    }
+
+    @Test
+    void uneReaffectationSansEffetSeLitDansSaRaison() {
+        UUID leadId = leadAvec(
+                base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.MINUTES),
+                LeadStatus.SYNCED);
+
+        CrmSyncAttempt tentative = new CrmSyncAttempt();
+        tentative.setLeadId(leadId);
+        tentative.setProviderId("dolibarr");
+        tentative.setNature(CrmSyncAttemptNature.REAFFECTATION);
+        tentative.setStatus(CrmSyncAttemptStatus.SUCCESS);
+        tentative.setErrorMessage("Commercial inconnu de l ERP : rien a poser");
+        tentative.setAttemptedAt(base.plus(5, ChronoUnit.MINUTES));
+        tentatives.saveAndFlush(tentative);
+
+        // La ligne repond a « pourquoi l'ERP n'a-t-il pas ete corrige ? », comme IGNOREE
+        // repond a « pourquoi n'ai-je pas ete prevenu ? ».
+        TimelineEntry entree = service.timeline(leadId).stream()
+                .filter(e -> e.type() == TimelineEventType.REAFFECTATION_ERP)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(entree.details())
+                .containsEntry("raison", "Commercial inconnu de l ERP : rien a poser");
     }
 
     @Test

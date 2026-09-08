@@ -72,6 +72,46 @@ public class OdooClient {
     }
 
     /**
+     * Met a jour un enregistrement existant. Symetrique de {@link #cree} : meme transport,
+     * meme authentification, meme lecture du corps.
+     *
+     * <p>L'identifiant voyage en {@code String} comme partout dans le pivot, et redevient un
+     * entier ici : Odoo n'accepte pas une chaine dans la liste d'identifiants d'un
+     * {@code write}, et c'est exactement le genre de traduction qui appartient a
+     * l'adaptateur.
+     *
+     * <p>Odoo rend {@code true} sur un write accepte. Tout le reste est un echec, y compris
+     * le {@code false} d'un appel refuse et l'absence de {@code result} d'une reponse
+     * tronquee — sans ce controle, une correction jamais appliquee passerait pour un succes.
+     */
+    public void ecrit(
+            CrmTarget target, int uid, String modele, String identifiant,
+            Map<String, Object> champs) {
+        long id;
+        try {
+            id = Long.parseLong(identifiant);
+        } catch (NumberFormatException erreur) {
+            throw new CrmSyncException(
+                    PROVIDER_ID, "Reference Odoo illisible sur " + modele + " : " + identifiant,
+                    erreur);
+        }
+        // execute_kw etale sa liste d'arguments dans le tableau d'appel : pour que Odoo lise
+        // les identifiants et les champs comme les deux arguments positionnels de write(),
+        // il faut lui passer une liste d'UN SEUL element, cet element etant lui-meme la paire
+        // [identifiants, champs]. Passer List.of(List.of(id), champs) etale les deux au lieu
+        // d'un seul, et Odoo lit alors la carte des champs comme des arguments nommes — c'est
+        // exactement le defaut observe contre une vraie instance (« write() got an unexpected
+        // keyword argument »).
+        Map<String, Object> reponse = executeKw(
+                target, uid, modele, "write", List.of(List.of(List.of(id), champs)));
+        Object resultat = resultat(reponse, modele + ".write");
+        if (!Boolean.TRUE.equals(resultat)) {
+            throw new CrmSyncException(
+                    PROVIDER_ID, "Odoo a refuse " + modele + ".write sur " + identifiant, null);
+        }
+    }
+
+    /**
      * @return l'identifiant de l'utilisateur, ou {@code null} si Odoo n'en connait aucun.
      *     La recherche porte sur {@code login} OU {@code email} : {@code res.users} expose
      *     les deux, et un commercial identifie par son courriel echapperait a une recherche

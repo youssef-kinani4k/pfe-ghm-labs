@@ -2,13 +2,14 @@
 
 <mat-dialog-content class="reattribution">
   @if (avertitSurERP()) {
-    <!-- L'icone double le mot et la couleur ne porte jamais seule l'information : cet
-         avertissement doit rester lisible sur un ecran imprime en noir et blanc. -->
-    <p class="lf-bandeau lf-bandeau--attente">
-      <mat-icon aria-hidden="true">warning</mat-icon>
+    <!-- L'icone double le mot et la couleur ne porte jamais seule l'information : ce
+         message doit rester lisible sur un ecran imprime en noir et blanc. C'est une
+         annonce et non un avertissement : lf-bandeau--info, au ton neutre. -->
+    <p class="lf-bandeau lf-bandeau--info">
+      <mat-icon aria-hidden="true">info</mat-icon>
       <span>
-        Ce lead est déjà synchronisé. L'ERP conservera l'ancien responsable : seul LeadFlow est
-        corrigé.
+        Ce lead est déjà synchronisé : la correction sera transmise à l'ERP dans la foulée. En cas
+        d'échec, elle apparaîtra dans le journal des messages morts.
       </span>
     </p>
   }

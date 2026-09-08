@@ -7,6 +7,7 @@ import com.leadflow.capture.RawLeadEvent;
 import com.leadflow.capture.RawLeadEventRepository;
 import com.leadflow.capture.RawLeadEventStatus;
 import com.leadflow.crm.CrmSyncAttempt;
+import com.leadflow.crm.CrmSyncAttemptNature;
 import com.leadflow.crm.CrmSyncAttemptRepository;
 import com.leadflow.crm.CrmSyncAttemptStatus;
 import com.leadflow.qualification.IntentSource;
@@ -181,6 +182,43 @@ class SeriesRepositoryTest {
 
     @Test
     @Transactional
+    void ignoreLesLignesDeReaffectation() {
+        // F15 : status = 'SUCCESS' ne designe plus une synchronisation a lui seul. La
+        // propagation d'une reattribution ecrit elle aussi des lignes SUCCESS, y compris
+        // « sans effet » pour un lead que l'ERP n'a jamais recu. Sans le filtre sur la
+        // nature, ce lead-la entrerait dans la mediane alors que rien n'est jamais parti.
+        Client boutique = boutique("reaffectation");
+        Instant capture = instantParisien(2026, 3, 2, 10);
+
+        Lead jamaisPousse = lead(boutique, capture, IntentSource.RULES);
+        tentative(
+                jamaisPousse,
+                capture.plusSeconds(60),
+                CrmSyncAttemptStatus.SUCCESS,
+                CrmSyncAttemptNature.REAFFECTATION);
+
+        assertThat(series.delaisParJour(
+                        boutique.getId().toString(), capture.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
+                .isEmpty();
+
+        // Et sur un lead reellement synchronise, une reaffectation tardive ne deplace pas
+        // le delai : elle n'est pas une synchronisation plus lente, elle n'en est pas une.
+        Lead pousse = lead(boutique, capture, IntentSource.RULES);
+        tentative(pousse, capture.plusSeconds(120), CrmSyncAttemptStatus.SUCCESS);
+        tentative(
+                pousse,
+                capture.plusSeconds(3 * 86_400),
+                CrmSyncAttemptStatus.SUCCESS,
+                CrmSyncAttemptNature.REAFFECTATION);
+
+        assertThat(series.delaisParJour(
+                        boutique.getId().toString(), capture.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
+                .singleElement()
+                .satisfies(p -> assertThat(p.getMedianeSecondes()).isEqualTo(120.0d));
+    }
+
+    @Test
+    @Transactional
     void separeLaMedianeDuP95() {
         Client boutique = boutique("percentiles");
         Instant jour = instantParisien(2026, 3, 2, 10);
@@ -301,10 +339,16 @@ class SeriesRepositoryTest {
     }
 
     private void tentative(Lead lead, Instant quand, CrmSyncAttemptStatus statut) {
+        tentative(lead, quand, statut, CrmSyncAttemptNature.SYNCHRONISATION);
+    }
+
+    private void tentative(
+            Lead lead, Instant quand, CrmSyncAttemptStatus statut, CrmSyncAttemptNature nature) {
         CrmSyncAttempt a = new CrmSyncAttempt();
         a.setLeadId(lead.getId());
         a.setProviderId("dolibarr");
         a.setStatus(statut);
+        a.setNature(nature);
         a.setAttemptedAt(quand);
         tentatives.save(a);
     }

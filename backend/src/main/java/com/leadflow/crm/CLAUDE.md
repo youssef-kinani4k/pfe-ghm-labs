@@ -7,7 +7,7 @@ engage tout le projet et pas seulement ce repertoire.
 
 ```
 crm/
-├── CrmConnector.java          port : providerId(), sync(...), resolveAssignee, reglagesAttendus, verifieAcces
+├── CrmConnector.java          port : providerId(), sync(...), resolveAssignee, reglagesAttendus, verifieAcces, reaffecte
 ├── CrmConnectorRegistry.java  resout l'adaptateur par providerId, applique `enabled`
 ├── CrmSyncService.java        orchestration : cible, etat anterieur, trace
 ├── CrmSyncTraceWriter.java    ecriture de la trace en transaction propre
@@ -68,6 +68,26 @@ porte cette quatrieme reference au meme titre que les trois autres, l'attributio
 etape a part entiere tentee tant qu'elle n'est pas deja faite, et le rejeu repare. Une carte
 de references par etape, plutot qu'un quatrieme champ, ne redeviendra la bonne reponse que
 si un ERP apporte un jour une cinquieme etape.
+
+**Le port porte une troisieme methode obligatoire depuis F15.** `reaffecte(references,
+assigneeRef, cible)` corrige le responsable d'un lead deja present dans l'ERP, sans rien
+creer. Sans `default`, pour la meme raison que `verifieAcces` : un ERP incapable de
+reaffecter doit le declarer en levant, pas l'omettre. Dolibarr y rattache le responsable au
+projet par `lieResponsable`, Odoo y ecrit `user_id` sur le `crm.lead` — la divergence se
+resout dans l'adaptateur, comme celle du Tiers et du Contact.
+
+**Cette divergence va plus loin qu'un nom de champ : Dolibarr demande deux appels la ou Odoo
+n'en demande qu'un.** `lieResponsable` *ajoute* un contact au projet et n'en retire aucun, si
+bien qu'une reaffectation laissait la fiche avec deux `PROJECTLEADER`, dont un etranger au
+lead — la recette de F15 l'a observe sur une vraie instance. `reaffecte` pose donc le nouveau
+lien **puis** retire l'ancien par `retireResponsable`, dans cet ordre : une panne entre les
+deux laisse le bon responsable en place, l'ordre inverse pourrait laisser le projet sans chef.
+Le `write` d'Odoo sur `user_id` remplacant la valeur, l'adaptateur Odoo n'a rien de tout cela.
+Les deux idempotences ne sont pas de meme nature non plus, et le rejeu s'appuie sur les deux :
+reposer un lien present rend un `500` que `lieResponsable` absorbe, retirer un lien absent rend
+`200` sans rien faire. Le retrait est enfin saute quand l'ancien responsable est absent — rien
+a defaire — ou confondu avec le nouveau, ce qui est la signature d'un rejeu et non d'un
+changement.
 
 Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
 `docs/erp-integration-setup.md`.
