@@ -31,6 +31,8 @@ class DolibarrConnectorTest {
         private String responsableLie;
         private String responsableRetire;
         private String refCherchee;
+        private String emailTiersCherche;
+        private String tiersExistant;
         private String opportuniteExistante;
         private boolean echoueSurOpportunite;
         private boolean echoueSurResponsable;
@@ -44,6 +46,13 @@ class DolibarrConnectorTest {
             appels.add("tiers");
             corpsTiers = corps;
             return "42";
+        }
+
+        @Override
+        public String chercheTiersParEmail(CrmTarget target, String email) {
+            appels.add("recherche-tiers");
+            emailTiersCherche = email;
+            return tiersExistant;
         }
 
         @Override
@@ -115,7 +124,9 @@ class DolibarrConnectorTest {
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
         assertThat(transport.appels)
-                .containsExactly("tiers", "contact", "recherche", "opportunite", "responsable");
+                .containsExactly(
+                        "recherche-tiers", "tiers", "contact", "recherche", "opportunite",
+                        "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
         assertThat(resultat.opportunityRef()).isEqualTo("99");
@@ -158,9 +169,38 @@ class DolibarrConnectorTest {
 
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
-        assertThat(transport.appels).containsExactly("tiers", "contact", "recherche", "responsable");
+        assertThat(transport.appels)
+                .containsExactly("recherche-tiers", "tiers", "contact", "recherche", "responsable");
         assertThat(resultat.opportunityRef()).isEqualTo("42");
         assertThat(resultat.assigneeRef()).isEqualTo("9");
+    }
+
+    /**
+     * Le tiers se cherche par courriel avant d'etre cree, comme l'opportunite se cherche par
+     * sa {@code ref}. Sans cette recherche, un prospect qui revient par un second formulaire
+     * ouvrait un doublon de tiers chez Dolibarr, et un rejeu apres une reponse perdue en
+     * ouvrait un troisieme — la seule etape de {@code sync} qui n'etait protegee ni par une
+     * reference stable ni par la deduplication de l'ERP.
+     */
+    @Test
+    void chercheLeTiersParCourrielAvantDenCreerUn() {
+        connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.emailTiersCherche).isEqualTo("amina@acme.test");
+        assertThat(transport.appels).startsWith("recherche-tiers", "tiers");
+    }
+
+    @Test
+    void adopteLeTiersExistantAuLieuDenCreerUnSecond() {
+        transport.tiersExistant = "58";
+
+        CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.appels).doesNotContain("tiers");
+        assertThat(resultat.accountRef()).isEqualTo("58");
+        // Le contact et l'opportunite se rattachent au tiers trouve, pas a un tiers neuf.
+        assertThat(transport.corpsContact).containsEntry("socid", "58");
+        assertThat(transport.corpsOpportunite).containsEntry("socid", "58");
     }
 
     @Test

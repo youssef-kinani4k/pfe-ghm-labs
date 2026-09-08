@@ -73,6 +73,37 @@ class DolibarrClientTest {
     }
 
     @Test
+    void chercheUnTiersParEmail() {
+        serveur.expect(requestTo(Matchers.containsString("/thirdparties")))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(requestTo(Matchers.containsString("sqlfilters")))
+                .andRespond(withSuccess("[{\"id\":58}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheTiersParEmail(CIBLE, "amina@acme.test")).isEqualTo("58");
+        serveur.verify();
+    }
+
+    @Test
+    void renvoieNulQuandAucunTiersNePorteLEmail() {
+        serveur.expect(requestTo(Matchers.containsString("/thirdparties")))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheTiersParEmail(CIBLE, "inconnu@acme.test")).isNull();
+    }
+
+    /**
+     * Dolibarr repond {@code 404} sur une liste de tiers sans resultat, la ou d'autres
+     * versions rendent un tableau vide. Les deux sont une absence, pas une panne.
+     */
+    @Test
+    void traiteUn404DeRechercheDeTiersCommeUneAbsence() {
+        serveur.expect(requestTo(Matchers.containsString("/thirdparties")))
+                .andRespond(withResourceNotFound().body("{\"error\":{\"message\":\"Not Found\"}}"));
+
+        assertThat(client.chercheTiersParEmail(CIBLE, "inconnu@acme.test")).isNull();
+    }
+
+    @Test
     void chercheUneOpportuniteParSaReference() {
         serveur.expect(requestTo(Matchers.containsString("/projects")))
                 .andExpect(method(HttpMethod.GET))

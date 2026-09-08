@@ -58,6 +58,45 @@ public class DolibarrClient {
     }
 
     /**
+     * Cherche un tiers par son courriel.
+     *
+     * <p>Pendant de {@link #chercheOpportuniteParRef} pour la premiere etape de la
+     * synchronisation, et pour la meme raison : rendre le geste sur. Le tiers etait la seule
+     * etape que rien ne protegeait — l'opportunite l'est par sa {@code ref} stable, le contact
+     * par la deduplication que Dolibarr applique lui-meme sur le courriel — si bien qu'un
+     * prospect revenant par un second formulaire ouvrait un doublon de tiers, et qu'un rejeu
+     * apres une reponse perdue en ouvrait un troisieme.
+     *
+     * <p>Le filtre {@code sqlfilters} est construit par concatenation, comme ailleurs dans
+     * cette classe : les apostrophes sont retirees plutot qu'echappees. Le courriel a
+     * traverse la normalisation de la qualification, qui est ce qui rend ce traitement
+     * suffisant.
+     *
+     * @return l'identifiant du tiers, ou {@code null} si l'ERP n'en connait aucun
+     */
+    @SuppressWarnings("unchecked")
+    public String chercheTiersParEmail(CrmTarget target, String email) {
+        String filtre = "(t.email:=:'" + email.replace("'", "") + "')";
+        try {
+            List<Map<String, Object>> reponse = restClient(target)
+                    .get()
+                    .uri(uri -> uri.path("/thirdparties").queryParam("sqlfilters", filtre).build())
+                    .retrieve()
+                    .body(List.class);
+            if (reponse == null || reponse.isEmpty()) {
+                return null;
+            }
+            Object id = reponse.getFirst().get("id");
+            return id == null ? null : String.valueOf(id);
+        } catch (HttpClientErrorException.NotFound absent) {
+            // Dolibarr rend 404 sur une liste vide de tiers : c'est une absence, pas une panne.
+            return null;
+        } catch (RestClientException e) {
+            throw echec("/thirdparties", e);
+        }
+    }
+
+    /**
      * Cherche une opportunite par sa {@code ref}.
      *
      * <p>Existe pour rendre le rejeu inoffensif : la {@code ref} etant desormais derivee du

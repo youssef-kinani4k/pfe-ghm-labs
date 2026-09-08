@@ -79,6 +79,13 @@ public class DolibarrConnector implements CrmConnector {
         String responsable = previous.assigneeRef();
         try {
             if (compte == null) {
+                // Meme raison que pour l'opportunite plus bas : on demande d'abord a l'ERP
+                // s'il connait deja ce courriel. Sans cette recherche, un prospect qui revient
+                // par un second formulaire ouvre un doublon de tiers, et un rejeu apres une
+                // reponse perdue en ouvre un troisieme.
+                compte = client.chercheTiersParEmail(target, lead.email());
+            }
+            if (compte == null) {
                 compte = client.creeTiers(target, corpsTiers(lead));
             }
             if (contact == null) {
