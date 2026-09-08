@@ -76,6 +76,19 @@ reaffecter doit le declarer en levant, pas l'omettre. Dolibarr y rattache le res
 projet par `lieResponsable`, Odoo y ecrit `user_id` sur le `crm.lead` — la divergence se
 resout dans l'adaptateur, comme celle du Tiers et du Contact.
 
+**Cette divergence va plus loin qu'un nom de champ : Dolibarr demande deux appels la ou Odoo
+n'en demande qu'un.** `lieResponsable` *ajoute* un contact au projet et n'en retire aucun, si
+bien qu'une reaffectation laissait la fiche avec deux `PROJECTLEADER`, dont un etranger au
+lead — la recette de F15 l'a observe sur une vraie instance. `reaffecte` pose donc le nouveau
+lien **puis** retire l'ancien par `retireResponsable`, dans cet ordre : une panne entre les
+deux laisse le bon responsable en place, l'ordre inverse pourrait laisser le projet sans chef.
+Le `write` d'Odoo sur `user_id` remplacant la valeur, l'adaptateur Odoo n'a rien de tout cela.
+Les deux idempotences ne sont pas de meme nature non plus, et le rejeu s'appuie sur les deux :
+reposer un lien present rend un `500` que `lieResponsable` absorbe, retirer un lien absent rend
+`200` sans rien faire. Le retrait est enfin saute quand l'ancien responsable est absent — rien
+a defaire — ou confondu avec le nouveau, ce qui est la signature d'un rejeu et non d'un
+changement.
+
 Les cles attendues dans `crm_config` pour chaque fournisseur sont documentees dans
 `docs/erp-integration-setup.md`.
 

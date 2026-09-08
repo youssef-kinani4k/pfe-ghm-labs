@@ -912,8 +912,11 @@ Ce qui n'existe pas :
   qualifies. Le badge se deplace, le score non — c'est voulu, mais cela surprend.
 - **La propagation d'une reattribution ne corrige que le responsable** : `reaffecte` ne
   touche ni le compte, ni le contact, ni l'opportunite deja crees chez l'ERP — seule
-  l'affectation change, comme cote LeadFlow. Une carte de references plus riche redeviendrait
-  la bonne reponse si un ERP apportait un jour une cinquieme etape de synchronisation.
+  l'affectation change, comme cote LeadFlow. Elle la corrige en revanche entierement : cote
+  Dolibarr, le nouveau chef de projet est ajoute **et l'ancien retire**, sans quoi la fiche
+  porterait deux responsables et l'ambiguite que la feature devait lever aurait seulement
+  change de place. Une carte de references plus riche redeviendrait la bonne reponse si un ERP
+  apportait un jour une cinquieme etape de synchronisation.
 - **Rien ne rattrape retroactivement les leads reattribues avant F15** : la propagation ne
   vaut que pour les reattributions posterieures a la migration. Un lead deja corrige dans
   LeadFlow avant F15 garde son ancien responsable chez l'ERP, sans qu'aucun rejeu ne le

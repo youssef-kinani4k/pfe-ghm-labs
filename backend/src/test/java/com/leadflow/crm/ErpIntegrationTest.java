@@ -10,6 +10,7 @@ import com.leadflow.crm.model.CrmSyncState;
 import com.leadflow.crm.model.CrmTarget;
 import com.leadflow.crm.odoo.OdooClient;
 import com.leadflow.crm.odoo.OdooConnector;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -81,10 +82,18 @@ class ErpIntegrationTest {
     }
 
     /**
-     * Le seul endroit qui eprouve la fenetre residuelle documentee dans le Javadoc de
-     * {@link DolibarrConnector#reaffecte} : un {@code lieResponsable} rejoue sur un
-     * responsable deja lie. Ici il n'est rejoue qu'une fois, avec un utilisateur different
-     * du premier — le cas normal d'une reattribution, pas le doublon documente.
+     * Eprouve la promesse entiere de la propagation cote Dolibarr : apres une reaffectation,
+     * l'opportunite doit porter le <strong>nouveau</strong> responsable et lui seul.
+     *
+     * <p>Ce test lit les contacts du projet par un appel direct, sans passer par
+     * {@link DolibarrClient} qui n'expose aucune lecture de ce genre. C est delibere : la
+     * recette de F15 a montre qu'un test qui se contente de verifier l'absence d'exception ne
+     * voit pas un ancien responsable reste en place, et c'est precisement le defaut qui avait
+     * echappe a tout le monde.
+     *
+     * <p>Il couvre aussi les deux idempotences, qui ne sont pas de meme nature : la pose d'un
+     * lien deja present rend un {@code 500} que {@code lieResponsable} absorbe, tandis que le
+     * retrait d'un lien deja absent rend {@code 200} sans rien faire.
      */
     @Test
     @EnabledIfEnvironmentVariable(named = "LEADFLOW_DOLIBARR_API_KEY", matches = ".+")
@@ -92,17 +101,45 @@ class ErpIntegrationTest {
         DolibarrConnector connecteur =
                 new DolibarrConnector(new DolibarrClient(RestClient.builder()));
         CrmTarget cible = cibleDolibarr();
-        CrmSyncResult synchronise = connecteur.sync(leadUnique(), cible, CrmSyncState.VIERGE);
-        assertThat(synchronise.opportunityRef()).isNotBlank();
+        CrmLead lead = leadUnique();
+        CrmSyncResult synchronise = connecteur.sync(
+                new CrmLead(lead.reference(), lead.companyName(), lead.firstName(),
+                        lead.lastName(), lead.email(), lead.phone(), lead.message(),
+                        lead.detectedIntent(), lead.score(), lead.countryCode(),
+                        lead.sector(), "1"),
+                cible, CrmSyncState.VIERGE);
+        String projet = synchronise.opportunityRef();
+        assertThat(projet).isNotBlank();
+        assertThat(chefsDeProjet(projet)).containsExactly("1");
 
-        connecteur.reaffecte(
-                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
+        connecteur.reaffecte(new CrmSyncState(null, null, projet, "1"), "2", cible);
 
-        // Pas de sonde dediee cote Dolibarr pour lire fk_user_resp : on rejoue reaffecte
-        // avec le meme utilisateur et on verifie qu'aucune exception ne remonte, ce qui est
-        // la seule chose qu'on puisse affirmer sans lecture directe de l'opportunite.
-        connecteur.reaffecte(
-                new CrmSyncState(null, null, synchronise.opportunityRef(), null), "2", cible);
+        assertThat(chefsDeProjet(projet)).containsExactly("2");
+
+        // Rejeu de la meme reaffectation : la livraison etant at-least-once, il est attendu.
+        // La pose heurte le doublon absorbe par lieResponsable, et le retrait porte sur un
+        // lien deja absent. L'etat final doit etre le meme.
+        connecteur.reaffecte(new CrmSyncState(null, null, projet, "1"), "2", cible);
+
+        assertThat(chefsDeProjet(projet)).containsExactly("2");
+    }
+
+    /** @return les identifiants utilisateur lies au projet comme chefs de projet. */
+    @SuppressWarnings("unchecked")
+    private static List<String> chefsDeProjet(String projet) {
+        CrmTarget cible = cibleDolibarr();
+        List<Map<String, Object>> contacts = RestClient.builder()
+                .baseUrl(cible.settings().get("baseUrl"))
+                .defaultHeader("DOLAPIKEY", cible.settings().get("apiKey"))
+                .build()
+                .get()
+                .uri("/projects/" + projet + "/contacts")
+                .retrieve()
+                .body(List.class);
+        return contacts == null ? List.of() : contacts.stream()
+                .filter(contact -> "PROJECTLEADER".equals(String.valueOf(contact.get("code"))))
+                .map(contact -> String.valueOf(contact.get("id")))
+                .toList();
     }
 
     @Test

@@ -29,6 +29,7 @@ class DolibarrConnectorTest {
         private Map<String, Object> corpsContact;
         private Map<String, Object> corpsOpportunite;
         private String responsableLie;
+        private String responsableRetire;
         private String refCherchee;
         private String opportuniteExistante;
         private boolean echoueSurOpportunite;
@@ -76,6 +77,12 @@ class DolibarrConnectorTest {
                 throw new CrmSyncException("dolibarr", "affectation refusee", null);
             }
             responsableLie = utilisateurRef;
+        }
+
+        @Override
+        public void retireResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
+            appels.add("retrait");
+            responsableRetire = utilisateurRef;
         }
 
         @Override
@@ -263,10 +270,38 @@ class DolibarrConnectorTest {
         connecteur.reaffecte(new CrmSyncState("42", "77", "301", "7"), "9", CIBLE);
 
         assertThat(transport.responsableLie).isEqualTo("9");
-        // Aucun appel de creation : le seul appel effectue est le rattachement du
-        // responsable. Le TransportFactice trace "responsable" dans lieResponsable meme
-        // pendant sync(), donc l'assertion porte sur l'ABSENCE de creation, pas sur une
-        // liste vide.
+        assertThat(transport.responsableRetire).isEqualTo("7");
+        // Aucun appel de creation, et l'ORDRE est porteur de sens : on pose le nouveau lien
+        // avant de retirer l'ancien. Une panne entre les deux laisse le bon responsable
+        // present en plus de l'ancien — l'etat d'avant ce correctif, donc sans regression ;
+        // l'ordre inverse pourrait laisser la fiche sans aucun chef de projet.
+        assertThat(transport.appels).containsExactly("responsable", "retrait");
+    }
+
+    @Test
+    void reaffecteNeRetireRienQuandLErpNePortaitAucunResponsable() {
+        TransportFactice transport = new TransportFactice();
+        DolibarrConnector connecteur = new DolibarrConnector(transport);
+
+        // assigneeRef nul : la synchronisation d'origine n'avait lie personne. Il n'y a
+        // alors aucun ancien lien a retirer, et inventer un segment d'URL a partir de null
+        // ferait un appel absurde.
+        connecteur.reaffecte(new CrmSyncState("42", "77", "301", null), "9", CIBLE);
+
+        assertThat(transport.responsableLie).isEqualTo("9");
+        assertThat(transport.appels).containsExactly("responsable");
+    }
+
+    @Test
+    void reaffecteNeRetireRienQuandLeResponsableEstDejaLeBon() {
+        TransportFactice transport = new TransportFactice();
+        DolibarrConnector connecteur = new DolibarrConnector(transport);
+
+        // Ancien et nouveau responsables confondus : retirer le lien qu'on vient de poser
+        // laisserait la fiche sans chef de projet. Le cas n'est pas theorique — la livraison
+        // est at-least-once, donc une meme reaffectation peut etre rejouee apres coup.
+        connecteur.reaffecte(new CrmSyncState("42", "77", "301", "9"), "9", CIBLE);
+
         assertThat(transport.appels).containsExactly("responsable");
     }
 

@@ -115,8 +115,26 @@ public class DolibarrConnector implements CrmConnector {
     /**
      * Dolibarr rattache le responsable au projet par un appel dedie — {@code fk_user_resp}
      * est ignore a la creation comme en modification, la sonde de F5 l'a verifie dans les
-     * deux sens. C'est le meme appel que l'etape d'attribution de {@link #sync}, ce qui rend
-     * la propagation gratuite en surface d'API.
+     * deux sens. C'est le meme appel que l'etape d'attribution de {@link #sync}.
+     *
+     * <p><strong>Mais deux appels, pas un.</strong> {@code lieResponsable} ajoute un contact et
+     * n'en retire aucun : sans le retrait qui suit, la fiche porterait deux
+     * {@code PROJECTLEADER} apres une reaffectation, dont un qui n'a plus rien a voir avec le
+     * lead — soit exactement l'ambiguite que cette feature doit lever. Ce n'est pas une
+     * supposition : la recette de F15 l'a observe sur une vraie instance. Odoo n'a pas ce
+     * besoin, son {@code write} sur {@code user_id} remplacant la valeur.
+     *
+     * <p><strong>L'ordre est porteur de sens</strong> : on pose le nouveau lien avant de
+     * retirer l'ancien. Une panne entre les deux laisse le bon responsable present en plus de
+     * l'ancien, soit l'etat qui precedait ce correctif — genant, jamais faux. L'ordre inverse
+     * pourrait laisser la fiche sans aucun chef de projet.
+     *
+     * <p>Deux cas ne retirent rien. L'ancienne reference absente signifie que la
+     * synchronisation d'origine n'avait lie personne, il n'y a alors aucun lien a defaire.
+     * Et l'ancienne confondue avec la nouvelle est le <strong>rejeu</strong> d'une
+     * reaffectation deja passee : la trace porte alors deja le nouveau responsable, et
+     * retirer ce qu'on vient de poser laisserait le projet sans responsable. La livraison
+     * etant at-least-once, ce cas est attendu, pas theorique.
      */
     @Override
     public void reaffecte(CrmSyncState references, String assigneeRef, CrmTarget cible) {
@@ -125,6 +143,10 @@ public class DolibarrConnector implements CrmConnector {
                     providerId(), "Aucune opportunite connue : rien a reaffecter", null);
         }
         client.lieResponsable(cible, references.opportunityRef(), assigneeRef);
+        String ancien = references.assigneeRef();
+        if (ancien != null && !ancien.equals(assigneeRef)) {
+            client.retireResponsable(cible, references.opportunityRef(), ancien);
+        }
     }
 
     @Override

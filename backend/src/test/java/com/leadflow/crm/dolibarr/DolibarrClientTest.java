@@ -165,6 +165,46 @@ class DolibarrClientTest {
     }
 
     @Test
+    void retireLeResponsableParSonIdentifiantUtilisateur() {
+        // Releve du code de l'instance (projet/class/api_projects.class.php) : la route
+        // compare $contact['id'] a {contactid}, donc le segment attend l'identifiant de
+        // l'UTILISATEUR et non le rowid du lien — le Javadoc de Dolibarr dit l'inverse et se
+        // trompe. C'est ce qui permet a reaffecte de passer directement l'ancienne
+        // reference, sans lecture prealable des contacts du projet.
+        serveur.expect(requestTo("http://erp.test/api/index.php/projects/99/contact/7/PROJECTLEADER"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withSuccess("{\"id\":\"99\"}", MediaType.APPLICATION_JSON));
+
+        client.retireResponsable(CIBLE, "99", "7");
+
+        serveur.verify();
+    }
+
+    @Test
+    void retireLeResponsableToleeUnLienAbsent() {
+        // Contrairement a la pose, le retrait est idempotent chez Dolibarr lui-meme :
+        // eprouve contre une vraie instance, rejouer le retrait d'un lien deja absent rend
+        // 200. Aucune signature d'erreur a reconnaitre ici, a la difference de
+        // lienDejaPose — ce test verrouille l'absence de traitement particulier.
+        serveur.expect(requestTo(Matchers.containsString("/projects/99/contact/7/PROJECTLEADER")))
+                .andRespond(withSuccess("{\"id\":\"99\"}", MediaType.APPLICATION_JSON));
+
+        client.retireResponsable(CIBLE, "99", "7");
+
+        serveur.verify();
+    }
+
+    @Test
+    void retireLeResponsableLeveSurUneErreurServeur() {
+        serveur.expect(requestTo(Matchers.containsString("/projects/99/contact/7/PROJECTLEADER")))
+                .andRespond(withServerError().body("{\"error\":{\"message\":\"projet verrouille\"}}"));
+
+        assertThatThrownBy(() -> client.retireResponsable(CIBLE, "99", "7"))
+                .isInstanceOf(CrmSyncException.class)
+                .hasMessageContaining("projet verrouille");
+    }
+
+    @Test
     void envoieUnCorpsJson() {
         serveur.expect(requestTo("http://erp.test/api/index.php/contacts"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))

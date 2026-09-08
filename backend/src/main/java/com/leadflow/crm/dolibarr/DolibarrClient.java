@@ -150,6 +150,36 @@ public class DolibarrClient {
                 && corps.contains("api_projects.class.php");
     }
 
+    /**
+     * Retire le lien de chef de projet d'un utilisateur sur une opportunite.
+     *
+     * <p>Symetrique de {@link #lieResponsable}, et indispensable avec lui : ce dernier
+     * <em>ajoute</em> un contact sans en retirer aucun, si bien qu'une reaffectation laissait
+     * la fiche Dolibarr avec deux {@code PROJECTLEADER}, dont un qui n'a plus rien a voir avec
+     * le lead. Odoo n'a pas besoin de ce geste — son {@code write} sur {@code user_id} remplace
+     * la valeur.
+     *
+     * <p>Le segment {@code contactid} attend l'identifiant de l'<strong>utilisateur</strong>,
+     * pas le {@code rowid} de la ligne de liaison. Le Javadoc de Dolibarr affirme l'inverse
+     * (« Row key of the contact in the array contact_ids ») et se trompe : la route compare
+     * {@code $contact['id']}, releve dans {@code projet/class/api_projects.class.php} d'une
+     * vraie instance. C'est ce qui permet a {@link DolibarrConnector#reaffecte} de passer
+     * directement l'ancienne reference sans lire d'abord les contacts du projet.
+     *
+     * <p>Contrairement a la pose, ce retrait est <strong>idempotent chez Dolibarr lui-meme</strong> :
+     * eprouve contre une vraie instance, retirer un lien deja absent rend {@code 200} et non le
+     * {@code 500} de {@link #lienDejaPose}. La route parcourt ses contacts et sort sans rien
+     * faire quand aucun ne correspond. Aucun traitement particulier n'est donc necessaire ici.
+     */
+    public void retireResponsable(CrmTarget target, String opportuniteRef, String utilisateurRef) {
+        String chemin = "/projects/" + opportuniteRef + "/contact/" + utilisateurRef + "/PROJECTLEADER";
+        try {
+            restClient(target).delete().uri(chemin).retrieve().toBodilessEntity();
+        } catch (RestClientException e) {
+            throw echec(chemin, e);
+        }
+    }
+
     /** @return l'identifiant de l'utilisateur, ou {@code null} si l'ERP n'en connait aucun. */
     @SuppressWarnings("unchecked")
     public String chercheUtilisateurParEmail(CrmTarget target, String email) {
