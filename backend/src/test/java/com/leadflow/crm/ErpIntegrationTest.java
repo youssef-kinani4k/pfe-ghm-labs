@@ -58,7 +58,7 @@ class ErpIntegrationTest {
 
     @Test
     @EnabledIfEnvironmentVariable(named = "LEADFLOW_DOLIBARR_API_KEY", matches = ".+")
-    void dolibarrCreeLesTroisObjetsPuisNeLesRecreePasAuRejeu() {
+    void dolibarrCreeLesTroisObjetsPuisLesRetrouveAuRejeu() {
         DolibarrConnector connecteur =
                 new DolibarrConnector(new DolibarrClient(RestClient.builder()));
         CrmLead lead = leadUnique();
@@ -69,16 +69,25 @@ class ErpIntegrationTest {
         assertThat(premier.contactRef()).isNotBlank();
         assertThat(premier.opportunityRef()).isNotBlank();
 
-        // Rejeu partiel : seul le tiers est connu. C'est le seul scenario qu'un vrai ERP
-        // peut departager — avec l'etat complet, l'adaptateur sort sans le moindre appel et
-        // l'assertion serait vraie sans conteneur. Ici Dolibarr doit accepter le socid
-        // reutilise et rendre un contact et une opportunite neufs.
-        CrmSyncResult rejeu = connecteur.sync(lead, cibleDolibarr(),
+        // Rejeu partiel : seul le tiers est connu, la reponse s'etant perdue apres sa
+        // creation. Le contact est retrouve par la deduplication que Dolibarr applique
+        // lui-meme sur le courriel, l'opportunite par sa ref stable.
+        CrmSyncResult rejeuPartiel = connecteur.sync(lead, cibleDolibarr(),
                 new CrmSyncState(premier.accountRef(), null, null, null));
 
-        assertThat(rejeu.accountRef()).isEqualTo(premier.accountRef());
-        assertThat(rejeu.contactRef()).isNotBlank().isNotEqualTo(premier.contactRef());
-        assertThat(rejeu.opportunityRef()).isNotBlank().isNotEqualTo(premier.opportunityRef());
+        assertThat(rejeuPartiel.accountRef()).isEqualTo(premier.accountRef());
+        assertThat(rejeuPartiel.contactRef()).isEqualTo(premier.contactRef());
+        assertThat(rejeuPartiel.opportunityRef()).isEqualTo(premier.opportunityRef());
+
+        // Rejeu total, depuis un etat vierge : le cas de la mort livree deux fois, ou du
+        // rejeu d'un message dont aucune trace n'a ete ecrite. Il ne devient departageable
+        // qu'avec la recherche de tiers par courriel — sans elle, cette ligne ouvrait un
+        // second tiers, et c'est ce doublon-la que rien ne rattrapait.
+        CrmSyncResult rejeuTotal = connecteur.sync(lead, cibleDolibarr(), CrmSyncState.VIERGE);
+
+        assertThat(rejeuTotal.accountRef()).isEqualTo(premier.accountRef());
+        assertThat(rejeuTotal.contactRef()).isEqualTo(premier.contactRef());
+        assertThat(rejeuTotal.opportunityRef()).isEqualTo(premier.opportunityRef());
     }
 
     /**
