@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,12 +50,43 @@ class SeriesRepositoryTest {
     @Autowired private CrmSyncAttemptRepository tentatives;
     @Autowired private EntityManager em;
 
+    /** Ce que cette classe a ecrit, et rien d'autre. Voir {@link #nettoie()}. */
+    private final List<UUID> boutiquesCreees = new ArrayList<>();
+
+    private final List<UUID> evenementsCrees = new ArrayList<>();
+    private final List<UUID> leadsCrees = new ArrayList<>();
+    private final List<UUID> tentativesCreees = new ArrayList<>();
+
+    /**
+     * N'efface que les lignes que cette classe a ecrites, par identifiant et dans l'ordre des
+     * cles etrangeres.
+     *
+     * <p>La suite complete partage une seule base Testcontainers, et quatre {@code deleteAll()}
+     * y vidaient des tables entieres que cette classe ne possede pas. Deux consequences, dont
+     * aucune ne se voit en lancement isole.
+     *
+     * <p>Elle detruisait d'abord les donnees des autres classes. Et elle levait ensuite une
+     * violation de contrainte des qu'une autre classe avait laisse un geste humain :
+     * {@code lead_action.lead_id} reference {@code lead} <b>sans cascade</b>, contrairement a
+     * {@code notification_attempt} et {@code crm_sync_attempt}, si bien que
+     * {@code leads.deleteAll()} echouait sur une ligne qui n'appartenait pas a cette classe.
+     *
+     * <p>Vider ces tables-la en plus ne ferait que deplacer l'echec d'un cran, et aggraverait
+     * la premiere consequence : c'est exactement le faux depart de F14, ou la CI est passee de
+     * « {@code client} est referencee par {@code raw_lead_event} » a « {@code raw_lead_event}
+     * est referencee par {@code lead} ». La suppression par identifiant est la reparation au
+     * bon niveau, et elle est sure quel que soit l'ordre d'execution.
+     */
     @AfterEach
     void nettoie() {
-        tentatives.deleteAll();
-        leads.deleteAll();
-        evenements.deleteAll();
-        clients.deleteAll();
+        tentatives.deleteAllById(tentativesCreees);
+        leads.deleteAllById(leadsCrees);
+        evenements.deleteAllById(evenementsCrees);
+        clients.deleteAllById(boutiquesCreees);
+        tentativesCreees.clear();
+        leadsCrees.clear();
+        evenementsCrees.clear();
+        boutiquesCreees.clear();
     }
 
     @Test
@@ -102,16 +134,23 @@ class SeriesRepositoryTest {
         Client mienne = boutique("mienne");
         Client autre = boutique("autre");
         Instant quand = instantParisien(2026, 3, 2, 10);
+        // Seul test de la classe a interroger sans filtre de boutique, donc le seul que des
+        // lignes etrangeres pourraient fausser. Le nettoyage etant desormais porte — il
+        // n'efface que ce que cette classe a ecrit —, la base partagee peut contenir les
+        // captures d'autres classes ; toutes sont datees de l'instant courant, tres
+        // posterieur au 2 mars 2026, donc une fenetre fermee au lendemain de la fixture les
+        // ecarte. C'est la borne, et non un vidage global, qui isole ce test.
+        Instant jusqu = instantParisien(2026, 3, 3, 0);
         evenement(mienne, quand, RawLeadEventStatus.PUBLISHED);
         evenement(autre, quand, RawLeadEventStatus.PUBLISHED);
 
         assertThat(series.volumeParJour(
-                        mienne.getId().toString(), quand.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
+                        mienne.getId().toString(), quand.minusSeconds(3600), jusqu, PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(1L));
 
         // clientId nul = toutes les boutiques. C'est la vue de l'agence.
-        assertThat(series.volumeParJour(null, quand.minusSeconds(3600), JUSQU_AU_LOIN, PARIS))
+        assertThat(series.volumeParJour(null, quand.minusSeconds(3600), jusqu, PARIS))
                 .singleElement()
                 .satisfies(p -> assertThat(p.getCaptures()).isEqualTo(2L));
     }
@@ -295,7 +334,9 @@ class SeriesRepositoryTest {
         c.setCrmProviderId("dolibarr");
         c.setCrmConfig(Map.of());
         c.setActive(true);
-        return clients.save(c);
+        Client sauvegardee = clients.save(c);
+        boutiquesCreees.add(sauvegardee.getId());
+        return sauvegardee;
     }
 
     private void evenement(Client boutique, Instant quand, RawLeadEventStatus statut) {
@@ -306,7 +347,7 @@ class SeriesRepositoryTest {
         e.setSignature("sig-" + UUID.randomUUID());
         e.setReceivedAt(quand);
         e.setStatus(statut);
-        evenements.save(e);
+        evenementsCrees.add(evenements.save(e).getId());
     }
 
     private Lead lead(Client boutique, Instant quand, IntentSource source) {
@@ -318,6 +359,7 @@ class SeriesRepositoryTest {
         e.setReceivedAt(quand);
         e.setStatus(RawLeadEventStatus.PUBLISHED);
         e = evenements.save(e);
+        evenementsCrees.add(e.getId());
 
         Lead l = new Lead();
         l.setClientId(boutique.getId());
@@ -327,6 +369,7 @@ class SeriesRepositoryTest {
         l.setStatus(LeadStatus.QUALIFIED);
         l.setIntentSource(source);
         l = leads.save(l);
+        leadsCrees.add(l.getId());
         em.flush();
 
         em.createNativeQuery("update lead set created_at = :quand where id = :id")
@@ -350,7 +393,7 @@ class SeriesRepositoryTest {
         a.setStatus(statut);
         a.setNature(nature);
         a.setAttemptedAt(quand);
-        tentatives.save(a);
+        tentativesCreees.add(tentatives.save(a).getId());
     }
 
     private static Instant instantParisien(int annee, int mois, int jour, int heure) {
