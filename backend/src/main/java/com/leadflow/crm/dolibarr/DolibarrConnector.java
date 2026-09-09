@@ -89,6 +89,13 @@ public class DolibarrConnector implements CrmConnector {
                 compte = client.creeTiers(target, corpsTiers(lead));
             }
             if (contact == null) {
+                // Meme geste que pour le tiers juste au-dessus, et il n'etait pas facultatif :
+                // Dolibarr ne deduplique pas les contacts sur le courriel, contrairement au
+                // tiers. Sans cette recherche, un rejeu dont seule la reference de tiers avait
+                // ete retenue ouvrait un second contact au meme courriel.
+                contact = client.chercheContactParEmail(target, lead.email());
+            }
+            if (contact == null) {
                 contact = client.creeContact(target, corpsContact(lead, compte));
             }
             if (opportunite == null) {

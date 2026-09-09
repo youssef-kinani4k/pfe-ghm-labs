@@ -6,6 +6,9 @@ import com.leadflow.crm.model.CrmCheck;
 import com.leadflow.crm.model.CrmCheckCause;
 import com.leadflow.crm.model.CrmSyncException;
 import com.leadflow.crm.model.CrmTarget;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,7 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Transport REST vers une instance Dolibarr. Ne connait pas le modele pivot : il recoit des
@@ -61,11 +65,11 @@ public class DolibarrClient {
      * Cherche un tiers par son courriel.
      *
      * <p>Pendant de {@link #chercheOpportuniteParRef} pour la premiere etape de la
-     * synchronisation, et pour la meme raison : rendre le geste sur. Le tiers etait la seule
-     * etape que rien ne protegeait — l'opportunite l'est par sa {@code ref} stable, le contact
-     * par la deduplication que Dolibarr applique lui-meme sur le courriel — si bien qu'un
-     * prospect revenant par un second formulaire ouvrait un doublon de tiers, et qu'un rejeu
-     * apres une reponse perdue en ouvrait un troisieme.
+     * synchronisation, et pour la meme raison : rendre le geste sur. Sans elle, un prospect
+     * revenant par un second formulaire ouvrait un doublon de tiers, et un rejeu apres une
+     * reponse perdue en ouvrait un troisieme — l'opportunite etait protegee par sa {@code ref}
+     * stable, le tiers par rien. Le contact ne l'etait pas davantage, contrairement a ce que
+     * ce correctif avait d'abord suppose : voir {@link #chercheContactParEmail}.
      *
      * <p>Le filtre {@code sqlfilters} est construit par concatenation, comme ailleurs dans
      * cette classe : les apostrophes sont retirees plutot qu'echappees. Le courriel a
@@ -80,7 +84,7 @@ public class DolibarrClient {
         try {
             List<Map<String, Object>> reponse = restClient(target)
                     .get()
-                    .uri(uri -> uri.path("/thirdparties").queryParam("sqlfilters", filtre).build())
+                    .uri(uriDeRecherche(target, "/thirdparties", filtre))
                     .retrieve()
                     .body(List.class);
             if (reponse == null || reponse.isEmpty()) {
@@ -93,6 +97,44 @@ public class DolibarrClient {
             return null;
         } catch (RestClientException e) {
             throw echec("/thirdparties", e);
+        }
+    }
+
+    /**
+     * Cherche un contact par son courriel.
+     *
+     * <p>Jumeau de {@link #chercheTiersParEmail}, et pour une raison que seule la recette
+     * contre une vraie instance a pu etablir : Dolibarr 23.0.2 <strong>ne deduplique pas</strong>
+     * les contacts sur le courriel, la ou le correctif du tiers avait suppose qu'il le faisait.
+     * Un rejeu dont seule la reference de tiers avait ete retenue ouvrait donc un second contact
+     * au meme courriel — le premier appel rendait l'identifiant {@code 34}, le rejeu {@code 35}.
+     * La convergence du rejeu ne peut pas reposer sur l'ERP : elle demande la meme recherche
+     * prealable que le tiers.
+     *
+     * <p>Meme filtre {@code sqlfilters} construit par concatenation, apostrophes retirees
+     * plutot qu'echappees, et meme traitement du {@code 404} comme une absence et non une panne.
+     *
+     * @return l'identifiant du contact, ou {@code null} si l'ERP n'en connait aucun
+     */
+    @SuppressWarnings("unchecked")
+    public String chercheContactParEmail(CrmTarget target, String email) {
+        String filtre = "(t.email:=:'" + email.replace("'", "") + "')";
+        try {
+            List<Map<String, Object>> reponse = restClient(target)
+                    .get()
+                    .uri(uriDeRecherche(target, "/contacts", filtre))
+                    .retrieve()
+                    .body(List.class);
+            if (reponse == null || reponse.isEmpty()) {
+                return null;
+            }
+            Object id = reponse.getFirst().get("id");
+            return id == null ? null : String.valueOf(id);
+        } catch (HttpClientErrorException.NotFound absent) {
+            // Dolibarr rend 404 sur une liste vide de contacts : une absence, pas une panne.
+            return null;
+        } catch (RestClientException e) {
+            throw echec("/contacts", e);
         }
     }
 
@@ -226,7 +268,7 @@ public class DolibarrClient {
         try {
             List<Map<String, Object>> reponse = restClient(target)
                     .get()
-                    .uri(uri -> uri.path("/users").queryParam("sqlfilters", filtre).build())
+                    .uri(uriDeRecherche(target, "/users", filtre))
                     .retrieve()
                     .body(List.class);
             if (reponse == null || reponse.isEmpty()) {
@@ -296,6 +338,35 @@ public class DolibarrClient {
         } catch (RestClientException e) {
             throw echec(chemin, e);
         }
+    }
+
+    /**
+     * Construit l'URI d'une recherche {@code sqlfilters}, et l'encode elle-meme.
+     *
+     * <p>Ce detour existe pour une raison etroite mais couteuse, etablie par la recette : le
+     * signe {@code +} est parfaitement <strong>legal</strong> dans une query selon la
+     * RFC 3986, si bien qu'aucun encodage conforme ne le touche — ni celui de
+     * {@code UriBuilder}, ni {@code UriUtils.encodeQueryParam}. Mais PHP, comme tout serveur
+     * qui lit une query en {@code application/x-www-form-urlencoded}, y voit une
+     * <strong>espace</strong>. Une recherche sur {@code amina+b14c@exemple.test} interrogeait
+     * donc Dolibarr sur {@code "amina b14c@exemple.test"}, ne trouvait rien, et faisait creer
+     * un doublon a chaque rejeu — le defaut n'etait pas dans la recherche, mais dans son
+     * adresse.
+     *
+     * <p>{@link URLEncoder} est le codec de cette convention-la, et c'est pourquoi il est
+     * prefere ici a l'encodage d'URI : il rend {@code %2B} pour le {@code +} et {@code +} pour
+     * l'espace, soit exactement ce que le serveur decodera. {@code build(true)} declare le
+     * resultat deja encode, sans quoi Spring transformerait chaque {@code %} en {@code %25}.
+     *
+     * <p>Les adresses en {@code +} ne sont pas un cas d'ecole : c'est la forme de sous-adresse
+     * que Gmail et beaucoup d'autres proposent, et un formulaire en recoit.
+     */
+    private URI uriDeRecherche(CrmTarget target, String chemin, String filtre) {
+        return UriComponentsBuilder.fromUriString(reglage(target, "baseUrl"))
+                .path(chemin)
+                .queryParam("sqlfilters", URLEncoder.encode(filtre, StandardCharsets.UTF_8))
+                .build(true)
+                .toUri();
     }
 
     private RestClient restClient(CrmTarget target) {

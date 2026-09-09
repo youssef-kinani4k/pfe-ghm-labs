@@ -104,6 +104,67 @@ class DolibarrClientTest {
     }
 
     @Test
+    void chercheUnContactParEmail() {
+        serveur.expect(requestTo(Matchers.containsString("/contacts")))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(requestTo(Matchers.containsString("sqlfilters")))
+                .andRespond(withSuccess("[{\"id\":34}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheContactParEmail(CIBLE, "amina@acme.test")).isEqualTo("34");
+        serveur.verify();
+    }
+
+    @Test
+    void renvoieNulQuandAucunContactNePorteLEmail() {
+        serveur.expect(requestTo(Matchers.containsString("/contacts")))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheContactParEmail(CIBLE, "inconnu@acme.test")).isNull();
+    }
+
+    @Test
+    void traiteUn404DeRechercheDeContactCommeUneAbsence() {
+        serveur.expect(requestTo(Matchers.containsString("/contacts")))
+                .andRespond(withResourceNotFound().body("{\"error\":{\"message\":\"Not Found\"}}"));
+
+        assertThat(client.chercheContactParEmail(CIBLE, "inconnu@acme.test")).isNull();
+    }
+
+    /**
+     * Le {@code +} d'une sous-adresse doit partir en {@code %2B}, et rien d'autre ne le
+     * garantit. Il est legal dans une query selon la RFC 3986, donc aucun encodage d'URI
+     * conforme ne le touche — mais le serveur lit la query en
+     * {@code application/x-www-form-urlencoded} et y voit une espace. La recherche portait
+     * alors sur une adresse qui n'existe pas, ne trouvait rien, et chaque rejeu creait un
+     * doublon : c'est le defaut qui a fait echouer la recette du rejeu Dolibarr, et il etait
+     * invisible en test contractuel tant qu'aucune adresse n'y portait de {@code +}.
+     */
+    @Test
+    void encodeLePlusDUneSousAdresseDansLeFiltre() {
+        serveur.expect(requestTo(Matchers.containsString("%2B")))
+                .andExpect(requestTo(Matchers.not(Matchers.containsString("amina+b14c"))))
+                .andRespond(withSuccess("[{\"id\":34}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheContactParEmail(CIBLE, "amina+b14c@exemple.test"))
+                .isEqualTo("34");
+        serveur.verify();
+    }
+
+    /** Meme garantie pour le tiers et l'utilisateur : les trois partagent la construction d'URI. */
+    @Test
+    void encodeAussiLePlusPourLeTiersEtLUtilisateur() {
+        serveur.expect(requestTo(Matchers.containsString("%2B")))
+                .andRespond(withSuccess("[{\"id\":58}]", MediaType.APPLICATION_JSON));
+        serveur.expect(requestTo(Matchers.containsString("%2B")))
+                .andRespond(withSuccess("[{\"id\":9}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.chercheTiersParEmail(CIBLE, "amina+b14c@exemple.test")).isEqualTo("58");
+        assertThat(client.chercheUtilisateurParEmail(CIBLE, "karim+vente@agence.test"))
+                .isEqualTo("9");
+        serveur.verify();
+    }
+
+    @Test
     void chercheUneOpportuniteParSaReference() {
         serveur.expect(requestTo(Matchers.containsString("/projects")))
                 .andExpect(method(HttpMethod.GET))

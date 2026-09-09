@@ -33,6 +33,8 @@ class DolibarrConnectorTest {
         private String refCherchee;
         private String emailTiersCherche;
         private String tiersExistant;
+        private String emailContactCherche;
+        private String contactExistant;
         private String opportuniteExistante;
         private boolean echoueSurOpportunite;
         private boolean echoueSurResponsable;
@@ -53,6 +55,13 @@ class DolibarrConnectorTest {
             appels.add("recherche-tiers");
             emailTiersCherche = email;
             return tiersExistant;
+        }
+
+        @Override
+        public String chercheContactParEmail(CrmTarget target, String email) {
+            appels.add("recherche-contact");
+            emailContactCherche = email;
+            return contactExistant;
         }
 
         @Override
@@ -125,8 +134,8 @@ class DolibarrConnectorTest {
 
         assertThat(transport.appels)
                 .containsExactly(
-                        "recherche-tiers", "tiers", "contact", "recherche", "opportunite",
-                        "responsable");
+                        "recherche-tiers", "tiers", "recherche-contact", "contact", "recherche",
+                        "opportunite", "responsable");
         assertThat(resultat.accountRef()).isEqualTo("42");
         assertThat(resultat.contactRef()).isEqualTo("77");
         assertThat(resultat.opportunityRef()).isEqualTo("99");
@@ -170,7 +179,9 @@ class DolibarrConnectorTest {
         CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
 
         assertThat(transport.appels)
-                .containsExactly("recherche-tiers", "tiers", "contact", "recherche", "responsable");
+                .containsExactly(
+                        "recherche-tiers", "tiers", "recherche-contact", "contact", "recherche",
+                        "responsable");
         assertThat(resultat.opportunityRef()).isEqualTo("42");
         assertThat(resultat.assigneeRef()).isEqualTo("9");
     }
@@ -179,8 +190,8 @@ class DolibarrConnectorTest {
      * Le tiers se cherche par courriel avant d'etre cree, comme l'opportunite se cherche par
      * sa {@code ref}. Sans cette recherche, un prospect qui revient par un second formulaire
      * ouvrait un doublon de tiers chez Dolibarr, et un rejeu apres une reponse perdue en
-     * ouvrait un troisieme — la seule etape de {@code sync} qui n'etait protegee ni par une
-     * reference stable ni par la deduplication de l'ERP.
+     * ouvrait un troisieme — aucune reference stable ne le protegeait, et la deduplication
+     * qu'on pretait a l'ERP n'existe pas, comme le contact l'a montre ensuite.
      */
     @Test
     void chercheLeTiersParCourrielAvantDenCreerUn() {
@@ -201,6 +212,31 @@ class DolibarrConnectorTest {
         // Le contact et l'opportunite se rattachent au tiers trouve, pas a un tiers neuf.
         assertThat(transport.corpsContact).containsEntry("socid", "58");
         assertThat(transport.corpsOpportunite).containsEntry("socid", "58");
+    }
+
+    /**
+     * Le contact se cherche exactement comme le tiers, et c'est la recette contre une vraie
+     * instance qui l'a impose : Dolibarr 23.0.2 ne deduplique pas les contacts sur le
+     * courriel, contrairement a ce que le correctif du tiers avait suppose. Un rejeu dont
+     * seule la reference de tiers avait ete retenue ouvrait un second contact — identifiant
+     * {@code 34} a la creation, {@code 35} au rejeu.
+     */
+    @Test
+    void chercheLeContactParCourrielAvantDenCreerUn() {
+        connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.emailContactCherche).isEqualTo("amina@acme.test");
+        assertThat(transport.appels).containsSubsequence("recherche-contact", "contact");
+    }
+
+    @Test
+    void adopteLeContactExistantAuLieuDenCreerUnSecond() {
+        transport.contactExistant = "34";
+
+        CrmSyncResult resultat = connecteur.sync(lead("Acme"), CIBLE, CrmSyncState.VIERGE);
+
+        assertThat(transport.appels).doesNotContain("contact");
+        assertThat(resultat.contactRef()).isEqualTo("34");
     }
 
     @Test
