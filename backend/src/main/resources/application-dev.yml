@@ -1,4 +1,10 @@
 spring:
+  config:
+    # Secrets du poste, hors du depot : backend/.env, ignore par git (motif .env*). C'est la
+    # que vit le mot de passe du relais SMTP, qui ne doit jamais etre commite. Facultatif —
+    # sans le fichier, le profil dev demarre comme avant. Une vraie variable d'environnement
+    # l'emporte toujours sur le fichier. Le modele a copier : backend/.env.example.
+    import: optional:file:.env[.properties]
   flyway:
     # Le jeu de demonstration s'ajoute aux migrations de schema, uniquement en dev.
     locations: classpath:db/migration,classpath:db/dev

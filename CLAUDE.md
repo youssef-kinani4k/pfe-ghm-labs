@@ -411,6 +411,14 @@ seuil. `SondeNotification` eprouve la configuration depuis l'ecran « Parametres
 un **vrai** message d'essai — un diagnostic qui ne prouverait que l'ouverture du port ne
 prouverait rien — et n'ecrit aucune ligne de `notification_attempt`.
 
+**Un identifiant SMTP ne part jamais en clair.** `CanalSmtp` active STARTTLS des que le relais
+le propose — Gmail et les relais transactionnels refusent l'authentification sans lui — et
+l'exige des qu'un identifiant est fourni : un relais authentifie qui ne le propose pas fait
+echouer l'envoi plutot que de recevoir le mot de passe lisible. Mailpit, sans identifiant,
+reste en clair. **Le mot de passe du relais vit dans `backend/.env`**, ignore par git et lu
+par le seul profil `dev` (`spring.config.import`), sur le modele de `backend/.env.example` ;
+en production, dans `.env.prod`. Une vraie variable d'environnement l'emporte sur le fichier.
+
 **L'alerte ne cite aucun lien vers le dashboard**, et porte a la place le telephone du
 prospect et son message. Le commercial n'a **aucun compte** sur la console — un seul modele
 d'utilisateur, aucun role — donc un lien l'enverrait sur un ecran de connexion qu'il ne peut

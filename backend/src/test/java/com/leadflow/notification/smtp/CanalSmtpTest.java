@@ -116,6 +116,23 @@ class CanalSmtpTest {
     }
 
     @Test
+    void unIdentifiantNePartJamaisSurUneConnexionEnClair() {
+        // GreenMail ne propose pas STARTTLS : c'est le relais qui laisserait passer un mot
+        // de passe en clair. Un relais authentifie (Gmail, un fournisseur transactionnel)
+        // exige le chiffrement ; le canal doit donc refuser d'envoyer l'identifiant plutot
+        // que de le livrer lisible a quiconque ecoute le reseau.
+        CanalSmtp authentifie = new CanalSmtp(new NotificationProperties(
+                new NotificationProperties.Smtp(
+                        true, "127.0.0.1", SERVEUR.getSmtp().getPort(), "agence@exemple.test",
+                        "mot-de-passe", "agence@exemple.test", Duration.ofSeconds(3))));
+
+        assertThatThrownBy(() -> authentifie.envoie(unLead()))
+                .isInstanceOf(NotificationException.class)
+                .hasMessageContaining("STARTTLS");
+        assertThat(SERVEUR.getReceivedMessages()).isEmpty();
+    }
+
+    @Test
     void sonIdentifiantEstCeluiQuiSecritDansLaTrace() {
         assertThat(canal().identifiant()).isEqualTo("smtp");
     }
