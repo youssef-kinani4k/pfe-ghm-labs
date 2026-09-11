@@ -4,6 +4,7 @@
 # c'est le seul fichier .env* qui ne contienne aucune vraie valeur.
 .env*
 !.env.prod.example
+!.env.example
 *.local
 
 # Backend (Maven / Java)

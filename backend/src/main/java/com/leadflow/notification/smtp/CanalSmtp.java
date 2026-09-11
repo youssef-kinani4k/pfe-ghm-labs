@@ -88,8 +88,15 @@ public class CanalSmtp implements CanalDeNotification {
         options.put("mail.smtp.writetimeout", String.valueOf(millisecondes));
         // L'authentification n'a lieu que si un identifiant est fourni : un relais de test
         // ou un relais interne ouvert n'en demande pas.
-        options.put("mail.smtp.auth",
-                String.valueOf(config.username() != null && !config.username().isBlank()));
+        boolean authentifie = config.username() != null && !config.username().isBlank();
+        options.put("mail.smtp.auth", String.valueOf(authentifie));
+        // Chiffrement des que le relais le propose : Gmail et les relais transactionnels
+        // refusent l'authentification sans lui (« 530 Must issue a STARTTLS command first »).
+        // Un relais de test comme Mailpit ne le propose pas, et la connexion reste en clair.
+        options.put("mail.smtp.starttls.enable", "true");
+        // Mais un identifiant ne part jamais en clair : un relais authentifie qui ne
+        // propose pas STARTTLS fait echouer l'envoi plutot que de livrer le mot de passe.
+        options.put("mail.smtp.starttls.required", String.valueOf(authentifie));
         return expediteur;
     }
 
